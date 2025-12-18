@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import 'services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,15 +31,45 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
 
-      // Simulate API call delay
-      await Future.delayed(const Duration(seconds: 1));
+      try {
+        await AuthService().signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        // Navigate to dashboard
-        context.go('/dashboard');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          // Navigate to dashboard
+          context.go('/dashboard');
+        }
+      } on AuthException catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Login failed: ${e.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login failed: Check your email or password'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }

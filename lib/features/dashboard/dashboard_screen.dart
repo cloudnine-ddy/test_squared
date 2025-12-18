@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
+import '../auth/services/auth_service.dart';
 import 'subject_detail_view.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -245,14 +247,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ),
                           ),
-                          IconButton(
+                          PopupMenuButton<String>(
                             icon: const Icon(
                               Icons.settings,
                               color: AppTheme.textGray,
                               size: 20,
                             ),
-                            onPressed: () {
-                              // TODO: Open settings
+                            color: AppTheme.surfaceDark,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'logout',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.logout,
+                                      color: AppTheme.textWhite,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text(
+                                      'Logout',
+                                      style: TextStyle(
+                                        color: AppTheme.textWhite,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            onSelected: (value) async {
+                              if (value == 'logout') {
+                                await AuthService().signOut();
+                                if (mounted) {
+                                  context.go('/');
+                                }
+                              }
                             },
                           ),
                         ],
