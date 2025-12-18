@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -13,7 +14,7 @@ class LoginScreen extends StatelessWidget {
             const Text('Welcome to Test²'),
             ElevatedButton(
               onPressed: () {
-                // TODO: Add sign in logic
+                context.go('/dashboard');
               },
               child: const Text('Sign In with Google'),
             ),
