@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/login_screen.dart';
+import 'core/router/app_router.dart';
 
 void main() {
   runApp(const TestSquaredApp());
@@ -11,10 +11,10 @@ class TestSquaredApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'TestSquared',
       theme: AppTheme.lightTheme,
-      home: const LoginScreen(),
+      routerConfig: goRouter,
     );
   }
 }
