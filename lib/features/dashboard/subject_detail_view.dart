@@ -7,11 +7,15 @@ import '../past_papers/models/topic_model.dart';
 class SubjectDetailView extends StatefulWidget {
   final String subjectName;
   final String subjectId;
+  final bool isPinned;
+  final VoidCallback onPinChanged;
 
   const SubjectDetailView({
     super.key,
     required this.subjectName,
     required this.subjectId,
+    required this.isPinned,
+    required this.onPinChanged,
   });
 
   @override
@@ -21,6 +25,21 @@ class SubjectDetailView extends StatefulWidget {
 class _SubjectDetailViewState extends State<SubjectDetailView> {
   String _viewMode = 'Topics'; // 'Topics' or 'Years'
   bool _isPinned = false;
+  bool _isTogglingPin = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isPinned = widget.isPinned;
+  }
+
+  @override
+  void didUpdateWidget(SubjectDetailView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isPinned != widget.isPinned) {
+      _isPinned = widget.isPinned;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,17 +95,25 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                 ),
               ),
               const SizedBox(width: 16),
-              // Pin Button
+              // Pin/Unpin Button
               IconButton(
-                icon: Icon(
-                  _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                  color: _isPinned ? AppTheme.primaryBlue : AppTheme.textGray,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _isPinned = !_isPinned;
-                  });
-                },
+                icon: _isTogglingPin
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            AppTheme.primaryBlue,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                        color: _isPinned ? AppTheme.primaryBlue : AppTheme.textGray,
+                      ),
+                tooltip: _isPinned ? 'Unpin' : 'Pin to Sidebar',
+                onPressed: _isTogglingPin ? null : _handlePinToggle,
               ),
             ],
           ),
@@ -97,6 +124,64 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         ),
       ],
     );
+  }
+
+  Future<void> _handlePinToggle() async {
+    setState(() {
+      _isTogglingPin = true;
+    });
+
+    try {
+      if (_isPinned) {
+        // Unpin the subject
+        await PastPaperRepository().unpinSubject(widget.subjectId);
+        setState(() {
+          _isPinned = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Subject unpinned'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Pin the subject
+        await PastPaperRepository().pinSubject(widget.subjectId);
+        setState(() {
+          _isPinned = true;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Subject pinned'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+      
+      // Refresh the pinned subjects list in the parent
+      widget.onPinChanged();
+    } catch (e) {
+      print('Error toggling pin: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTogglingPin = false;
+        });
+      }
+    }
   }
 
   Widget _buildTopicsView() {

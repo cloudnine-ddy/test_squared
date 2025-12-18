@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
@@ -18,13 +19,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int? _selectedSubjectIndex;
   String? _selectedSubjectName; // Nullable, initialized to null
   String? _selectedSubjectId; // Store subject ID for filtering
-  final List<String> _pinnedSubjects = ['Add Math', 'Physics'];
+  List<SubjectModel> _pinnedSubjects = [];
+  bool _isLoadingPinnedSubjects = false;
   
   final List<String> _curriculums = [
     'SPM (Coming Soon)',
     'IGCSE',
     'A-Level (Coming Soon)',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPinnedSubjects();
+  }
+
+  Future<void> _loadPinnedSubjects() async {
+    setState(() {
+      _isLoadingPinnedSubjects = true;
+    });
+
+    try {
+      final subjects = await PastPaperRepository().getPinnedSubjects();
+      setState(() {
+        _pinnedSubjects = subjects;
+        _isLoadingPinnedSubjects = false;
+      });
+    } catch (e) {
+      print('Error loading pinned subjects: $e');
+      setState(() {
+        _isLoadingPinnedSubjects = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,55 +189,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 12),
                 // Pinned Subjects List
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: _pinnedSubjects.length,
-                    itemBuilder: (context, index) {
-                      final isSelected = _selectedSubjectIndex == index;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: ListTile(
-                          selected: isSelected,
-                          selectedTileColor: AppTheme.primaryBlue.withOpacity(0.1),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          title: Text(
-                            _pinnedSubjects[index],
-                            style: TextStyle(
-                              color: isSelected
-                                  ? AppTheme.primaryBlue
-                                  : AppTheme.textWhite,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.normal,
+                  child: _isLoadingPinnedSubjects
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             ),
                           ),
-                          onTap: () async {
-                            final subjectName = _pinnedSubjects[index];
-                            setState(() {
-                              _selectedSubjectIndex = index;
-                              _selectedSubjectName = subjectName;
-                            });
-                            
-                            // Fetch subject ID by name
-                            try {
-                              final subjects = await PastPaperRepository().getSubjects();
-                              final subject = subjects.firstWhere(
-                                (s) => s.name == subjectName,
-                                orElse: () => SubjectModel(id: '', name: subjectName),
-                              );
-                              setState(() {
-                                _selectedSubjectId = subject.id;
-                              });
-                            } catch (e) {
-                              print('Error fetching subject ID: $e');
-                            }
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                        )
+                      : _pinnedSubjects.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  'No pinned subjects',
+                                  style: TextStyle(
+                                    color: AppTheme.textGray,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              itemCount: _pinnedSubjects.length,
+                              itemBuilder: (context, index) {
+                                final subject = _pinnedSubjects[index];
+                                final isSelected = _selectedSubjectIndex == index;
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: ListTile(
+                                    selected: isSelected,
+                                    selectedTileColor: AppTheme.primaryBlue.withOpacity(0.1),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    title: Text(
+                                      subject.name,
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? AppTheme.primaryBlue
+                                            : AppTheme.textWhite,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedSubjectIndex = index;
+                                        _selectedSubjectName = subject.name;
+                                        _selectedSubjectId = subject.id;
+                                      });
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
                 ),
                 // Spacer pushes footer to bottom
                 const Spacer(),
@@ -226,27 +264,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 16),
                       // Profile Row
-                      Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 16,
-                            backgroundColor: AppTheme.primaryBlue,
-                            child: Icon(
-                              Icons.person,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Text(
-                              'User Name',
-                              style: TextStyle(
-                                color: AppTheme.textWhite,
-                                fontSize: 14,
+                      Builder(
+                        builder: (context) {
+                          final user = Supabase.instance.client.auth.currentUser;
+                          final userName = user?.userMetadata?['full_name'] as String? ?? 'Student';
+                          final userEmail = user?.email ?? 'No email';
+                          final avatarText = userName.isNotEmpty ? userName[0].toUpperCase() : 'S';
+                          
+                          return Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: AppTheme.primaryBlue,
+                                child: Text(
+                                  avatarText,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      userName,
+                                      style: const TextStyle(
+                                        color: AppTheme.textWhite,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      userEmail,
+                                      style: TextStyle(
+                                        color: AppTheme.textGray,
+                                        fontSize: 12,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
                           PopupMenuButton<String>(
                             icon: const Icon(
                               Icons.settings,
@@ -287,7 +351,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               }
                             },
                           ),
-                        ],
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -306,6 +372,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ? SubjectDetailView(
                     subjectName: _selectedSubjectName!,
                     subjectId: _selectedSubjectId!,
+                    isPinned: _pinnedSubjects.any((s) => s.id == _selectedSubjectId),
+                    onPinChanged: () => _loadPinnedSubjects(),
                   )
                 : _buildEmptyState(),
           ),
@@ -485,16 +553,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                           onTap: () {
+                            // Only set the selected subject (no auto-pinning)
                             setState(() {
                               _selectedSubjectName = subject.name;
                               _selectedSubjectId = subject.id;
-                              // Update selected index if it's a pinned subject
+                              // Update selected index if it's already in the pinned list
                               final pinnedIndex = _pinnedSubjects
-                                  .indexOf(subject.name);
+                                  .indexWhere((s) => s.id == subject.id);
                               if (pinnedIndex != -1) {
                                 _selectedSubjectIndex = pinnedIndex;
+                              } else {
+                                _selectedSubjectIndex = null;
                               }
                             });
+                            
                             Navigator.of(context).pop();
                           },
                               );
