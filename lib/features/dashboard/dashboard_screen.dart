@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../past_papers/data/past_paper_repository.dart';
-import '../past_papers/models/topic_model.dart';
 import '../past_papers/models/subject_model.dart';
 import 'subject_detail_view.dart';
 
@@ -14,10 +12,16 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String _selectedCurriculum = 'SPM';
+  String _selectedCurriculum = 'IGCSE';
   int? _selectedSubjectIndex;
-  String? _selectedSubjectName;
+  String? _selectedSubjectName; // Nullable, initialized to null
   final List<String> _pinnedSubjects = ['Add Math', 'Physics'];
+  
+  final List<String> _curriculums = [
+    'SPM (Coming Soon)',
+    'IGCSE',
+    'A-Level (Coming Soon)',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -49,34 +53,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Curriculum Switcher
-                      DropdownButton<String>(
-                        value: _selectedCurriculum,
-                        isExpanded: true,
-                        underline: Container(),
-                        dropdownColor: AppTheme.surfaceDark,
-                        style: const TextStyle(
-                          color: AppTheme.textWhite,
-                          fontSize: 14,
+                      // Curriculum Switcher (PopupMenuButton)
+                      PopupMenuButton<String>(
+                        offset: const Offset(0, 40),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        items: ['SPM', 'IGCSE', 'A-Level']
-                            .map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedCurriculum = newValue;
-                            });
-                          }
+                        color: const Color(0xFF1F2937),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _selectedCurriculum,
+                              style: const TextStyle(
+                                color: AppTheme.textWhite,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.keyboard_arrow_down,
+                              color: AppTheme.textGray,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                        itemBuilder: (BuildContext context) {
+                          return _curriculums.map((String curriculum) {
+                            return PopupMenuItem<String>(
+                              value: curriculum,
+                              child: Text(
+                                curriculum,
+                                style: const TextStyle(
+                                  color: AppTheme.textWhite,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            );
+                          }).toList();
                         },
-                        icon: const Icon(
-                          Icons.arrow_drop_down,
-                          color: AppTheme.textGray,
-                        ),
+                        onSelected: (String newValue) {
+                          // Prevent selection of "Coming Soon" items
+                          if (newValue.contains('Coming Soon')) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('This curriculum is coming soon!'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                            return;
+                          }
+                          setState(() {
+                            _selectedCurriculum = newValue;
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -227,110 +256,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Expanded(
             child: _selectedSubjectName != null
                 ? SubjectDetailView(subjectName: _selectedSubjectName!)
-                : _buildMainContent(),
+                : _buildEmptyState(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMainContent() {
-    return FutureBuilder<List<TopicModel>>(
-      future: PastPaperRepository().getTopics(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return const Center(
-            child: Text('Error loading topics'),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
-            child: Text('No topics found'),
-          );
-        }
-
-        final topics = snapshot.data!;
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.2,
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.school_outlined,
+            size: 64,
+            color: Colors.white10,
           ),
-          itemCount: topics.length,
-          itemBuilder: (context, index) {
-            final topic = topics[index];
-            return InkWell(
-              onTap: () {
-                context.go('/topic/${topic.id}');
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border(
-                      top: BorderSide(
-                        color: topic.color,
-                        width: 4,
-                      ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              topic.name,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              topic.description,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${topic.questionCount} questions',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: topic.color,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+          const SizedBox(height: 16),
+          Text(
+            'Select a subject from the sidebar to start',
+            style: TextStyle(
+              color: Colors.white10,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
