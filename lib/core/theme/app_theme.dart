@@ -13,6 +13,10 @@ class AppTheme {
         brightness: Brightness.light,
       ),
       primaryColor: primaryColor,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: primaryColor,
+        foregroundColor: Colors.white,
+      ),
     );
   }
 }
