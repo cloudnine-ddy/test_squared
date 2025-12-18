@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/topic_model.dart';
 import '../models/question_model.dart';
+import '../models/subject_model.dart';
 
 class PastPaperRepository {
   final _supabase = Supabase.instance.client;
@@ -87,6 +88,58 @@ class PastPaperRepository {
       
       print('DEBUG: Successfully mapped ${questions.length} out of ${data.length} questions');
       return questions;
+    } catch (e, stackTrace) {
+      print('ERROR: $e');
+      print('STACK TRACE: $stackTrace');
+      return [];
+    }
+  }
+
+  Future<List<SubjectModel>> getSubjects() async {
+    try {
+      print('DEBUG: Starting getSubjects() method');
+      print('DEBUG: About to call Supabase.from("subjects").select()');
+      
+      final response = await _supabase
+          .from('subjects')
+          .select()
+          .limit(50);
+      
+      print('DEBUG: Supabase call completed');
+      print('DEBUG: Response type: ${response.runtimeType}');
+      
+      final List<dynamic> data = response as List<dynamic>;
+      
+      print('RAW DATA: $data');
+      print('DEBUG: Data length: ${data.length}');
+      
+      if (data.isEmpty) {
+        print('WARNING: Supabase returned an empty list for subjects');
+        return [];
+      }
+      
+      print('DEBUG: Starting to map data to SubjectModel');
+      final subjects = <SubjectModel>[];
+      
+      for (var item in data) {
+        try {
+          if (item is Map<String, dynamic>) {
+            print('DEBUG: Mapping subject item: $item');
+            final subject = SubjectModel.fromMap(item);
+            subjects.add(subject);
+          } else {
+            print('WARNING: Skipping invalid subject item (not a Map): $item');
+          }
+        } catch (e, stackTrace) {
+          print('Skipping bad subject: $e');
+          print('Item that failed: $item');
+          print('Stack trace: $stackTrace');
+          // Continue to next item instead of crashing
+        }
+      }
+      
+      print('DEBUG: Successfully mapped ${subjects.length} out of ${data.length} subjects');
+      return subjects;
     } catch (e, stackTrace) {
       print('ERROR: $e');
       print('STACK TRACE: $stackTrace');

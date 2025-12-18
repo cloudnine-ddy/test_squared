@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/topic_model.dart';
+import '../past_papers/models/subject_model.dart';
 import 'subject_detail_view.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -17,18 +18,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int? _selectedSubjectIndex;
   String? _selectedSubjectName;
   final List<String> _pinnedSubjects = ['Add Math', 'Physics'];
-  final List<String> _allSubjects = [
-    'Biology',
-    'Chemistry',
-    'Physics',
-    'Add Math',
-    'History',
-    'Geography',
-    'English',
-    'Malay',
-    'Chinese',
-    'Economics',
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -347,7 +336,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _showSubjectSelector(BuildContext context) {
     final TextEditingController searchController = TextEditingController();
-    final List<String> filteredSubjects = List.from(_allSubjects);
+    String searchQuery = '';
 
     showDialog(
       context: context,
@@ -361,6 +350,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               child: Container(
                 width: 500,
+                constraints: const BoxConstraints(maxHeight: 600),
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -396,49 +386,114 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: const TextStyle(color: AppTheme.textWhite),
                       onChanged: (value) {
                         setDialogState(() {
-                          filteredSubjects.clear();
-                          if (value.isEmpty) {
-                            filteredSubjects.addAll(_allSubjects);
-                          } else {
-                            filteredSubjects.addAll(
-                              _allSubjects.where((subject) =>
-                                  subject.toLowerCase().contains(
-                                        value.toLowerCase(),
-                                      )),
-                            );
-                          }
+                          searchQuery = value;
                         });
                       },
                     ),
                     const SizedBox(height: 16),
-                    // Subjects List
+                    // Subjects List with FutureBuilder
                     Flexible(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: filteredSubjects.length,
-                        itemBuilder: (context, index) {
-                          final subject = filteredSubjects[index];
-                          return ListTile(
-                            title: Text(
-                              subject,
-                              style: const TextStyle(
-                                color: AppTheme.textWhite,
+                      child: FutureBuilder<List<SubjectModel>>(
+                        future: PastPaperRepository().getSubjects(),
+                        builder: (context, snapshot) {
+                          // Loading State
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
                               ),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            onTap: () {
-                              setState(() {
-                                _selectedSubjectName = subject;
-                                // Update selected index if it's a pinned subject
-                                final pinnedIndex =
-                                    _pinnedSubjects.indexOf(subject);
-                                if (pinnedIndex != -1) {
-                                  _selectedSubjectIndex = pinnedIndex;
-                                }
-                              });
-                              Navigator.of(context).pop();
+                            );
+                          }
+
+                          // Error State
+                          if (snapshot.hasError) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Text(
+                                  'Failed to load subjects',
+                                  style: TextStyle(
+                                    color: AppTheme.textWhite,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          // Empty State
+                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Text(
+                                  'No subjects found',
+                                  style: TextStyle(
+                                    color: AppTheme.textWhite,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          // Success State - Filter subjects based on search
+                          final allSubjects = snapshot.data!;
+                          final filteredSubjects = searchQuery.isEmpty
+                              ? allSubjects
+                              : allSubjects.where((subject) =>
+                                  subject.name
+                                      .toLowerCase()
+                                      .contains(searchQuery.toLowerCase())).toList();
+
+                          if (filteredSubjects.isEmpty) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32.0),
+                                child: Text(
+                                  'No subjects match your search',
+                                  style: TextStyle(
+                                    color: AppTheme.textWhite,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredSubjects.length,
+                            itemBuilder: (context, index) {
+                              final subject = filteredSubjects[index];
+                              return ListTile(
+                                title: Text(
+                                  subject.name,
+                                  style: const TextStyle(
+                                    color: AppTheme.textWhite,
+                                  ),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                onTap: () {
+                                  setState(() {
+                                    _selectedSubjectName = subject.name;
+                                    // Update selected index if it's a pinned subject
+                                    final pinnedIndex = _pinnedSubjects
+                                        .indexOf(subject.name);
+                                    if (pinnedIndex != -1) {
+                                      _selectedSubjectIndex = pinnedIndex;
+                                    }
+                                  });
+                                  Navigator.of(context).pop();
+                                },
+                              );
                             },
                           );
                         },
