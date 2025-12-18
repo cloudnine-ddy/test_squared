@@ -15,6 +15,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String _selectedCurriculum = 'IGCSE';
   int? _selectedSubjectIndex;
   String? _selectedSubjectName; // Nullable, initialized to null
+  String? _selectedSubjectId; // Store subject ID for filtering
   final List<String> _pinnedSubjects = ['Add Math', 'Physics'];
   
   final List<String> _curriculums = [
@@ -183,11 +184,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   : FontWeight.normal,
                             ),
                           ),
-                          onTap: () {
+                          onTap: () async {
+                            final subjectName = _pinnedSubjects[index];
                             setState(() {
                               _selectedSubjectIndex = index;
-                              _selectedSubjectName = _pinnedSubjects[index];
+                              _selectedSubjectName = subjectName;
                             });
+                            
+                            // Fetch subject ID by name
+                            try {
+                              final subjects = await PastPaperRepository().getSubjects();
+                              final subject = subjects.firstWhere(
+                                (s) => s.name == subjectName,
+                                orElse: () => SubjectModel(id: '', name: subjectName),
+                              );
+                              setState(() {
+                                _selectedSubjectId = subject.id;
+                              });
+                            } catch (e) {
+                              print('Error fetching subject ID: $e');
+                            }
                           },
                         ),
                       );
@@ -254,8 +270,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           // Main Content Area
           Expanded(
-            child: _selectedSubjectName != null
-                ? SubjectDetailView(subjectName: _selectedSubjectName!)
+            child: _selectedSubjectName != null && _selectedSubjectId != null
+                ? SubjectDetailView(
+                    subjectName: _selectedSubjectName!,
+                    subjectId: _selectedSubjectId!,
+                  )
                 : _buildEmptyState(),
           ),
         ],
@@ -433,18 +452,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                onTap: () {
-                                  setState(() {
-                                    _selectedSubjectName = subject.name;
-                                    // Update selected index if it's a pinned subject
-                                    final pinnedIndex = _pinnedSubjects
-                                        .indexOf(subject.name);
-                                    if (pinnedIndex != -1) {
-                                      _selectedSubjectIndex = pinnedIndex;
-                                    }
-                                  });
-                                  Navigator.of(context).pop();
-                                },
+                          onTap: () {
+                            setState(() {
+                              _selectedSubjectName = subject.name;
+                              _selectedSubjectId = subject.id;
+                              // Update selected index if it's a pinned subject
+                              final pinnedIndex = _pinnedSubjects
+                                  .indexOf(subject.name);
+                              if (pinnedIndex != -1) {
+                                _selectedSubjectIndex = pinnedIndex;
+                              }
+                            });
+                            Navigator.of(context).pop();
+                          },
                               );
                             },
                           );

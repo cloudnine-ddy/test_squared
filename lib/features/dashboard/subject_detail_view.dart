@@ -6,10 +6,12 @@ import '../past_papers/models/topic_model.dart';
 
 class SubjectDetailView extends StatefulWidget {
   final String subjectName;
+  final String subjectId;
 
   const SubjectDetailView({
     super.key,
     required this.subjectName,
+    required this.subjectId,
   });
 
   @override
@@ -99,7 +101,8 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
 
   Widget _buildTopicsView() {
     return FutureBuilder<List<TopicModel>>(
-      future: PastPaperRepository().getTopics(),
+      key: ValueKey('topics_${widget.subjectId}'), // Force rebuild when subjectId changes
+      future: PastPaperRepository().getTopics(subjectId: widget.subjectId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -114,8 +117,34 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return const Center(
-            child: Text('No topics found'),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.inventory_2_outlined,
+                  size: 64,
+                  color: Colors.white24,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No topics available yet',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Check back later or try another subject.',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 

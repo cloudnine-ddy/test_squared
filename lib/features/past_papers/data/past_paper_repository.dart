@@ -6,12 +6,16 @@ import '../models/subject_model.dart';
 class PastPaperRepository {
   final _supabase = Supabase.instance.client;
 
-  Future<List<TopicModel>> getTopics() async {
+  Future<List<TopicModel>> getTopics({required String subjectId}) async {
     try {
       print('DEBUG: Starting getTopics() method');
-      print('DEBUG: About to call Supabase.from("topics").select()');
+      print('DEBUG: Subject ID: $subjectId');
+      print('DEBUG: About to call Supabase.from("topics").select().eq("subject_id", "$subjectId")');
       
-      final response = await _supabase.from('topics').select();
+      final response = await _supabase
+          .from('topics')
+          .select()
+          .eq('subject_id', subjectId);
       
       print('DEBUG: Supabase call completed');
       print('DEBUG: Response type: ${response.runtimeType}');
@@ -22,7 +26,7 @@ class PastPaperRepository {
       print('DEBUG: Data length: ${data.length}');
       
       if (data.isEmpty) {
-        print('WARNING: Supabase returned an empty list.');
+        print('WARNING: Supabase returned an empty list for subject $subjectId');
         return [];
       }
       
