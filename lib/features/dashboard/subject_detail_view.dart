@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/topic_model.dart';
 
@@ -139,12 +140,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
           _isPinned = false;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Subject unpinned'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ToastService.showInfo('Subject unpinned');
         }
       } else {
         // Pin the subject
@@ -153,12 +149,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
           _isPinned = true;
         });
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Subject pinned'),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          ToastService.showSuccess('Subject pinned');
         }
       }
       
@@ -167,13 +158,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
     } catch (e) {
       print('Error toggling pin: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        ToastService.showError('Error: ${e.toString()}');
       }
     } finally {
       if (mounted) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
 import '../auth/services/auth_service.dart';
@@ -124,12 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onSelected: (String newValue) {
                           // Prevent selection of "Coming Soon" items
                           if (newValue.contains('Coming Soon')) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('This curriculum is coming soon!'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
+                            ToastService.showWarning('This curriculum is coming soon!');
                             return;
                           }
                           setState(() {
@@ -552,7 +548,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                          onTap: () {
+                          onTap: () async {
                             // Only set the selected subject (no auto-pinning)
                             setState(() {
                               _selectedSubjectName = subject.name;
@@ -568,6 +564,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             });
                             
                             Navigator.of(context).pop();
+                            
+                            // Check if subject has topics and show warning if empty
+                            try {
+                              final topics = await PastPaperRepository().getTopics(subjectId: subject.id);
+                              if (topics.isEmpty && mounted) {
+                                ToastService.showWarning('This subject has no content yet.');
+                              }
+                            } catch (e) {
+                              // Silently fail - we don't want to show error for this check
+                              print('Error checking topics: $e');
+                            }
                           },
                               );
                             },

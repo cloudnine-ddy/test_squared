@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/keys/app_keys.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +25,7 @@ class TestSquaredApp extends StatelessWidget {
       title: 'TestSquared',
       theme: AppTheme.darkTheme,
       routerConfig: goRouter,
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
     );
   }
 }

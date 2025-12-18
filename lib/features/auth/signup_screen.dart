@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/toast_service.dart';
 import 'services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -48,14 +49,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             _isLoading = false;
           });
           
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Account created!'),
-              backgroundColor: AppTheme.secondaryGreen,
-            ),
-          );
-          
+          ToastService.showSuccess('Account created successfully!');
           // Navigate to dashboard
           context.go('/dashboard');
         }
@@ -64,26 +58,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
           setState(() {
             _isLoading = false;
           });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.message),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastService.showError(e.message);
         }
       } catch (e) {
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('An error occurred: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          ToastService.showError('An error occurred: ${e.toString()}');
         }
       }
     }

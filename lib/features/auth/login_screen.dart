@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/services/toast_service.dart';
 import 'services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -41,34 +42,62 @@ class _LoginScreenState extends State<LoginScreen> {
           setState(() {
             _isLoading = false;
           });
-          // Navigate to dashboard
+          // Navigate first, then show success toast on dashboard
           context.go('/dashboard');
         }
       } on AuthException catch (e) {
+        print('AuthException: ${e.message}');
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Login failed: ${e.message}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          // Show error message from Supabase
+          final errorMessage = e.message.isNotEmpty
+              ? e.message
+              : 'Invalid email or password';
+          ToastService.showError(errorMessage);
         }
-      } catch (e) {
+      } catch (e, stackTrace) {
+        print('Login error: $e');
+        print('Stack trace: $stackTrace');
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
+          // Extract error message from various exception types
+          String errorMessage = 'Login failed: Check your email or password';
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login failed: Check your email or password'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          // Try to extract message from exception
+          final errorString = e.toString().toLowerCase();
+          if (errorString.contains('invalid login credentials') ||
+              errorString.contains('invalid credentials') ||
+              errorString.contains('email or password')) {
+            errorMessage = 'Invalid email or password';
+          } else if (errorString.contains('email not confirmed') ||
+              errorString.contains('email not verified')) {
+            errorMessage = 'Please verify your email first';
+          } else if (errorString.contains('user not found')) {
+            errorMessage = 'No account found with this email';
+          } else if (errorString.contains('network') ||
+              errorString.contains('connection')) {
+            errorMessage = 'Network error: Please check your connection';
+          } else if (e is AuthException) {
+            errorMessage = e.message.isNotEmpty ? e.message : errorMessage;
+          } else if (e.toString().isNotEmpty &&
+              !errorString.contains('exception')) {
+            // Only use the error string if it's meaningful
+            final cleanError = e
+                .toString()
+                .replaceAll('Exception: ', '')
+                .trim();
+            if (cleanError.isNotEmpty && cleanError.length < 100) {
+              errorMessage = cleanError;
+            }
+          }
+
+          // Always show error toast
+          print('Showing error toast: $errorMessage');
+          ToastService.showError(errorMessage);
         }
       }
     }
