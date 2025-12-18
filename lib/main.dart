@@ -22,7 +22,7 @@ class TestSquaredApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'TestSquared',
-      theme: AppTheme.lightTheme,
+      theme: AppTheme.darkTheme,
       routerConfig: goRouter,
     );
   }
