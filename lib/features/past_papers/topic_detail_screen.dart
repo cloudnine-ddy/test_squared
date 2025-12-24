@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
 import 'widgets/question_card.dart';
@@ -15,6 +16,16 @@ class TopicDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (GoRouter.of(context).canPop()) {
+              GoRouter.of(context).pop();
+            } else {
+              GoRouter.of(context).go('/dashboard');
+            }
+          },
+        ),
         title: Text('Topic $topicId'),
       ),
       body: FutureBuilder<List<QuestionModel>>(

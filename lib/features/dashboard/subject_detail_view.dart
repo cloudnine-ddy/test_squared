@@ -152,7 +152,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
           ToastService.showSuccess('Subject pinned');
         }
       }
-      
+
       // Refresh the pinned subjects list in the parent
       widget.onPinChanged();
     } catch (e) {
@@ -233,7 +233,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
             final topic = topics[index];
             return InkWell(
               onTap: () {
-                context.go('/topic/${topic.id}');
+                context.push('/topic/${topic.id}');
               },
               borderRadius: BorderRadius.circular(12),
               child: Card(
