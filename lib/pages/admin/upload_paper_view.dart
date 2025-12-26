@@ -1,0 +1,573 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/services/toast_service.dart';
+import '../../core/theme/app_theme.dart';
+
+/// Upload paper view - extracted from the original admin page
+class UploadPaperView extends StatefulWidget {
+  const UploadPaperView({super.key});
+
+  @override
+  State<UploadPaperView> createState() => _UploadPaperViewState();
+}
+
+class _UploadPaperViewState extends State<UploadPaperView> {
+  bool _isLoadingSubjects = false;
+  bool _isSubmitting = false;
+  String? _statusMessage;
+
+  final _formKey = GlobalKey<FormState>();
+  final _yearController = TextEditingController();
+  final _variantController = TextEditingController();
+
+  List<Map<String, dynamic>> _subjects = [];
+  String? _selectedSubjectId;
+  String? _selectedSeason;
+
+  String? _selectedFileName;
+  Uint8List? _selectedFileBytes;
+
+  final List<String> _seasons = const ['March', 'June', 'November'];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSubjects();
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _variantController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchSubjects() async {
+    setState(() {
+      _isLoadingSubjects = true;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      final data = await supabase
+          .from('subjects')
+          .select('id, name')
+          .order('name');
+      final subjects = List<Map<String, dynamic>>.from(data);
+
+      if (mounted) {
+        setState(() {
+          _subjects = subjects;
+          _selectedSubjectId ??=
+              subjects.isNotEmpty ? subjects.first['id']?.toString() : null;
+        });
+      }
+    } catch (_) {
+      ToastService.showError('Failed to load subjects');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingSubjects = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickPdf() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final file = result.files.single;
+    if (file.bytes == null) {
+      ToastService.showError(
+        kIsWeb ? 'Failed to read file data' : 'Failed to read PDF bytes',
+      );
+      return;
+    }
+
+    setState(() {
+      _selectedFileName = file.name;
+      _selectedFileBytes = file.bytes;
+    });
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (_selectedSubjectId == null) {
+      ToastService.showError('Please select a subject');
+      return;
+    }
+
+    if (_selectedSeason == null) {
+      ToastService.showError('Please select a season');
+      return;
+    }
+
+    if (_selectedFileBytes == null) {
+      ToastService.showError('Please select a PDF');
+      return;
+    }
+
+    final year = int.tryParse(_yearController.text.trim());
+    final variant = int.tryParse(_variantController.text.trim());
+    if (year == null || variant == null) {
+      ToastService.showError('Please enter valid numbers');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await _uploadPaper(
+        year: year,
+        variant: variant,
+        season: _selectedSeason!,
+        subjectId: _selectedSubjectId!,
+        fileBytes: _selectedFileBytes!,
+      );
+
+      if (mounted) {
+        setState(() {
+          _selectedFileName = null;
+          _selectedFileBytes = null;
+          _selectedSeason = null;
+          _yearController.clear();
+          _variantController.clear();
+        });
+      }
+
+      ToastService.showSuccess('Success! Questions Extracted.');
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _statusMessage = null;
+        });
+      }
+      ToastService.showError('Error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _uploadPaper({
+    required int year,
+    required int variant,
+    required String season,
+    required String subjectId,
+    required Uint8List fileBytes,
+  }) async {
+    final supabase = Supabase.instance.client;
+    const bucketName = 'exam-papers';
+    final filePath = 'pdfs/$subjectId/${year}_${season}_$variant.pdf';
+
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Uploading...';
+      });
+    }
+
+    await supabase.storage.from(bucketName).uploadBinary(
+          filePath,
+          fileBytes,
+          fileOptions: const FileOptions(
+            contentType: 'application/pdf',
+            upsert: true,
+          ),
+        );
+
+    final String publicUrl =
+        supabase.storage.from(bucketName).getPublicUrl(filePath);
+
+    final newPaper = await supabase.from('papers').insert({
+      'subject_id': subjectId,
+      'year': year,
+      'season': season,
+      'variant': variant,
+      'pdf_url': publicUrl,
+    }).select().single();
+
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Analyzing with AI...';
+      });
+    }
+
+    await supabase.functions.invoke(
+      'analyze-paper',
+      body: {
+        'paperId': newPaper['id'],
+        'pdfUrl': publicUrl,
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Success! Questions Extracted.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Card(
+            color: AppTheme.surfaceDark,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.upload_file,
+                            color: Color(0xFF818CF8),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Upload Exam Paper',
+                              style: TextStyle(
+                                color: AppTheme.textWhite,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Upload a PDF and AI will extract questions',
+                              style: TextStyle(
+                                color: AppTheme.textGray,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    // Subject dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedSubjectId,
+                      decoration: InputDecoration(
+                        labelText: 'Subject',
+                        filled: true,
+                        fillColor: const Color(0xFF1F2937),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: _subjects
+                          .map(
+                            (subject) => DropdownMenuItem<String>(
+                              value: subject['id']?.toString(),
+                              child: Text(
+                                subject['name']?.toString() ?? 'Unknown',
+                                style: const TextStyle(
+                                  color: AppTheme.textWhite,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: _isLoadingSubjects
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _selectedSubjectId = value;
+                              });
+                            },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a subject';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    // Year input
+                    TextFormField(
+                      controller: _yearController,
+                      decoration: InputDecoration(
+                        labelText: 'Year',
+                        hintText: 'e.g. 2024',
+                        filled: true,
+                        fillColor: const Color(0xFF1F2937),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      style: const TextStyle(color: AppTheme.textWhite),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a year';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Please enter a valid year';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    // Season dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedSeason,
+                      decoration: InputDecoration(
+                        labelText: 'Season',
+                        filled: true,
+                        fillColor: const Color(0xFF1F2937),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: _seasons
+                          .map(
+                            (season) => DropdownMenuItem<String>(
+                              value: season,
+                              child: Text(
+                                season,
+                                style: const TextStyle(
+                                  color: AppTheme.textWhite,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedSeason = value;
+                        });
+                      },
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please select a season';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    // Variant input
+                    TextFormField(
+                      controller: _variantController,
+                      decoration: InputDecoration(
+                        labelText: 'Variant',
+                        hintText: 'e.g. 1, 2, 3',
+                        filled: true,
+                        fillColor: const Color(0xFF1F2937),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      style: const TextStyle(color: AppTheme.textWhite),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a variant';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Please enter a valid variant';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    // File picker
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F2937),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _selectedFileName != null
+                              ? const Color(0xFF6366F1).withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.1),
+                          width: _selectedFileName != null ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(
+                            _selectedFileName != null
+                                ? Icons.check_circle
+                                : Icons.cloud_upload_outlined,
+                            color: _selectedFileName != null
+                                ? const Color(0xFF10B981)
+                                : Colors.white.withValues(alpha: 0.5),
+                            size: 40,
+                          ),
+                          const SizedBox(height: 12),
+                          if (_selectedFileName != null) ...[
+                            Text(
+                              _selectedFileName!,
+                              style: const TextStyle(
+                                color: AppTheme.textWhite,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          OutlinedButton.icon(
+                            onPressed: _isSubmitting ? null : _pickPdf,
+                            icon: const Icon(Icons.attach_file),
+                            label: Text(_selectedFileName != null
+                                ? 'Change PDF'
+                                : 'Select PDF'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF818CF8),
+                              side: const BorderSide(color: Color(0xFF6366F1)),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    // Submit button
+                    SizedBox(
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6366F1),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          disabledBackgroundColor:
+                              const Color(0xFF6366F1).withValues(alpha: 0.5),
+                        ),
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.upload, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Upload & Analyze',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    if (_statusMessage != null) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            if (_statusMessage!.contains('Success'))
+                              const Icon(
+                                Icons.check_circle,
+                                color: Color(0xFF10B981),
+                                size: 20,
+                              )
+                            else
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF818CF8),
+                                  ),
+                                ),
+                              ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _statusMessage!,
+                              style: const TextStyle(
+                                color: AppTheme.textWhite,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

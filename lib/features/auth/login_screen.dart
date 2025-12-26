@@ -39,11 +39,26 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         if (mounted) {
+          final supabase = Supabase.instance.client;
+          final user = supabase.auth.currentUser;
+          if (user == null) {
+            throw AuthException('No user session found.');
+          }
+          final profile = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', user.id)
+              .maybeSingle();
+          final role = (profile?['role'] as String?)?.toLowerCase() ?? 'student';
           setState(() {
             _isLoading = false;
           });
-          // Navigate first, then show success toast on dashboard
-          context.go('/dashboard');
+          if (role == 'admin') {
+            context.go('/admin');
+          } else {
+            // Navigate first, then show success toast on dashboard
+            context.go('/dashboard');
+          }
         }
       } on AuthException catch (e) {
         print('AuthException: ${e.message}');
