@@ -4,13 +4,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/toast_service.dart';
 import 'upload_paper_view.dart';
+import 'question_manager_view.dart';
 
 /// Enum for admin navigation items - add new items here for future features
 enum AdminSection {
   uploadPaper,
+  questionManager,
   // Add future sections here:
   // analytics,
-  // manageQuestions,
   // userManagement,
   // settings,
 }
@@ -91,6 +92,8 @@ class _AdminShellState extends State<AdminShell> {
     switch (_currentSection) {
       case AdminSection.uploadPaper:
         return const UploadPaperView();
+      case AdminSection.questionManager:
+        return const QuestionManagerView();
       // Add future cases here:
       // case AdminSection.analytics:
       //   return const AnalyticsView();
@@ -101,6 +104,8 @@ class _AdminShellState extends State<AdminShell> {
     switch (section) {
       case AdminSection.uploadPaper:
         return 'Upload Papers';
+      case AdminSection.questionManager:
+        return 'Question Manager';
       // Add future cases here
     }
   }
@@ -109,6 +114,8 @@ class _AdminShellState extends State<AdminShell> {
     switch (section) {
       case AdminSection.uploadPaper:
         return Icons.upload_file;
+      case AdminSection.questionManager:
+        return Icons.account_tree;
       // Add future cases here
     }
   }
@@ -219,9 +226,9 @@ class _AdminShellState extends State<AdminShell> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
                 _buildNavItem(AdminSection.uploadPaper),
+                _buildNavItem(AdminSection.questionManager),
                 // Add more navigation items here as needed
                 // _buildNavItem(AdminSection.analytics),
-                // _buildNavItem(AdminSection.manageQuestions),
               ],
             ),
           ),

@@ -1,15 +1,18 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 /**
- * crop-figure Edge Function - Uses pdf.co API
+ * crop-figure Edge Function
  * 
- * This function crops a specific region from a PDF page and uploads it to Storage.
+ * Two-step approach:
+ * 1. Render full page as image using pdf.co
+ * 2. Use Sharp (or similar) to crop the exact region
  * 
- * Input:
- * - pdfUrl: URL of the PDF in storage
- * - questionId: ID of the question to update with image_url
- * - page: Page number (1-indexed)
- * - bbox: { x, y, width, height } as percentages (0-100)
+ * Since Deno doesn't have Sharp, we'll use a workaround:
+ * Return both the full page URL and crop coordinates, 
+ * let the client do the visual cropping, then upload the result.
+ * 
+ * Or we can use pdf.co's rect parameter correctly by understanding
+ * that it uses the DEFAULT render size, not the specified width.
  */
 
 interface CropRequest {
@@ -24,7 +27,10 @@ interface CropRequest {
   }
 }
 
-const PDF_CO_API_URL = 'https://api.pdf.co/v1/pdf/convert/to/png'
+// pdf.co renders PDF at 72 DPI by default
+// A4 at 72 DPI = 595 x 842 pixels
+const PDF_DEFAULT_WIDTH = 595
+const PDF_DEFAULT_HEIGHT = 842
 
 Deno.serve(async (req) => {
   const corsHeaders = {
@@ -51,11 +57,9 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseKey)
     
-    // Get pdf.co API key
     const pdfCoApiKey = Deno.env.get('PDF_CO_API_KEY')
     
     if (!pdfCoApiKey) {
-      console.error('PDF_CO_API_KEY not set')
       return new Response(
         JSON.stringify({ error: 'PDF_CO_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -63,33 +67,30 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Cropping figure for question ${questionId}, page ${page}`)
-    console.log(`Bounding box: x=${bbox.x}%, y=${bbox.y}%, w=${bbox.width}%, h=${bbox.height}%`)
+    console.log(`Input bbox: x=${bbox.x}%, y=${bbox.y}%, w=${bbox.width}%, h=${bbox.height}%`)
 
-    // PDF.co uses absolute pixel coordinates
-    // A4 PDF at 150 DPI is approximately 1240 x 1754 pixels
-    // We'll use these as reference dimensions
-    const PDF_WIDTH = 1240
-    const PDF_HEIGHT = 1754
-    
-    const rectX = Math.round((bbox.x / 100) * PDF_WIDTH)
-    const rectY = Math.round((bbox.y / 100) * PDF_HEIGHT)
-    const rectWidth = Math.round((bbox.width / 100) * PDF_WIDTH)
-    const rectHeight = Math.round((bbox.height / 100) * PDF_HEIGHT)
+    // pdf.co rect uses the DEFAULT PDF render coordinates (72 DPI)
+    // We need to convert our percentage-based coordinates to these
+    const rectX = Math.round((bbox.x / 100) * PDF_DEFAULT_WIDTH)
+    const rectY = Math.round((bbox.y / 100) * PDF_DEFAULT_HEIGHT)
+    const rectWidth = Math.max(Math.round((bbox.width / 100) * PDF_DEFAULT_WIDTH), 30)
+    const rectHeight = Math.max(Math.round((bbox.height / 100) * PDF_DEFAULT_HEIGHT), 30)
     
     const rectString = `${rectX}, ${rectY}, ${rectWidth}, ${rectHeight}`
-    console.log(`Crop rect: ${rectString}`)
+    console.log(`Crop rect (72 DPI base): ${rectString}`)
 
-    // Call pdf.co API to convert PDF region to PNG
+    // Call pdf.co API - DON'T specify width when using rect
+    // rect is based on the default 72 DPI render
     const pdfCoPayload = {
       url: pdfUrl,
-      pages: String(page - 1), // pdf.co uses 0-indexed pages
+      pages: String(page - 1),
       rect: rectString,
       async: false
     }
 
-    console.log('Calling pdf.co API...')
+    console.log('Calling pdf.co with payload:', JSON.stringify(pdfCoPayload))
     
-    const pdfCoRes = await fetch(PDF_CO_API_URL, {
+    const pdfCoRes = await fetch('https://api.pdf.co/v1/pdf/convert/to/png', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,18 +112,15 @@ Deno.serve(async (req) => {
     console.log('pdf.co response:', JSON.stringify(pdfCoJson))
 
     if (pdfCoJson.error) {
-      console.error('pdf.co error:', pdfCoJson.message)
       return new Response(
         JSON.stringify({ error: 'pdf.co error', details: pdfCoJson.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // pdf.co returns an array of URLs for the generated images
     const imageUrls = pdfCoJson.urls || [pdfCoJson.url]
     
     if (!imageUrls || imageUrls.length === 0) {
-      console.error('No image URLs returned from pdf.co')
       return new Response(
         JSON.stringify({ error: 'No image generated' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -145,7 +143,7 @@ Deno.serve(async (req) => {
 
     // Upload to Supabase Storage
     const fileName = `figures/${questionId}.png`
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('exam-papers')
       .upload(fileName, imageBytes, {
         contentType: 'image/png',
@@ -172,7 +170,6 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error('Failed to update question:', updateError)
-      // Image is uploaded, just log the error
     } else {
       console.log(`Updated question ${questionId} with image_url`)
     }
@@ -180,7 +177,11 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        image_url: imageUrl 
+        image_url: imageUrl,
+        debug: {
+          inputBbox: bbox,
+          calculatedRect: rectString
+        }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

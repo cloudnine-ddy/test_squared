@@ -146,18 +146,18 @@ For EACH question, provide:
 3. topic_ids: Array of topic UUIDs (the "id" values from the AVAILABLE TOPICS list above, like "abc123-def456-..."). MUST be valid UUIDs from the list, NOT topic names!
 4. type: Either "structured" (written answer) or "mcq" (multiple choice)
 5. options: If MCQ, provide array of options like [{"label": "A", "text": "option text"}, ...]
-6. figure: If the question includes a diagram/figure/graph, provide its location:
+6. figure: If the question includes a diagram/figure/graph/table/image, provide its location:
    - page: page number (1-indexed)
-   - x: percentage from left edge (0-100)
-   - y: percentage from top edge (0-100)
-   - width: percentage of page width (0-100)
-   - height: percentage of page height (0-100)
+   - x: percentage from left edge (0-100) - START 15% BEFORE the actual figure
+   - y: percentage from top edge (0-100) - START 15% ABOVE the actual figure  
+   - width: percentage of page width (0-100) - ADD 30% extra width to ensure full capture
+   - height: percentage of page height (0-100) - ADD 30% extra height to ensure full capture
 
 CRITICAL RULES:
 - topic_ids MUST contain UUID values from the topics list (like "abc123-def456-789..."), NOT topic names
 - Combine all sub-parts (a, b, i, ii) into ONE question entry
-- Match to topics as accurately as possible  
-- For figures, estimate the bounding box as percentages of the page dimensions
+- Match to topics as accurately as possible
+- FIGURE BOUNDING BOX: Be VERY GENEROUS! Always add extra padding around figures. It's better to include too much than too little. Include the figure label (e.g., "Fig. 1") in the bounding box.
 - If no figure, omit the "figure" field entirely
 - If no matching topic, use empty array []
 
