@@ -42,13 +42,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { paperId, pdfUrl } = await req.json()
+    const { paperId, pdfUrl, markSchemeUrl } = await req.json()
     
     if (!paperId || !pdfUrl) {
       return new Response(
         JSON.stringify({ error: 'Missing paperId or pdfUrl' }), 
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+    
+    const hasMarkScheme = !!markSchemeUrl
+    console.log(`Mark scheme provided: ${hasMarkScheme}`)
+    if (hasMarkScheme) {
+      console.log(`Mark scheme URL: ${markSchemeUrl}`)
     }
 
     // Initialize Supabase
@@ -339,8 +345,16 @@ Return ONLY valid JSON in this exact format:
 
         try {
           console.log(`Cropping figure for Q${question.question_number}...`)
-          const cropResponse = await supabase.functions.invoke('crop-figure', {
-            body: {
+          
+          // Call crop-figure directly with service role auth
+          const cropResponse = await fetch(`${supabaseUrl}/functions/v1/crop-figure`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseKey}`,
+              'apikey': supabaseKey,
+            },
+            body: JSON.stringify({
               pdfUrl,
               questionId: insertedQ.id,
               page: question.figure.page,
@@ -350,11 +364,13 @@ Return ONLY valid JSON in this exact format:
                 width: question.figure.width,
                 height: question.figure.height
               }
-            }
+            })
           })
+          
+          const cropResult = await cropResponse.json()
 
-          if (cropResponse.error) {
-            console.warn(`Failed to crop figure for Q${question.question_number}:`, cropResponse.error)
+          if (!cropResponse.ok || cropResult.error) {
+            console.warn(`Failed to crop figure for Q${question.question_number}:`, cropResult.error || cropResponse.status)
           } else {
             figuresCropped++
             console.log(`✅ Cropped and stored figure for Q${question.question_number}`)
@@ -365,6 +381,143 @@ Return ONLY valid JSON in this exact format:
       }
     }
 
+    // Step 8: Process mark scheme if provided
+    let answersExtracted = 0
+    if (hasMarkScheme && insertedQuestions) {
+      console.log(`[8/8] Processing mark scheme...`)
+      
+      try {
+        // Download mark scheme PDF
+        console.log(`Downloading mark scheme from: ${markSchemeUrl}`)
+        const msResponse = await fetch(markSchemeUrl)
+        console.log(`Mark scheme download status: ${msResponse.status}`)
+        if (!msResponse.ok) {
+          console.warn('Failed to download mark scheme')
+        } else {
+          const msBlob = await msResponse.blob()
+          const msArrayBuffer = await msBlob.arrayBuffer()
+          const msBytes = new Uint8Array(msArrayBuffer)
+          const msBase64 = uint8ArrayToBase64(msBytes)
+          
+          console.log(`Mark scheme downloaded: ${(msBytes.length / 1024).toFixed(1)} KB`)
+          
+          // Build prompt for answer extraction
+          const msPrompt = `You are analyzing an EXAM MARK SCHEME / ANSWER SHEET.
+
+Extract the OFFICIAL ANSWERS for each question. The mark scheme may contain:
+- Direct answers (e.g., "A", "42", "x = 5")
+- Marking criteria (e.g., "Award 1 mark for method, 2 for answer")
+- Acceptable alternative answers
+
+For each question, extract:
+1. question_number: The question number (1, 2, 3, etc.)
+2. official_answer: The official answer or marking criteria (as a clear string)
+3. marks: Number of marks available (extract from [1], [2 marks], etc.)
+
+Return ONLY valid JSON:
+{
+  "answers": [
+    {"question_number": 1, "official_answer": "B", "marks": 1},
+    {"question_number": 2, "official_answer": "x = 5\\nMethod: rearrange equation\\nAnswer: substitute and solve", "marks": 3}
+  ]
+}`
+
+          // Send to Gemini
+          const msGeminiPayload = {
+            contents: [{
+              parts: [
+                { text: msPrompt },
+                { inline_data: { mime_type: 'application/pdf', data: msBase64 } }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 8192
+            }
+          }
+          
+          const msGeminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(msGeminiPayload)
+          })
+          
+          if (msGeminiRes.ok) {
+            const msGeminiJson = await msGeminiRes.json()
+            const msRawText = msGeminiJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+            const msCleanJson = msRawText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim()
+            
+            try {
+              const answersData = JSON.parse(msCleanJson)
+              console.log(`Extracted ${answersData.answers?.length || 0} answers from mark scheme`)
+              
+              // Match answers to questions and generate AI solutions
+              for (const answer of answersData.answers || []) {
+                const matchingQ = insertedQuestions.find(
+                  (q: { question_number: number }) => q.question_number === answer.question_number
+                )
+                
+                if (matchingQ) {
+                  // Generate AI step-by-step solution
+                  const solutionPrompt = `You are a helpful tutor. Generate a clear, student-friendly step-by-step solution.
+
+Question: ${questionsToInsert.find(q => q.question_number === answer.question_number)?.content || 'See paper'}
+
+Official Answer: ${answer.official_answer}
+Marks Available: ${answer.marks || 'Unknown'}
+
+Create a solution that:
+1. Explains the approach simply
+2. Shows clear working steps
+3. Explains WHY each step is correct
+4. Highlights common mistakes to avoid
+
+Format your response as clear numbered steps. Be concise but thorough.`
+
+                  const solutionRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: solutionPrompt }] }],
+                      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+                    })
+                  })
+                  
+                  let aiSolution = null
+                  if (solutionRes.ok) {
+                    const solutionJson = await solutionRes.json()
+                    aiSolution = solutionJson.candidates?.[0]?.content?.parts?.[0]?.text || null
+                  }
+                  
+                  // Update question with official answer and AI solution
+                  await supabase
+                    .from('questions')
+                    .update({
+                      official_answer: answer.official_answer,
+                      ai_answer: {
+                        ...questionsToInsert.find(q => q.question_number === answer.question_number)?.ai_answer,
+                        marks: answer.marks,
+                        ai_solution: aiSolution
+                      }
+                    })
+                    .eq('id', matchingQ.id)
+                  
+                  answersExtracted++
+                  console.log(`✅ Updated Q${answer.question_number} with answer + AI solution`)
+                }
+              }
+            } catch (parseErr) {
+              console.warn('Failed to parse mark scheme response:', parseErr)
+            }
+          } else {
+            console.warn('Mark scheme Gemini API error:', msGeminiRes.status)
+          }
+        }
+      } catch (msError) {
+        console.warn('Error processing mark scheme:', msError)
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -372,7 +525,8 @@ Return ONLY valid JSON in this exact format:
         questions_count: questionsToInsert.length,
         topics_matched: questionsToInsert.filter(q => q.topic_ids.length > 0).length,
         figures_detected: questionsWithFigures.length,
-        figures_cropped: figuresCropped
+        figures_cropped: figuresCropped,
+        answers_extracted: answersExtracted
       }), 
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

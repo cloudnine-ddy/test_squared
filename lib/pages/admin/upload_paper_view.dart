@@ -29,8 +29,13 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   String? _selectedSubjectId;
   String? _selectedSeason;
 
+  // Question paper file
   String? _selectedFileName;
   Uint8List? _selectedFileBytes;
+  
+  // Mark scheme file (optional)
+  String? _markSchemeFileName;
+  Uint8List? _markSchemeFileBytes;
 
   final List<String> _seasons = const ['March', 'June', 'November'];
 
@@ -103,6 +108,29 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     });
   }
 
+  Future<void> _pickMarkScheme() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) {
+      return;
+    }
+
+    final file = result.files.single;
+    if (file.bytes == null) {
+      ToastService.showError('Failed to read mark scheme');
+      return;
+    }
+
+    setState(() {
+      _markSchemeFileName = file.name;
+      _markSchemeFileBytes = file.bytes;
+    });
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -141,12 +169,15 @@ class _UploadPaperViewState extends State<UploadPaperView> {
         season: _selectedSeason!,
         subjectId: _selectedSubjectId!,
         fileBytes: _selectedFileBytes!,
+        markSchemeBytes: _markSchemeFileBytes, // Optional
       );
 
       if (mounted) {
         setState(() {
           _selectedFileName = null;
           _selectedFileBytes = null;
+          _markSchemeFileName = null;
+          _markSchemeFileBytes = null;
           _selectedSeason = null;
           _yearController.clear();
           _variantController.clear();
@@ -160,7 +191,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
           _statusMessage = null;
         });
       }
-      ToastService.showError('Error');
+      ToastService.showError('Error: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -176,6 +207,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     required String season,
     required String subjectId,
     required Uint8List fileBytes,
+    Uint8List? markSchemeBytes,
   }) async {
     final supabase = Supabase.instance.client;
     const bucketName = 'exam-papers';
@@ -183,10 +215,11 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
     if (mounted) {
       setState(() {
-        _statusMessage = 'Uploading...';
+        _statusMessage = 'Uploading question paper...';
       });
     }
 
+    // Upload question paper
     await supabase.storage.from(bucketName).uploadBinary(
           filePath,
           fileBytes,
@@ -199,6 +232,27 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     final String publicUrl =
         supabase.storage.from(bucketName).getPublicUrl(filePath);
 
+    // Upload mark scheme if provided
+    String? markSchemeUrl;
+    if (markSchemeBytes != null) {
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Uploading mark scheme...';
+        });
+      }
+      
+      final markSchemePath = 'pdfs/$subjectId/${year}_${season}_${variant}_ms.pdf';
+      await supabase.storage.from(bucketName).uploadBinary(
+            markSchemePath,
+            markSchemeBytes,
+            fileOptions: const FileOptions(
+              contentType: 'application/pdf',
+              upsert: true,
+            ),
+          );
+      markSchemeUrl = supabase.storage.from(bucketName).getPublicUrl(markSchemePath);
+    }
+
     final newPaper = await supabase.from('papers').insert({
       'subject_id': subjectId,
       'year': year,
@@ -209,7 +263,9 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
     if (mounted) {
       setState(() {
-        _statusMessage = 'Analyzing with AI...';
+        _statusMessage = markSchemeUrl != null 
+            ? 'Analyzing paper + extracting answers...'
+            : 'Analyzing with AI...';
       });
     }
 
@@ -218,6 +274,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       body: {
         'paperId': newPaper['id'],
         'pdfUrl': publicUrl,
+        if (markSchemeUrl != null) 'markSchemeUrl': markSchemeUrl,
       },
     );
 
@@ -477,6 +534,81 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+                    
+                    // Mark scheme file picker (optional)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F2937),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _markSchemeFileName != null
+                              ? Colors.green.withValues(alpha: 0.5)
+                              : Colors.white.withValues(alpha: 0.1),
+                          width: _markSchemeFileName != null ? 2 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                _markSchemeFileName != null
+                                    ? Icons.check_circle
+                                    : Icons.description_outlined,
+                                color: _markSchemeFileName != null
+                                    ? const Color(0xFF10B981)
+                                    : Colors.white.withValues(alpha: 0.5),
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _markSchemeFileName ?? 'Mark Scheme (Optional)',
+                                      style: TextStyle(
+                                        color: _markSchemeFileName != null
+                                            ? AppTheme.textWhite
+                                            : Colors.white.withValues(alpha: 0.7),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    if (_markSchemeFileName == null)
+                                      Text(
+                                        'AI will extract answers & generate solutions',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(alpha: 0.4),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              OutlinedButton(
+                                onPressed: _isSubmitting ? null : _pickMarkScheme,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.green,
+                                  side: BorderSide(
+                                    color: Colors.green.withValues(alpha: 0.5),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: Text(_markSchemeFileName != null
+                                    ? 'Change'
+                                    : 'Select'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
                     const SizedBox(height: 32),
                     // Submit button
                     SizedBox(
