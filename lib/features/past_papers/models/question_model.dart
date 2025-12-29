@@ -71,7 +71,6 @@ class QuestionModel {
 
     // Handle ai_answer
     String aiSolution = '';
-    int? marks;
     Map<String, dynamic>? aiAnswerRaw;
 
     final aiAnswerData = map['ai_answer'] ?? map['aiAnswer'];
@@ -80,7 +79,6 @@ class QuestionModel {
         aiAnswerRaw = aiAnswerData;
         // Check 'text' first as per new requirement, then fallback to 'ai_solution'
         aiSolution = aiAnswerData['text']?.toString() ?? aiAnswerData['ai_solution']?.toString() ?? '';
-        marks = aiAnswerData['marks'] as int?;
       } else if (aiAnswerData is List && aiAnswerData.isNotEmpty) {
         final steps = aiAnswerData
             .whereType<Map<String, dynamic>>()
@@ -89,6 +87,12 @@ class QuestionModel {
             .toList();
         aiSolution = steps.join('\n');
       }
+    }
+
+    // Read marks from proper column first, fallback to ai_answer.marks for old data
+    int? marks = map['marks'] as int?;
+    if (marks == null && aiAnswerRaw != null) {
+      marks = aiAnswerRaw['marks'] as int?;
     }
 
     return QuestionModel(

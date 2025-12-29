@@ -1,7 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// VERSION: 2.0 - Added topic_ids validation
-// Use gemini-2.0-flash-exp which supports PDF analysis
+// VERSION: 4.0 - Optimized prompt for smaller output
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
 
 // Types for structured data
@@ -23,6 +22,7 @@ interface ExtractedQuestion {
   content: string
   topic_ids: string[]
   type: 'structured' | 'mcq'
+  marks?: number
   options?: { label: string; text: string }[]
   figure?: FigureBbox
 }
@@ -139,64 +139,42 @@ Deno.serve(async (req) => {
     // Step 4: Build the prompt for Gemini
     const topicsJson = JSON.stringify(topicsList.map(t => ({ id: t.id, name: t.name })))
     
-    const prompt = `You are an expert exam paper analyzer for IGCSE/GCSE papers.
+    const prompt = `Analyze this PDF exam paper. Extract questions as JSON.
 
-AVAILABLE TOPICS (use the "id" field for topic_ids, NOT the name):
+TOPICS (use id NOT name in topic_ids):
 ${topicsJson}
 
-TASK: Analyze this PDF exam paper and extract all questions.
-
-For EACH question, provide:
-1. question_number: The main question number (1, 2, 3, etc.) as an integer
-2. content: The COMPLETE question text, including ALL sub-parts (a, b, c, i, ii, etc.)
-3. topic_ids: Array of topic UUIDs (the "id" values from the AVAILABLE TOPICS list above, like "abc123-def456-..."). MUST be valid UUIDs from the list, NOT topic names!
-4. type: Either "structured" (written answer) or "mcq" (multiple choice)
-5. options: If MCQ, provide array of options like [{"label": "A", "text": "option text"}, ...]
-6. figure: If the question includes a diagram/figure/graph/table/image, provide its location:
-   - page: page number (1-indexed)
-   - x: percentage from left edge (0-100) - START 15% BEFORE the actual figure
-   - y: percentage from top edge (0-100) - START 15% ABOVE the actual figure  
-   - width: percentage of page width (0-100) - ADD 30% extra width to ensure full capture
-   - height: percentage of page height (0-100) - ADD 30% extra height to ensure full capture
-
-CRITICAL RULES:
-- topic_ids MUST contain UUID values from the topics list (like "abc123-def456-789..."), NOT topic names
-- Combine all sub-parts (a, b, i, ii) into ONE question entry
-- Match to topics as accurately as possible
-- FIGURE BOUNDING BOX: Be VERY GENEROUS! Always add extra padding around figures. It's better to include too much than too little. Include the figure label (e.g., "Fig. 1") in the bounding box.
-- If no figure, omit the "figure" field entirely
-- If no matching topic, use empty array []
-
-Return ONLY valid JSON in this exact format:
+OUTPUT FORMAT - Return ONLY this JSON structure:
 {
   "questions": [
     {
       "question_number": 1,
-      "content": "Full text of question 1 including all parts...",
-      "topic_ids": ["uuid-1", "uuid-2"],
-      "type": "structured",
-      "figure": {
-        "page": 1,
-        "x": 10,
-        "y": 30,
-        "width": 40,
-        "height": 25
-      }
+      "content": "Question text (for MCQ: just the stem, NOT the options)",
+      "topic_ids": ["uuid-from-topics-list"],
+      "type": "mcq",
+      "marks": 1,
+      "options": [{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}]
     },
     {
       "question_number": 2,
-      "content": "Question 2 text...",
-      "topic_ids": ["uuid-3"],
-      "type": "mcq",
-      "options": [
-        {"label": "A", "text": "First option"},
-        {"label": "B", "text": "Second option"},
-        {"label": "C", "text": "Third option"},
-        {"label": "D", "text": "Fourth option"}
-      ]
+      "content": "Full question including all sub-parts a,b,c etc",
+      "topic_ids": ["uuid"],
+      "type": "structured",
+      "marks": 6,
+      "figure": {"page":1,"x":10,"y":30,"width":50,"height":40}
     }
   ]
-}`
+}
+
+RULES:
+- For MCQs: "content" = question stem ONLY (not A/B/C/D options). Options go in "options" array.
+- For structured: "content" = full question with all sub-parts
+- "topic_ids" = UUIDs from TOPICS list (or empty [])
+- "marks" = total marks for the question (usually shown in [X] or (X marks) format)
+- "figure" = include ONLY if question has diagram/image. Add 20% padding to bounding box.
+- Combine all sub-parts (a,b,i,ii) into ONE entry per main question number
+
+Return valid JSON only, no markdown.`
 
     // Step 5: Send to Gemini
     console.log('[5/6] Sending to Gemini for analysis...')
@@ -215,7 +193,7 @@ Return ONLY valid JSON in this exact format:
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 16384,
       }
     }
 
@@ -239,15 +217,44 @@ Return ONLY valid JSON in this exact format:
     // Parse Gemini response
     let extractedData: AIResponse
     try {
-      const rawText = geminiJson.candidates[0].content.parts[0].text
-      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim()
-      extractedData = JSON.parse(cleanJson)
+      let rawText = geminiJson.candidates[0].content.parts[0].text
+      
+      // Remove markdown code blocks if present
+      if (rawText.includes('```')) {
+        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim()
+      }
+      
+      // Try parsing directly first
+      try {
+        extractedData = JSON.parse(rawText)
+      } catch (firstError) {
+        console.log('First parse failed, attempting repair...')
+        
+        // Try to repair common issues
+        // 1. Fix unescaped control characters inside strings only
+        let repaired = rawText
+        
+        // Replace unescaped newlines inside string values
+        // This regex finds strings and escapes newlines within them
+        repaired = repaired.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match) => {
+          return match
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t')
+        })
+        
+        extractedData = JSON.parse(repaired)
+      }
+      
       console.log(`Gemini extracted ${extractedData.questions.length} questions`)
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', parseError)
-      console.error('Raw response:', JSON.stringify(geminiJson, null, 2))
+      // Log first 2000 chars of response for debugging
+      const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || 'No text'
+      console.error('Raw response (first 2000 chars):', rawText.substring(0, 2000))
+      console.error('Response length:', rawText.length)
       return new Response(
-        JSON.stringify({ error: 'Failed to parse AI response' }), 
+        JSON.stringify({ error: 'Failed to parse AI response', details: String(parseError) }), 
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -309,9 +316,10 @@ Return ONLY valid JSON in this exact format:
         topic_ids: filteredTopicIds,
         type: question.type,
         options: question.options || null,
-        image_url: null, // TODO: Implement PDF cropping with different library
+        marks: question.marks || null,  // Save marks to proper column
+        image_url: null,
         official_answer: null,
-        ai_answer: figureMetadata, // Store figure info here
+        ai_answer: figureMetadata, // Store figure info here (temporary, until cropped)
       })
     }
 
