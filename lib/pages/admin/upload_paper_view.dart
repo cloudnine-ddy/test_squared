@@ -29,6 +29,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   List<Map<String, dynamic>> _subjects = [];
   String? _selectedSubjectId;
   String? _selectedSeason;
+  String _paperType = 'subjective'; // 'objective' or 'subjective'
 
   // Question paper file
   String? _selectedFileName;
@@ -170,6 +171,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
         variant: variant,
         season: _selectedSeason!,
         subjectId: _selectedSubjectId!,
+        paperType: _paperType,
         fileBytes: _selectedFileBytes!,
         markSchemeBytes: _markSchemeFileBytes, // Optional
       );
@@ -208,6 +210,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     required int variant,
     required String season,
     required String subjectId,
+    required String paperType,
     required Uint8List fileBytes,
     Uint8List? markSchemeBytes,
   }) async {
@@ -263,6 +266,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       'season': season,
       'variant': variant,
       'pdf_url': publicUrl,
+      'paper_type': paperType,
     }).select().single();
 
     // Step 2: Analyzing
@@ -280,6 +284,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       body: {
         'paperId': newPaper['id'],
         'pdfUrl': publicUrl,
+        'paperType': paperType,
         if (markSchemeUrl != null) 'markSchemeUrl': markSchemeUrl,
       },
     );
@@ -387,26 +392,28 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Upload Exam Paper',
-                              style: TextStyle(
-                                color: AppTheme.textWhite,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Upload Exam Paper',
+                                style: TextStyle(
+                                  color: AppTheme.textWhite,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Upload a PDF and AI will extract questions',
-                              style: TextStyle(
-                                color: AppTheme.textGray,
-                                fontSize: 14,
+                              SizedBox(height: 4),
+                              Text(
+                                'Upload a PDF and AI will extract questions',
+                                style: TextStyle(
+                                  color: AppTheme.textGray,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -449,6 +456,113 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 20),
+                    
+                    // Paper Type Toggle
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Paper Type',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _paperType = 'objective'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: _paperType == 'objective'
+                                        ? Colors.blue.withValues(alpha: 0.2)
+                                        : const Color(0xFF1F2937),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _paperType == 'objective'
+                                          ? Colors.blue
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.quiz_outlined,
+                                        color: _paperType == 'objective'
+                                            ? Colors.blue
+                                            : Colors.white54,
+                                        size: 28,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'MCQ',
+                                        style: TextStyle(
+                                          color: _paperType == 'objective'
+                                              ? Colors.blue
+                                              : Colors.white54,
+                                          fontWeight: _paperType == 'objective'
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _paperType = 'subjective'),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: _paperType == 'subjective'
+                                        ? Colors.purple.withValues(alpha: 0.2)
+                                        : const Color(0xFF1F2937),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: _paperType == 'subjective'
+                                          ? Colors.purple
+                                          : Colors.transparent,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.edit_document,
+                                        color: _paperType == 'subjective'
+                                            ? Colors.purple
+                                            : Colors.white54,
+                                        size: 28,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Written',
+                                        style: TextStyle(
+                                          color: _paperType == 'subjective'
+                                              ? Colors.purple
+                                              : Colors.white54,
+                                          fontWeight: _paperType == 'subjective'
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
                     // Year input

@@ -9,11 +9,17 @@ class QuestionModel {
   final int? marks;
   final String aiSolution;
   final Map<String, dynamic>? aiAnswerRaw;
+  
+  // MCQ-specific fields
+  final String type; // 'mcq' or 'structured'
+  final List<Map<String, String>>? options; // [{label: 'A', text: '...'}]
+  final String? correctAnswer; // 'A', 'B', 'C', or 'D'
 
   // Paper info (joined from papers table)
   final int? paperYear;
   final String? paperSeason;
   final int? paperVariant;
+  final String? paperType; // 'objective' or 'subjective'
 
   const QuestionModel({
     required this.id,
@@ -26,9 +32,13 @@ class QuestionModel {
     this.marks,
     required this.aiSolution,
     this.aiAnswerRaw,
+    this.type = 'structured',
+    this.options,
+    this.correctAnswer,
     this.paperYear,
     this.paperSeason,
     this.paperVariant,
+    this.paperType,
   });
 
   // Helper getters
@@ -36,6 +46,24 @@ class QuestionModel {
   bool get hasOfficialAnswer => officialAnswer.isNotEmpty;
   bool get hasFigure => imageUrl != null && imageUrl!.isNotEmpty;
   bool get hasPaperInfo => paperYear != null && paperSeason != null;
+  bool get isMCQ => type == 'mcq';
+  bool get hasOptions => options != null && options!.isNotEmpty;
+  
+  /// Gets the correct answer for MCQ - uses correctAnswer if available,
+  /// otherwise falls back to parsing first letter from officialAnswer
+  String? get effectiveCorrectAnswer {
+    if (correctAnswer != null && correctAnswer!.isNotEmpty) {
+      return correctAnswer;
+    }
+    // Fallback: try to get first letter from officialAnswer (e.g., "A", "B")
+    if (officialAnswer.isNotEmpty) {
+      final firstChar = officialAnswer.trim().toUpperCase();
+      if (firstChar.isNotEmpty && 'ABCD'.contains(firstChar[0])) {
+        return firstChar[0];
+      }
+    }
+    return null;
+  }
 
   String get paperLabel {
     if (!hasPaperInfo) return '';
@@ -95,6 +123,31 @@ class QuestionModel {
       marks = aiAnswerRaw['marks'] as int?;
     }
 
+    // MCQ fields
+    final type = map['type']?.toString() ?? 'structured';
+    final correctAnswer = map['correct_answer']?.toString();
+    
+    // Parse options array
+    List<Map<String, String>>? options;
+    final optionsRaw = map['options'];
+    if (optionsRaw != null && optionsRaw is List) {
+      options = optionsRaw.map((o) {
+        if (o is Map) {
+          return {
+            'label': o['label']?.toString() ?? '',
+            'text': o['text']?.toString() ?? '',
+          };
+        }
+        return {'label': '', 'text': ''};
+      }).toList();
+    }
+    
+    // Paper type from joined papers table
+    String? paperType;
+    if (paperData is Map<String, dynamic>) {
+      paperType = paperData['paper_type']?.toString();
+    }
+
     return QuestionModel(
       id: id,
       paperId: paperId,
@@ -106,9 +159,13 @@ class QuestionModel {
       marks: marks,
       aiSolution: aiSolution,
       aiAnswerRaw: aiAnswerRaw,
+      type: type,
+      options: options,
+      correctAnswer: correctAnswer,
       paperYear: paperYear,
       paperSeason: paperSeason,
       paperVariant: paperVariant,
+      paperType: paperType,
     );
   }
 

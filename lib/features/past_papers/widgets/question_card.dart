@@ -60,6 +60,23 @@ class QuestionCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  
+                  // Question type icon (MCQ or Written)
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: question.isMCQ 
+                          ? Colors.cyan.withValues(alpha: 0.15)
+                          : Colors.orange.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      question.isMCQ ? Icons.quiz_outlined : Icons.edit_document,
+                      color: question.isMCQ ? Colors.cyan : Colors.orange,
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
 
                   // Paper info badge (year/season)
                   if (question.hasPaperInfo)

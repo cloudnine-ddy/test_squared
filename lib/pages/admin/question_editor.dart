@@ -49,6 +49,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
   double _figureY = 30;
   double _figureWidth = 40;
   double _figureHeight = 30;
+  
+  // MCQ fields
+  bool _isMCQ = false;
+  List<Map<String, dynamic>> _options = [];
+  String? _correctAnswer;
+  String? _originalAnswer; // AI-extracted answer (shown with green border)
 
   @override
   void initState() {
@@ -121,6 +127,15 @@ class _QuestionEditorState extends State<QuestionEditor> {
         }
       }
       
+      // MCQ data
+      _isMCQ = _question?['type'] == 'mcq';
+      _correctAnswer = _question?['correct_answer']?.toString();
+      _originalAnswer = _correctAnswer; // Store original AI answer
+      final optionsRaw = _question?['options'];
+      if (optionsRaw is List) {
+        _options = optionsRaw.map((o) => Map<String, dynamic>.from(o as Map)).toList();
+      }
+      
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -162,6 +177,8 @@ class _QuestionEditorState extends State<QuestionEditor> {
             'question_number': _questionNumber,
             'topic_ids': _selectedTopicIds,
             'ai_answer': aiAnswer,
+            'options': _isMCQ ? _options : null,
+            'correct_answer': _isMCQ ? _correctAnswer : null,
           })
           .eq('id', widget.questionId);
       
@@ -284,6 +301,90 @@ class _QuestionEditorState extends State<QuestionEditor> {
                         onChanged: (_) => _markChanged(),
                       ),
                     ),
+                    
+                    // MCQ Options (read-only display)
+                    if (_isMCQ && _options.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      _buildSection(
+                        'MCQ Options',
+                        Column(
+                          children: [
+                            for (int i = 0; i < _options.length; i++)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _options[i]['label'] == _correctAnswer
+                                      ? Colors.green.withValues(alpha: 0.2)
+                                      : const Color(0xFF1E2233),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: _options[i]['label'] == _correctAnswer
+                                        ? Colors.green
+                                        : Colors.white.withValues(alpha: 0.1),
+                                    width: _options[i]['label'] == _correctAnswer ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    // Letter badge
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: _options[i]['label'] == _correctAnswer
+                                            ? Colors.green
+                                            : Colors.white.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      child: Center(
+                                        child: _options[i]['label'] == _correctAnswer
+                                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                            : Text(
+                                                _options[i]['label'] ?? '',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    // Editable text field
+                                    Expanded(
+                                      child: TextFormField(
+                                        initialValue: _options[i]['text'] ?? '',
+                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          border: InputBorder.none,
+                                          hintText: 'Option ${_options[i]['label']}...',
+                                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                                        ),
+                                        onChanged: (value) {
+                                          _options[i]['text'] = value;
+                                          _markChanged();
+                                        },
+                                      ),
+                                    ),
+                                    if (_options[i]['label'] == _correctAnswer)
+                                      const Text('✓ Correct', style: TextStyle(color: Colors.green, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                            // Note about changing correct answer
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'To change the correct answer, edit the Official Answer field below',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11, fontStyle: FontStyle.italic),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     
                     const SizedBox(height: 20),
                     

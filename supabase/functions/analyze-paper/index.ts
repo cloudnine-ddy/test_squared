@@ -24,6 +24,7 @@ interface ExtractedQuestion {
   type: 'structured' | 'mcq'
   marks?: number
   options?: { label: string; text: string }[]
+  correct_answer?: string
   figure?: FigureBbox
 }
 
@@ -42,7 +43,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { paperId, pdfUrl, markSchemeUrl } = await req.json()
+    const { paperId, pdfUrl, markSchemeUrl, paperType } = await req.json()
+    const isObjective = paperType === 'objective'
+    
+    console.log(`[DEBUG] Paper type received: "${paperType}"`)
+    console.log(`[DEBUG] Is objective (MCQ): ${isObjective}`)
     
     if (!paperId || !pdfUrl) {
       return new Response(
@@ -136,29 +141,50 @@ Deno.serve(async (req) => {
     const base64Data = uint8ArrayToBase64(pdfBytes)
     console.log(`PDF downloaded: ${(pdfBytes.length / 1024 / 1024).toFixed(2)} MB`)
 
-    // Step 4: Build the prompt for Gemini
+    // Step 4: Build the prompt for Gemini based on paper type
     const topicsJson = JSON.stringify(topicsList.map(t => ({ id: t.id, name: t.name })))
     
-    const prompt = `Analyze this PDF exam paper. Extract questions as JSON.
+    const objectivePrompt = `Analyze this MCQ (Multiple Choice) exam paper. Extract questions as JSON.
 
 TOPICS (use id NOT name in topic_ids):
 ${topicsJson}
 
-OUTPUT FORMAT - Return ONLY this JSON structure:
+OUTPUT FORMAT - Return ONLY this JSON:
 {
   "questions": [
     {
       "question_number": 1,
-      "content": "Question text (for MCQ: just the stem, NOT the options)",
+      "content": "Question stem ONLY (without A/B/C/D options)",
       "topic_ids": ["uuid-from-topics-list"],
       "type": "mcq",
       "marks": 1,
-      "options": [{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}]
-    },
+      "options": [{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}],
+      "correct_answer": "A"
+    }
+  ]
+}
+
+RULES:
+- "content" = question stem ONLY, NOT the A/B/C/D options
+- "options" = array with label (A/B/C/D) and text
+- "correct_answer" = correct letter if visible in answer key
+- "marks" = usually 1 for MCQ
+- Extract ALL questions from the paper
+
+Return valid JSON only, no markdown.`
+
+    const subjectivePrompt = `Analyze this structured/written exam paper. Extract questions as JSON.
+
+TOPICS (use id NOT name in topic_ids):
+${topicsJson}
+
+OUTPUT FORMAT - Return ONLY this JSON:
+{
+  "questions": [
     {
-      "question_number": 2,
-      "content": "Full question including all sub-parts a,b,c etc",
-      "topic_ids": ["uuid"],
+      "question_number": 1,
+      "content": "Full question including all sub-parts (a), (b), (i), (ii) etc",
+      "topic_ids": ["uuid-from-topics-list"],
       "type": "structured",
       "marks": 6,
       "figure": {"page":1,"x":10,"y":30,"width":50,"height":40}
@@ -167,14 +193,16 @@ OUTPUT FORMAT - Return ONLY this JSON structure:
 }
 
 RULES:
-- For MCQs: "content" = question stem ONLY (not A/B/C/D options). Options go in "options" array.
-- For structured: "content" = full question with all sub-parts
-- "topic_ids" = UUIDs from TOPICS list (or empty [])
-- "marks" = total marks for the question (usually shown in [X] or (X marks) format)
-- "figure" = include ONLY if question has diagram/image. Add 20% padding to bounding box.
-- Combine all sub-parts (a,b,i,ii) into ONE entry per main question number
+- "content" = full question text with ALL sub-parts combined
+- "marks" = total marks (shown as [X] or (X marks))
+- "figure" = ONLY if question has diagram/image. Coordinates are % of page.
+- Combine sub-parts (a,b,c,i,ii) into ONE entry per main question number
+- "type" = "structured" for all written questions
 
 Return valid JSON only, no markdown.`
+
+    const prompt = isObjective ? objectivePrompt : subjectivePrompt
+    console.log(`Using ${isObjective ? 'OBJECTIVE (MCQ)' : 'SUBJECTIVE (Written)'} prompt`)
 
     // Step 5: Send to Gemini
     console.log('[5/6] Sending to Gemini for analysis...')
@@ -316,6 +344,7 @@ Return valid JSON only, no markdown.`
         topic_ids: filteredTopicIds,
         type: question.type,
         options: question.options || null,
+        correct_answer: question.correct_answer || null,
         marks: question.marks || null,  // Save marks to proper column
         image_url: null,
         official_answer: null,

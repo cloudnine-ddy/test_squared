@@ -76,9 +76,14 @@ class PastPaperRepository {
     try {
       final response = await _supabase
           .from('questions')
-          .select()
+          .select('*, papers(year, season, variant, paper_type)')
           .eq('id', questionId)
           .single();
+      
+      // Debug: Print raw response to see what's coming from DB
+      print('[DEBUG] getQuestionById raw response: $response');
+      print('[DEBUG] type field: ${response['type']}');
+      print('[DEBUG] options field: ${response['options']}');
       
       return QuestionModel.fromMap(response as Map<String, dynamic>);
     } catch (e) {
