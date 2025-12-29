@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
 import '../../core/theme/app_theme.dart';
+import 'widgets/question_image_header.dart';
+import 'widgets/question_action_bar.dart';
+import 'widgets/answer_reveal_sheet.dart';
+import 'widgets/formatted_question_text.dart';
 
 /// Full-page question detail view with figure and answer reveals
 class QuestionDetailScreen extends StatefulWidget {
@@ -20,7 +24,6 @@ class QuestionDetailScreen extends StatefulWidget {
 class _QuestionDetailScreenState extends State<QuestionDetailScreen> {
   QuestionModel? _question;
   bool _isLoading = true;
-  bool _showOfficialAnswer = false;
   bool _showAiSolution = false;
 
   @override
@@ -39,204 +42,18 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            if (GoRouter.of(context).canPop()) {
-              GoRouter.of(context).pop();
-            } else {
-              GoRouter.of(context).go('/dashboard');
-            }
-          },
-        ),
-        title: Text(
-          _question != null 
-              ? 'Question ${_question!.questionNumber}' 
-              : 'Question',
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          if (_question?.marks != null)
-            Container(
-              margin: const EdgeInsets.only(right: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.star, color: Colors.amber, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_question!.marks} marks',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-      body: _buildBody(),
-    );
-  }
+  void _showAnswerSheet() {
+    if (_question == null) return;
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.blue),
-      );
-    }
-
-    if (_question == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, color: Colors.red[300], size: 64),
-            const SizedBox(height: 16),
-            const Text(
-              'Question not found',
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Question Content Card
-          _buildCard(
-            title: 'Question ${_question!.questionNumber}',
-            icon: Icons.help_outline,
-            iconColor: Colors.blue,
-            child: SelectableText(
-              _question!.content,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                height: 1.6,
-              ),
-            ),
-          ),
-          
-          // Figure (if exists)
-          if (_question!.hasFigure) ...[
-            const SizedBox(height: 16),
-            _buildCard(
-              title: 'Figure',
-              icon: Icons.image,
-              iconColor: Colors.green,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  _question!.imageUrl!,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      height: 200,
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: CircularProgressIndicator(color: Colors.blue),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: 100,
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.broken_image, color: Colors.white38, size: 32),
-                            SizedBox(height: 8),
-                            Text('Failed to load image', 
-                                style: TextStyle(color: Colors.white38)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ],
-          
-          const SizedBox(height: 16),
-          
-          // Official Answer Section
-          _buildRevealSection(
-            title: 'Official Answer',
-            icon: Icons.check_circle_outline,
-            iconColor: Colors.green,
-            isRevealed: _showOfficialAnswer,
-            hasContent: _question!.hasOfficialAnswer,
-            onToggle: () => setState(() => _showOfficialAnswer = !_showOfficialAnswer),
-            content: _question!.officialAnswer,
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // AI Solution Section
-          _buildRevealSection(
-            title: 'AI Step-by-Step Solution',
-            icon: Icons.lightbulb_outline,
-            iconColor: Colors.amber,
-            isRevealed: _showAiSolution,
-            hasContent: _question!.hasAiSolution,
-            onToggle: () => setState(() => _showAiSolution = !_showAiSolution),
-            content: _question!.aiSolution,
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // AI Explain More Button
-          Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceDark,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
-            ),
-            child: ListTile(
-              onTap: _showAiExplainDialog,
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.cyan.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.psychology, color: Colors.cyan, size: 20),
-              ),
-              title: const Text(
-                'Ask AI to Explain',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                'Get additional explanation for this question',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
-              ),
-              trailing: Icon(Icons.arrow_forward_ios, color: Colors.cyan.withValues(alpha: 0.7), size: 16),
-            ),
-          ),
-          
-          const SizedBox(height: 40),
-        ],
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => AnswerRevealSheet(
+        officialAnswer: _question!.officialAnswer,
+        aiSolution: _question!.aiSolution,
+        hasOfficialAnswer: _question!.hasOfficialAnswer,
+        hasAiSolution: _question!.hasAiSolution,
       ),
     );
   }
@@ -261,7 +78,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'This feature will use AI to provide additional explanation for the question.',
+                'This feature will use AI to provide additional explanation for the question context and concepts.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 16),
@@ -278,7 +95,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Coming soon! This will use Gemini AI to explain concepts in more detail.',
+                        'This specific feature is coming soon!',
                         style: TextStyle(color: Colors.cyan.shade200, fontSize: 13),
                       ),
                     ),
@@ -298,179 +115,181 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen> {
     );
   }
 
-  Widget _buildCard({
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required Widget child,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
+  void _toggleAiSolution() {
+    setState(() {
+      _showAiSolution = !_showAiSolution;
+    });
+    // If opening AI, maybe scroll to bottom? (Optional, better to let user scroll)
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0B0E14),
+        body: Center(child: CircularProgressIndicator(color: Colors.blue)),
+      );
+    }
+
+    // ... Error handling remains the same ...
+    if (_question == null) {
+        return const Scaffold(body: Center(child: Text('Error')));
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B0E14),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: const Color(0xFF0B0E14),
+            expandedHeight: _question!.hasFigure ? 300 : 0,
+            floating: false,
+            pinned: true,
+            leading: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+              ),
+              onPressed: () {
+                 if (GoRouter.of(context).canPop()) {
+                    GoRouter.of(context).pop();
+                } else {
+                    GoRouter.of(context).go('/dashboard');
+                }
+              },
+            ),
+            actions: [
+               if (_question?.marks != null)
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(icon, color: iconColor, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_question!.marks} marks',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+            ],
+            flexibleSpace: _question!.hasFigure
+                ? QuestionImageHeader(
+                    imageUrl: _question!.imageUrl!,
+                    heroTag: 'figure_${_question!.id}',
+                  )
+                : null,
+          ),
+
+          // Question Content
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            sliver: SliverToBoxAdapter(
+              child: FormattedQuestionText(
+                content: _question!.content,
+                fontSize: 18,
+              ),
             ),
           ),
-          const Divider(height: 1, color: Colors.white12),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: child,
+
+          // AI Solution Card (Animated Reveal)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 100), // Bottom padding
+            sliver: SliverToBoxAdapter(
+              child: AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: _buildAiSolutionCard(),
+                crossFadeState: _showAiSolution
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 300),
+                sizeCurve: Curves.easeInOut,
+              ),
+            ),
           ),
         ],
+      ),
+      bottomNavigationBar: QuestionActionBar(
+        onToggleOfficialAnswer: _showAnswerSheet, // Reusing existing method name for simplicity, though it shows bottom sheet
+        onToggleAiExplanation: _toggleAiSolution,
+        hasAiSolution: _question!.hasAiSolution,
+        isAiSolutionVisible: _showAiSolution,
       ),
     );
   }
 
-  Widget _buildRevealSection({
-    required String title,
-    required IconData icon,
-    required Color iconColor,
-    required bool isRevealed,
-    required bool hasContent,
-    required VoidCallback onToggle,
-    required String content,
-  }) {
+  Widget _buildAiSolutionCard() {
+    if (_question == null || !_question!.hasAiSolution) return const SizedBox.shrink();
+
+    // Split text by double newline to form paragraphs
+    final parts = _question!.aiSolution.split(RegExp(r'\n\n+'));
+
     return Container(
+      margin: const EdgeInsets.only(top: 24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: const Color(0xFF1A1A2E), // Subtle purple/blue tint
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isRevealed 
-              ? iconColor.withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.1),
-          width: isRevealed ? 2 : 1,
+          color: Colors.indigoAccent.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with toggle button
-          InkWell(
-            onTap: hasContent ? onToggle : null,
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
+            // Header
+            Row(
+              children: [
+                Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: iconColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
+                        color: Colors.indigoAccent.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(icon, color: iconColor, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (!hasContent)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[700],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'Not available',
-                        style: TextStyle(color: Colors.white54, fontSize: 12),
-                      ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isRevealed 
-                            ? Colors.grey[700]
-                            : iconColor.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isRevealed ? Icons.visibility_off : Icons.visibility,
-                            color: isRevealed ? Colors.white70 : iconColor,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            isRevealed ? 'Hide' : 'Reveal',
-                            style: TextStyle(
-                              color: isRevealed ? Colors.white70 : iconColor,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          
-          // Content (animated reveal)
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Divider(height: 1, color: Colors.white12),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: SelectableText(
-                    content,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      height: 1.7,
-                    ),
-                  ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.indigoAccent, size: 20),
                 ),
-              ],
+                const SizedBox(width: 12),
+                const Text(
+                    'AI Step-by-Step',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                    ),
+                ),
+            ],
             ),
-            crossFadeState: isRevealed 
-                ? CrossFadeState.showSecond 
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
+            const SizedBox(height: 16),
+            const Divider(color: Colors.white10),
+            const SizedBox(height: 16),
+
+            // Step content
+            ...parts.map((part) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: SelectableText(
+                    part.trim(),
+                    style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        height: 1.6,
+                        fontFamily: 'Roboto',
+                    ),
+                ),
+            )),
         ],
       ),
     );

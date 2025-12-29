@@ -9,7 +9,7 @@ class QuestionModel {
   final int? marks;
   final String aiSolution;
   final Map<String, dynamic>? aiAnswerRaw;
-  
+
   // Paper info (joined from papers table)
   final int? paperYear;
   final String? paperSeason;
@@ -36,7 +36,7 @@ class QuestionModel {
   bool get hasOfficialAnswer => officialAnswer.isNotEmpty;
   bool get hasFigure => imageUrl != null && imageUrl!.isNotEmpty;
   bool get hasPaperInfo => paperYear != null && paperSeason != null;
-  
+
   String get paperLabel {
     if (!hasPaperInfo) return '';
     final season = paperSeason!.substring(0, 1).toUpperCase() + paperSeason!.substring(1);
@@ -50,7 +50,7 @@ class QuestionModel {
     final officialAnswer = map['official_answer']?.toString() ?? '';
     final questionNumber = map['question_number'] as int? ?? 0;
     final imageUrl = map['image_url']?.toString();
-    
+
     // Paper info from joined papers table
     int? paperYear;
     String? paperSeason;
@@ -61,24 +61,25 @@ class QuestionModel {
       paperSeason = paperData['season']?.toString();
       paperVariant = paperData['variant'] as int?;
     }
-    
+
     // Handle topicIds
     List<String> topicIds = [];
     final topicIdsRaw = map['topic_ids'] ?? map['topicIds'];
     if (topicIdsRaw != null && topicIdsRaw is List) {
       topicIds = topicIdsRaw.map((e) => e.toString()).toList();
     }
-    
+
     // Handle ai_answer
     String aiSolution = '';
     int? marks;
     Map<String, dynamic>? aiAnswerRaw;
-    
+
     final aiAnswerData = map['ai_answer'] ?? map['aiAnswer'];
     if (aiAnswerData != null) {
       if (aiAnswerData is Map<String, dynamic>) {
         aiAnswerRaw = aiAnswerData;
-        aiSolution = aiAnswerData['ai_solution']?.toString() ?? '';
+        // Check 'text' first as per new requirement, then fallback to 'ai_solution'
+        aiSolution = aiAnswerData['text']?.toString() ?? aiAnswerData['ai_solution']?.toString() ?? '';
         marks = aiAnswerData['marks'] as int?;
       } else if (aiAnswerData is List && aiAnswerData.isNotEmpty) {
         final steps = aiAnswerData
@@ -89,7 +90,7 @@ class QuestionModel {
         aiSolution = steps.join('\n');
       }
     }
-    
+
     return QuestionModel(
       id: id,
       paperId: paperId,
