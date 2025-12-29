@@ -3,6 +3,7 @@ import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/past_papers/topic_detail_screen.dart';
+import '../../features/past_papers/question_detail_screen.dart';
 import '../../pages/admin/admin_shell.dart';
 
 final goRouter = GoRouter(
@@ -31,6 +32,12 @@ final goRouter = GoRouter(
         return TopicDetailScreen(topicId: topicId);
       },
     ),
+    GoRoute(
+      path: '/question/:questionId',
+      builder: (context, state) {
+        final questionId = state.pathParameters['questionId']!;
+        return QuestionDetailScreen(questionId: questionId);
+      },
+    ),
   ],
 );
-

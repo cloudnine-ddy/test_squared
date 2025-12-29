@@ -1,11 +1,14 @@
 class QuestionModel {
-  final String id; // UUID
-  final String? paperId; // Foreign Key to Papers (nullable)
-  final List<String> topicIds; // List of IDs to support multi-tagging
+  final String id;
+  final String? paperId;
+  final List<String> topicIds;
   final int questionNumber;
   final String content;
   final String officialAnswer;
-  final List<Map<String, dynamic>> aiAnswer; // JSONB step-by-step guide
+  final String? imageUrl;
+  final int? marks;
+  final String aiSolution; // AI-generated step-by-step solution (text)
+  final Map<String, dynamic>? aiAnswerRaw; // Raw ai_answer from DB
 
   const QuestionModel({
     required this.id,
@@ -14,74 +17,59 @@ class QuestionModel {
     required this.questionNumber,
     required this.content,
     required this.officialAnswer,
-    required this.aiAnswer,
+    this.imageUrl,
+    this.marks,
+    required this.aiSolution,
+    this.aiAnswerRaw,
   });
 
-  // Helper getter to check if AI answer exists
-  bool get hasAiAnswer => aiAnswer.isNotEmpty;
+  // Helper getter to check if AI solution exists
+  bool get hasAiSolution => aiSolution.isNotEmpty;
+  
+  // Helper getter to check if official answer exists
+  bool get hasOfficialAnswer => officialAnswer.isNotEmpty;
+  
+  // Helper getter to check if figure exists
+  bool get hasFigure => imageUrl != null && imageUrl!.isNotEmpty;
 
-  // Convert to Map for database operations
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'paper_id': paperId,
-      'topic_ids': topicIds,
-      'question_number': questionNumber,
-      'content': content,
-      'official_answer': officialAnswer,
-      'ai_answer': aiAnswer,
-    };
-  }
-
-  // Create from Map (e.g., from database) - Extremely defensive
+  // Create from Map (e.g., from database)
   factory QuestionModel.fromMap(Map<String, dynamic> map) {
-    // Handle id safely - default to empty string if null
     final id = map['id']?.toString() ?? '';
-    
-    // Handle paperId safely - nullable
     final paperId = map['paper_id']?.toString();
-    
-    // Handle content safely - default to 'No content' if null
     final content = map['content']?.toString() ?? 'No content';
-    
-    // Handle officialAnswer safely - default to empty string if null
     final officialAnswer = map['official_answer']?.toString() ?? 
                           map['officialAnswer']?.toString() ?? '';
-    
-    // Handle questionNumber safely - default to 0 if null
     final questionNumber = map['question_number'] as int? ?? 
                           map['questionNumber'] as int? ?? 0;
+    final imageUrl = map['image_url']?.toString();
     
-    // Handle topicIds safely - if null, return empty list, otherwise cast safely
+    // Handle topicIds
     List<String> topicIds = [];
     final topicIdsRaw = map['topic_ids'] ?? map['topicIds'];
-    if (topicIdsRaw != null) {
-      if (topicIdsRaw is List) {
-        try {
-          topicIds = topicIdsRaw
-              .map((e) => e.toString())
-              .toList();
-        } catch (e) {
-          print('WARNING: Failed to parse topicIds: $e');
-          topicIds = [];
-        }
-      }
+    if (topicIdsRaw != null && topicIdsRaw is List) {
+      topicIds = topicIdsRaw.map((e) => e.toString()).toList();
     }
     
-    // Handle aiAnswer safely - if null, return empty list, otherwise cast safely
-    List<Map<String, dynamic>> aiAnswer = [];
-    final aiAnswerRaw = map['ai_answer'] ?? map['aiAnswer'];
-    if (aiAnswerRaw != null) {
-      if (aiAnswerRaw is List) {
-        try {
-          aiAnswer = aiAnswerRaw
-              .where((item) => item is Map<String, dynamic>)
-              .map((item) => item as Map<String, dynamic>)
-              .toList();
-        } catch (e) {
-          print('WARNING: Failed to parse aiAnswer: $e');
-          aiAnswer = [];
-        }
+    // Handle ai_answer - can be Map with ai_solution string, or List (old format)
+    String aiSolution = '';
+    int? marks;
+    Map<String, dynamic>? aiAnswerRaw;
+    
+    final aiAnswerData = map['ai_answer'] ?? map['aiAnswer'];
+    if (aiAnswerData != null) {
+      if (aiAnswerData is Map<String, dynamic>) {
+        aiAnswerRaw = aiAnswerData;
+        // New format: {ai_solution: "...", marks: 5}
+        aiSolution = aiAnswerData['ai_solution']?.toString() ?? '';
+        marks = aiAnswerData['marks'] as int?;
+      } else if (aiAnswerData is List && aiAnswerData.isNotEmpty) {
+        // Old format: List of step objects - convert to text
+        final steps = aiAnswerData
+            .whereType<Map<String, dynamic>>()
+            .map((step) => step['description']?.toString() ?? '')
+            .where((s) => s.isNotEmpty)
+            .toList();
+        aiSolution = steps.join('\n');
       }
     }
     
@@ -92,8 +80,25 @@ class QuestionModel {
       questionNumber: questionNumber,
       content: content,
       officialAnswer: officialAnswer,
-      aiAnswer: aiAnswer,
+      imageUrl: imageUrl,
+      marks: marks,
+      aiSolution: aiSolution,
+      aiAnswerRaw: aiAnswerRaw,
     );
+  }
+
+  // Convert to Map for database operations
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'paper_id': paperId,
+      'topic_ids': topicIds,
+      'question_number': questionNumber,
+      'content': content,
+      'official_answer': officialAnswer,
+      'image_url': imageUrl,
+      'ai_answer': aiAnswerRaw,
+    };
   }
 
   // Create a copy with optional field updates
@@ -104,7 +109,9 @@ class QuestionModel {
     int? questionNumber,
     String? content,
     String? officialAnswer,
-    List<Map<String, dynamic>>? aiAnswer,
+    String? imageUrl,
+    int? marks,
+    String? aiSolution,
   }) {
     return QuestionModel(
       id: id ?? this.id,
@@ -113,8 +120,10 @@ class QuestionModel {
       questionNumber: questionNumber ?? this.questionNumber,
       content: content ?? this.content,
       officialAnswer: officialAnswer ?? this.officialAnswer,
-      aiAnswer: aiAnswer ?? this.aiAnswer,
+      imageUrl: imageUrl ?? this.imageUrl,
+      marks: marks ?? this.marks,
+      aiSolution: aiSolution ?? this.aiSolution,
+      aiAnswerRaw: aiAnswerRaw,
     );
   }
 }
-

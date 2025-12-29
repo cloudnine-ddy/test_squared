@@ -8,41 +8,82 @@ class PastPaperRepository {
 
   Future<List<TopicModel>> getTopics({required String subjectId}) async {
     try {
-      print('DEBUG: Starting getTopics() method');
-      print('DEBUG: Subject ID: $subjectId');
-      print('DEBUG: About to call Supabase.from("topics").select().eq("subject_id", "$subjectId")');
-      
-      final response = await _supabase
+      // Fetch topics for this subject
+      final topicsResponse = await _supabase
           .from('topics')
           .select()
           .eq('subject_id', subjectId);
       
-      print('DEBUG: Supabase call completed');
-      print('DEBUG: Response type: ${response.runtimeType}');
+      final List<dynamic> topicsData = topicsResponse as List<dynamic>;
       
-      final List<dynamic> data = response as List<dynamic>;
-      
-      print('RAW DATA: $data');
-      print('DEBUG: Data length: ${data.length}');
-      
-      if (data.isEmpty) {
-        print('WARNING: Supabase returned an empty list for subject $subjectId');
+      if (topicsData.isEmpty) {
         return [];
       }
       
-      print('DEBUG: Starting to map data to TopicModel');
-      final topics = data.map((e) {
-        print('DEBUG: Mapping item: $e');
-        return TopicModel.fromMap(e as Map<String, dynamic>);
+      // Fetch all questions for this subject to count by topic
+      // First get paper IDs for this subject
+      final papersResponse = await _supabase
+          .from('papers')
+          .select('id')
+          .eq('subject_id', subjectId);
+      
+      final paperIds = (papersResponse as List<dynamic>)
+          .map((p) => p['id'] as String)
+          .toList();
+      
+      // Count questions per topic
+      Map<String, int> topicCounts = {};
+      
+      if (paperIds.isNotEmpty) {
+        final questionsResponse = await _supabase
+            .from('questions')
+            .select('topic_ids')
+            .inFilter('paper_id', paperIds);
+        
+        final questionsData = questionsResponse as List<dynamic>;
+        
+        for (var q in questionsData) {
+          final topicIds = q['topic_ids'];
+          if (topicIds is List) {
+            for (var topicId in topicIds) {
+              final id = topicId.toString();
+              topicCounts[id] = (topicCounts[id] ?? 0) + 1;
+            }
+          }
+        }
+      }
+      
+      // Map topics with counts
+      final topics = topicsData.map((e) {
+        final map = e as Map<String, dynamic>;
+        final topicId = map['id']?.toString() ?? '';
+        return TopicModel.fromMap({
+          ...map,
+          'question_count': topicCounts[topicId] ?? 0,
+        });
       }).toList();
       
-      print('DEBUG: Successfully mapped ${topics.length} topics');
       return topics;
     } catch (e, stackTrace) {
-      print('ERROR: $e');
+      print('ERROR in getTopics: $e');
       print('STACK TRACE: $stackTrace');
-      // Return empty list on error, or you could throw the error
       return [];
+    }
+  }
+
+  // Get a single question by ID
+  Future<QuestionModel?> getQuestionById(String questionId) async {
+    try {
+      final response = await _supabase
+          .from('questions')
+          .select()
+          .eq('id', questionId)
+          .single();
+      
+      return QuestionModel.fromMap(response as Map<String, dynamic>);
+    } catch (e) {
+      print('ERROR in getQuestionById: $e');
+      return null;
     }
   }
 
