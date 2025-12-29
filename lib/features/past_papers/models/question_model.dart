@@ -7,8 +7,13 @@ class QuestionModel {
   final String officialAnswer;
   final String? imageUrl;
   final int? marks;
-  final String aiSolution; // AI-generated step-by-step solution (text)
-  final Map<String, dynamic>? aiAnswerRaw; // Raw ai_answer from DB
+  final String aiSolution;
+  final Map<String, dynamic>? aiAnswerRaw;
+  
+  // Paper info (joined from papers table)
+  final int? paperYear;
+  final String? paperSeason;
+  final int? paperVariant;
 
   const QuestionModel({
     required this.id,
@@ -21,27 +26,41 @@ class QuestionModel {
     this.marks,
     required this.aiSolution,
     this.aiAnswerRaw,
+    this.paperYear,
+    this.paperSeason,
+    this.paperVariant,
   });
 
-  // Helper getter to check if AI solution exists
+  // Helper getters
   bool get hasAiSolution => aiSolution.isNotEmpty;
-  
-  // Helper getter to check if official answer exists
   bool get hasOfficialAnswer => officialAnswer.isNotEmpty;
-  
-  // Helper getter to check if figure exists
   bool get hasFigure => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get hasPaperInfo => paperYear != null && paperSeason != null;
+  
+  String get paperLabel {
+    if (!hasPaperInfo) return '';
+    final season = paperSeason!.substring(0, 1).toUpperCase() + paperSeason!.substring(1);
+    return '$paperYear $season${paperVariant != null ? " V$paperVariant" : ""}';
+  }
 
-  // Create from Map (e.g., from database)
   factory QuestionModel.fromMap(Map<String, dynamic> map) {
     final id = map['id']?.toString() ?? '';
     final paperId = map['paper_id']?.toString();
     final content = map['content']?.toString() ?? 'No content';
-    final officialAnswer = map['official_answer']?.toString() ?? 
-                          map['officialAnswer']?.toString() ?? '';
-    final questionNumber = map['question_number'] as int? ?? 
-                          map['questionNumber'] as int? ?? 0;
+    final officialAnswer = map['official_answer']?.toString() ?? '';
+    final questionNumber = map['question_number'] as int? ?? 0;
     final imageUrl = map['image_url']?.toString();
+    
+    // Paper info from joined papers table
+    int? paperYear;
+    String? paperSeason;
+    int? paperVariant;
+    final paperData = map['papers'];
+    if (paperData is Map<String, dynamic>) {
+      paperYear = paperData['year'] as int?;
+      paperSeason = paperData['season']?.toString();
+      paperVariant = paperData['variant'] as int?;
+    }
     
     // Handle topicIds
     List<String> topicIds = [];
@@ -50,7 +69,7 @@ class QuestionModel {
       topicIds = topicIdsRaw.map((e) => e.toString()).toList();
     }
     
-    // Handle ai_answer - can be Map with ai_solution string, or List (old format)
+    // Handle ai_answer
     String aiSolution = '';
     int? marks;
     Map<String, dynamic>? aiAnswerRaw;
@@ -59,11 +78,9 @@ class QuestionModel {
     if (aiAnswerData != null) {
       if (aiAnswerData is Map<String, dynamic>) {
         aiAnswerRaw = aiAnswerData;
-        // New format: {ai_solution: "...", marks: 5}
         aiSolution = aiAnswerData['ai_solution']?.toString() ?? '';
         marks = aiAnswerData['marks'] as int?;
       } else if (aiAnswerData is List && aiAnswerData.isNotEmpty) {
-        // Old format: List of step objects - convert to text
         final steps = aiAnswerData
             .whereType<Map<String, dynamic>>()
             .map((step) => step['description']?.toString() ?? '')
@@ -84,10 +101,12 @@ class QuestionModel {
       marks: marks,
       aiSolution: aiSolution,
       aiAnswerRaw: aiAnswerRaw,
+      paperYear: paperYear,
+      paperSeason: paperSeason,
+      paperVariant: paperVariant,
     );
   }
 
-  // Convert to Map for database operations
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -101,7 +120,6 @@ class QuestionModel {
     };
   }
 
-  // Create a copy with optional field updates
   QuestionModel copyWith({
     String? id,
     String? paperId,
@@ -112,6 +130,9 @@ class QuestionModel {
     String? imageUrl,
     int? marks,
     String? aiSolution,
+    int? paperYear,
+    String? paperSeason,
+    int? paperVariant,
   }) {
     return QuestionModel(
       id: id ?? this.id,
@@ -124,6 +145,9 @@ class QuestionModel {
       marks: marks ?? this.marks,
       aiSolution: aiSolution ?? this.aiSolution,
       aiAnswerRaw: aiAnswerRaw,
+      paperYear: paperYear ?? this.paperYear,
+      paperSeason: paperSeason ?? this.paperSeason,
+      paperVariant: paperVariant ?? this.paperVariant,
     );
   }
 }

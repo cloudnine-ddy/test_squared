@@ -53,7 +53,27 @@ class QuestionCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
+                  
+                  // Paper info badge (year/season)
+                  if (question.hasPaperInfo)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        question.paperLabel,
+                        style: const TextStyle(
+                          color: Colors.purple,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  
+                  const SizedBox(width: 8),
                   
                   // Marks badge (if available)
                   if (question.marks != null) ...[

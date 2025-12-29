@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../core/services/toast_service.dart';
 import 'upload_paper_view.dart';
 import 'question_manager_view.dart';
@@ -232,13 +234,22 @@ class _AdminShellState extends State<AdminShell> {
               ],
             ),
           ),
-          // Bottom section with logout
+          // Bottom section with theme toggle and logout
           Container(
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
                 Divider(color: Colors.white.withValues(alpha: 0.1)),
                 const SizedBox(height: 8),
+                // Theme toggle button
+                Consumer<ThemeProvider>(
+                  builder: (context, themeProvider, _) => _buildFooterButton(
+                    icon: themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                    label: themeProvider.isDarkMode ? 'Light Mode' : 'Dark Mode',
+                    onTap: () => themeProvider.toggleTheme(),
+                  ),
+                ),
+                const SizedBox(height: 4),
                 _buildLogoutButton(),
               ],
             ),
@@ -345,6 +356,52 @@ class _AdminShellState extends State<AdminShell> {
                   'Logout',
                   style: TextStyle(
                     color: Colors.red.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFooterButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: _isSidebarExpanded ? 16 : 0,
+            vertical: 12,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: _isSidebarExpanded
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: Colors.white.withValues(alpha: 0.7),
+                size: 22,
+              ),
+              if (_isSidebarExpanded) ...[
+                const SizedBox(width: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w500,
                   ),
                 ),

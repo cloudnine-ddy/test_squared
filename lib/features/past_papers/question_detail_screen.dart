@@ -204,7 +204,95 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen> {
             content: _question!.aiSolution,
           ),
           
+          const SizedBox(height: 16),
+          
+          // AI Explain More Button
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceDark,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
+            ),
+            child: ListTile(
+              onTap: _showAiExplainDialog,
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.cyan.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.psychology, color: Colors.cyan, size: 20),
+              ),
+              title: const Text(
+                'Ask AI to Explain',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                'Get additional explanation for this question',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+              ),
+              trailing: Icon(Icons.arrow_forward_ios, color: Colors.cyan.withValues(alpha: 0.7), size: 16),
+            ),
+          ),
+          
           const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAiExplainDialog() async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.psychology, color: Colors.cyan),
+            const SizedBox(width: 12),
+            const Text('AI Explanation', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'This feature will use AI to provide additional explanation for the question.',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.cyan.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, color: Colors.cyan, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Coming soon! This will use Gemini AI to explain concepts in more detail.',
+                        style: TextStyle(color: Colors.cyan.shade200, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );

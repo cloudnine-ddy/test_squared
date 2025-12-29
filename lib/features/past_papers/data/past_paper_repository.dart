@@ -89,52 +89,35 @@ class PastPaperRepository {
 
   Future<List<QuestionModel>> getQuestionsByTopic(String topicId) async {
     try {
-      print('DEBUG: Starting getQuestionsByTopic() method');
-      print('DEBUG: Topic ID: $topicId');
-      print('DEBUG: About to call Supabase.from("questions").select().contains("topic_ids", [$topicId])');
-      
+      // Join with papers table to get year/season info
       final response = await _supabase
           .from('questions')
-          .select()
-          .contains('topic_ids', [topicId]);
-      
-      print('DEBUG: Supabase call completed');
-      print('DEBUG: Response type: ${response.runtimeType}');
+          .select('*, papers(year, season, variant)')
+          .contains('topic_ids', [topicId])
+          .order('question_number');
       
       final List<dynamic> data = response as List<dynamic>;
       
-      print('RAW DATA: $data');
-      print('DEBUG: Data length: ${data.length}');
-      
       if (data.isEmpty) {
-        print('WARNING: Supabase returned an empty list for topic $topicId');
         return [];
       }
       
-      print('DEBUG: Starting to map data to QuestionModel');
       final questions = <QuestionModel>[];
       
       for (var item in data) {
         try {
           if (item is Map<String, dynamic>) {
-            print('DEBUG: Mapping question item: $item');
             final question = QuestionModel.fromMap(item);
             questions.add(question);
-          } else {
-            print('WARNING: Skipping invalid question item (not a Map): $item');
           }
-        } catch (e, stackTrace) {
+        } catch (e) {
           print('Skipping bad question: $e');
-          print('Item that failed: $item');
-          print('Stack trace: $stackTrace');
-          // Continue to next item instead of crashing
         }
       }
       
-      print('DEBUG: Successfully mapped ${questions.length} out of ${data.length} questions');
       return questions;
     } catch (e, stackTrace) {
-      print('ERROR: $e');
+      print('ERROR in getQuestionsByTopic: $e');
       print('STACK TRACE: $stackTrace');
       return [];
     }

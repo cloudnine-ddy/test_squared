@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/theme_provider.dart';
 import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
@@ -318,6 +320,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             itemBuilder: (context) => [
+                              PopupMenuItem(
+                                value: 'theme',
+                                child: Consumer<ThemeProvider>(
+                                  builder: (context, themeProvider, _) => Row(
+                                    children: [
+                                      Icon(
+                                        themeProvider.isDarkMode 
+                                            ? Icons.light_mode 
+                                            : Icons.dark_mode,
+                                        color: AppTheme.textWhite,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        themeProvider.isDarkMode 
+                                            ? 'Light Mode' 
+                                            : 'Dark Mode',
+                                        style: const TextStyle(
+                                          color: AppTheme.textWhite,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                               const PopupMenuItem(
                                 value: 'logout',
                                 child: Row(
@@ -339,7 +366,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ),
                             ],
                             onSelected: (value) async {
-                              if (value == 'logout') {
+                              if (value == 'theme') {
+                                Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+                              } else if (value == 'logout') {
                                 await AuthService().signOut();
                                 if (mounted) {
                                   context.go('/');

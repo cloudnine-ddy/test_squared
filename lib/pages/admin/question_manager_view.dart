@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/toast_service.dart';
 import 'question_editor.dart';
+import 'pdf_preview_dialog.dart';
 
 /// Question Manager - Organized hierarchical view of all questions
 /// Navigation: Exam Type → Subject → Year → Paper → Questions
@@ -457,6 +458,58 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                   ),
                 ),
                 const SizedBox(width: 4),
+                // PDF Preview button
+                IconButton(
+                  onPressed: () async {
+                    final pdfUrl = paper['pdf_url'] as String?;
+                    final subjectId = paper['subject_id'] as String?;
+                    if (pdfUrl != null) {
+                      try {
+                        String filePath;
+                        
+                        // Check if it's a full URL or just a filename
+                        if (pdfUrl.startsWith('http')) {
+                          // Full URL - extract path after exam-papers/
+                          if (pdfUrl.contains('/exam-papers/')) {
+                            filePath = pdfUrl.split('/exam-papers/').last;
+                          } else {
+                            ToastService.showError('Unknown URL format');
+                            return;
+                          }
+                        } else {
+                          // Just a filename - construct the path
+                          if (subjectId != null) {
+                            filePath = 'pdfs/$subjectId/$pdfUrl';
+                          } else {
+                            filePath = 'pdfs/$pdfUrl';
+                          }
+                        }
+                        
+                        print('DEBUG: Using file path: $filePath');
+                        
+                        // Create a signed URL (valid for 1 hour)
+                        final signedUrl = await Supabase.instance.client.storage
+                            .from('exam-papers')
+                            .createSignedUrl(filePath, 3600);
+                        
+                        showPdfPreview(context, signedUrl, paperLabel);
+                      } catch (e) {
+                        print('DEBUG error: $e');
+                        ToastService.showError('Failed to load PDF: $e');
+                      }
+                    } else {
+                      ToastService.showError('PDF URL not available');
+                    }
+                  },
+                  icon: Icon(
+                    Icons.visibility,
+                    size: 16,
+                    color: Colors.blue.withValues(alpha: 0.7),
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                  tooltip: 'Preview PDF',
+                ),
                 IconButton(
                   onPressed: () => _deletePaper(paperId, paperLabel),
                   icon: Icon(

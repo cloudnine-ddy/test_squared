@@ -20,6 +20,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   bool _isLoadingSubjects = false;
   bool _isSubmitting = false;
   String? _statusMessage;
+  int _uploadStep = 0; // 0=idle, 1=uploading, 2=analyzing, 3=extracting, 4=cropping, 5=done
 
   final _formKey = GlobalKey<FormState>();
   final _yearController = TextEditingController();
@@ -160,6 +161,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
     setState(() {
       _isSubmitting = true;
+      _uploadStep = 0;
     });
 
     try {
@@ -213,8 +215,10 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     const bucketName = 'exam-papers';
     final filePath = 'pdfs/$subjectId/${year}_${season}_$variant.pdf';
 
+    // Step 1: Uploading
     if (mounted) {
       setState(() {
+        _uploadStep = 1;
         _statusMessage = 'Uploading question paper...';
       });
     }
@@ -261,8 +265,10 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       'pdf_url': publicUrl,
     }).select().single();
 
+    // Step 2: Analyzing
     if (mounted) {
       setState(() {
+        _uploadStep = 2;
         _statusMessage = markSchemeUrl != null 
             ? 'Analyzing paper + extracting answers...'
             : 'Analyzing with AI...';
@@ -280,9 +286,70 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
     if (mounted) {
       setState(() {
+        _uploadStep = 5;
         _statusMessage = 'Success! Questions Extracted.';
       });
     }
+  }
+
+  Widget _buildProgressStep(int step, String title, String subtitle) {
+    final isComplete = _uploadStep >= step;
+    final isCurrent = _uploadStep == step - 1 || (_uploadStep == step && step < 5);
+    
+    Color iconColor;
+    IconData iconData;
+    
+    if (isComplete) {
+      iconColor = const Color(0xFF10B981);
+      iconData = Icons.check_circle;
+    } else if (isCurrent) {
+      iconColor = Colors.blue;
+      iconData = Icons.radio_button_on;
+    } else {
+      iconColor = Colors.grey;
+      iconData = Icons.radio_button_off;
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          if (isCurrent && !isComplete)
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+              ),
+            )
+          else
+            Icon(iconData, color: iconColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: isComplete || isCurrent ? Colors.white : Colors.white54,
+                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -651,44 +718,34 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                               ),
                       ),
                     ),
-                    if (_statusMessage != null) ...[
+                    if (_isSubmitting || _statusMessage?.contains('Success') == true) ...[
                       const SizedBox(height: 20),
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                          color: const Color(0xFF1F2937),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                            color: Colors.white.withValues(alpha: 0.1),
                           ),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_statusMessage!.contains('Success'))
-                              const Icon(
-                                Icons.check_circle,
-                                color: Color(0xFF10B981),
-                                size: 20,
-                              )
-                            else
-                              const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF818CF8),
-                                  ),
-                                ),
-                              ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _statusMessage!,
-                              style: const TextStyle(
-                                color: AppTheme.textWhite,
-                                fontWeight: FontWeight.w500,
+                            const Text(
+                              'Upload Progress',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            _buildProgressStep(1, 'Uploading Paper', 'Sending PDF to server'),
+                            _buildProgressStep(2, 'Analyzing', 'AI extracting questions'),
+                            _buildProgressStep(3, 'Processing Answers', 'Matching with mark scheme'),
+                            _buildProgressStep(4, 'Cropping Figures', 'Extracting images'),
+                            _buildProgressStep(5, 'Complete', 'All done!'),
                           ],
                         ),
                       ),
