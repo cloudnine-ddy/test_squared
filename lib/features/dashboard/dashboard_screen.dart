@@ -248,6 +248,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               },
                             ),
                 ),
+                const SizedBox(height: 20),
+                // Navigation Items
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    children: [
+                      _buildNavButton(
+                        icon: Icons.trending_up,
+                        label: 'My Progress',
+                        onTap: () => context.push('/progress'),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildNavButton(
+                        icon: Icons.bookmark,
+                        label: 'Bookmarks',
+                        onTap: () => context.push('/bookmarks'),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildNavButton(
+                        icon: Icons.search,
+                        label: 'Search',
+                        onTap: () => context.push('/search'),
+                      ),
+                    ],
+                  ),
+                ),
                 // Spacer pushes footer to bottom
                 const Spacer(),
                 // Footer
@@ -346,6 +372,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                               const PopupMenuItem(
+                                value: 'accessibility',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.accessibility_new,
+                                      color: AppTheme.textWhite,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 12),
+                                    Text(
+                                      'Accessibility',
+                                      style: TextStyle(
+                                        color: AppTheme.textWhite,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
                                 value: 'logout',
                                 child: Row(
                                   children: [
@@ -368,6 +413,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             onSelected: (value) async {
                               if (value == 'theme') {
                                 Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+                              } else if (value == 'accessibility') {
+                                context.push('/settings/accessibility');
                               } else if (value == 'logout') {
                                 await AuthService().signOut();
                                 if (mounted) {
@@ -618,6 +665,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
         );
       },
+    );
+  }
+
+  Widget _buildNavButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundDeepest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primaryBlue, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.textWhite,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

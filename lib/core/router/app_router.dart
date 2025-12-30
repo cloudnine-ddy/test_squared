@@ -5,6 +5,10 @@ import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/past_papers/topic_detail_screen.dart';
 import '../../features/past_papers/question_detail_screen.dart';
 import '../../pages/admin/admin_shell.dart';
+import '../../features/progress/screens/progress_dashboard_screen.dart';
+import '../../features/bookmarks/screens/bookmarks_screen.dart';
+import '../../features/search/screens/search_screen.dart';
+import '../../features/settings/screens/accessibility_settings_screen.dart';
 
 final goRouter = GoRouter(
   initialLocation: '/',
@@ -38,6 +42,22 @@ final goRouter = GoRouter(
         final questionId = state.pathParameters['questionId']!;
         return QuestionDetailScreen(questionId: questionId);
       },
+    ),
+    GoRoute(
+      path: '/progress',
+      builder: (context, state) => const ProgressDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/bookmarks',
+      builder: (context, state) => const BookmarksScreen(),
+    ),
+    GoRoute(
+      path: '/search',
+      builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
+      path: '/settings/accessibility',
+      builder: (context, state) => const AccessibilitySettingsScreen(),
     ),
   ],
 );

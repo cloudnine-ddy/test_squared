@@ -7,13 +7,14 @@ import '../../core/theme/theme_provider.dart';
 import '../../core/services/toast_service.dart';
 import 'upload_paper_view.dart';
 import 'question_manager_view.dart';
+import 'analytics_dashboard_view.dart';
 
 /// Enum for admin navigation items - add new items here for future features
 enum AdminSection {
   uploadPaper,
   questionManager,
+  analytics,
   // Add future sections here:
-  // analytics,
   // userManagement,
   // settings,
 }
@@ -96,9 +97,9 @@ class _AdminShellState extends State<AdminShell> {
         return const UploadPaperView();
       case AdminSection.questionManager:
         return const QuestionManagerView();
+      case AdminSection.analytics:
+        return const AnalyticsDashboardView();
       // Add future cases here:
-      // case AdminSection.analytics:
-      //   return const AnalyticsView();
     }
   }
 
@@ -108,6 +109,8 @@ class _AdminShellState extends State<AdminShell> {
         return 'Upload Papers';
       case AdminSection.questionManager:
         return 'Question Manager';
+      case AdminSection.analytics:
+        return 'Analytics';
       // Add future cases here
     }
   }
@@ -118,6 +121,8 @@ class _AdminShellState extends State<AdminShell> {
         return Icons.upload_file;
       case AdminSection.questionManager:
         return Icons.account_tree;
+      case AdminSection.analytics:
+        return Icons.analytics;
       // Add future cases here
     }
   }
