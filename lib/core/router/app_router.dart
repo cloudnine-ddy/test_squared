@@ -4,6 +4,8 @@ import '../../features/auth/signup_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/past_papers/topic_detail_screen.dart';
 import '../../features/past_papers/question_detail_screen.dart';
+import '../../features/past_papers/paper_selection_screen.dart';
+import '../../features/past_papers/paper_detail_screen.dart';
 import '../../pages/admin/admin_shell.dart';
 import '../../features/progress/screens/progress_dashboard_screen.dart';
 import '../../features/bookmarks/screens/bookmarks_screen.dart';
@@ -54,6 +56,21 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/search',
       builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
+      path: '/papers/year/:year/subject/:subjectId',
+      builder: (context, state) {
+        final year = int.parse(state.pathParameters['year']!);
+        final subjectId = state.pathParameters['subjectId']!;
+        return PaperSelectionScreen(year: year, subjectId: subjectId);
+      },
+    ),
+    GoRoute(
+      path: '/paper/:paperId',
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId']!;
+        return PaperDetailScreen(paperId: paperId);
+      },
     ),
     GoRoute(
       path: '/settings/accessibility',

@@ -297,37 +297,118 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
   }
 
   Widget _buildYearsView() {
-    final years = List.generate(10, (index) => 2024 - index);
+    return FutureBuilder<List<int>>(
+      key: ValueKey('years_${widget.subjectId}'), // Force rebuild when subjectId changes
+      future: PastPaperRepository().fetchAvailableYears(widget.subjectId),
+      builder: (context, snapshot) {
+        // Loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: AppTheme.primaryBlue,
+            ),
+          );
+        }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: years.length,
-      itemBuilder: (context, index) {
-        final year = years[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            title: Text(
-              '$year',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
+        // Error state
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Colors.red[300],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading papers',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please try again later',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
-            subtitle: Text(
-              'Past papers from $year',
-              style: TextStyle(
-                color: Colors.grey[600],
-              ),
+          );
+        }
+
+        // Empty state
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 64,
+                  color: Colors.white24,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No past papers found',
+                  style: TextStyle(
+                    color: Colors.grey[400],
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Papers will appear here once added to the database.',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // TODO: Navigate to year detail
-            },
-          ),
+          );
+        }
+
+        // Success state - display years
+        final years = snapshot.data!;
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: years.length,
+          itemBuilder: (context, index) {
+            final year = years[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                title: Text(
+                  '$year',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  'Past papers from $year',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  context.push('/papers/year/$year/subject/${widget.subjectId}');
+                },
+              ),
+            );
+          },
         );
       },
     );
   }
 }
-

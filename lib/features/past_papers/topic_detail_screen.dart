@@ -4,6 +4,7 @@ import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
 import 'widgets/question_card.dart';
 import 'widgets/skeleton_card.dart';
+import 'widgets/multiple_choice_feed_card.dart';
 import '../../core/theme/app_theme.dart';
 
 /// Topic detail screen with dark theme, search, and marks filter
@@ -19,23 +20,25 @@ class TopicDetailScreen extends StatefulWidget {
   State<TopicDetailScreen> createState() => _TopicDetailScreenState();
 }
 
-class _TopicDetailScreenState extends State<TopicDetailScreen> {
+class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTickerProviderStateMixin {
   List<QuestionModel> _allQuestions = [];
-  List<QuestionModel> _filteredQuestions = [];
   bool _isLoading = true;
   String _searchQuery = '';
   String _marksFilter = 'all'; // all, 1-2, 3-4, 5+
   final _searchController = TextEditingController();
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadQuestions();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -44,40 +47,47 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     if (mounted) {
       setState(() {
         _allQuestions = questions;
-        _filteredQuestions = questions;
         _isLoading = false;
       });
     }
   }
 
-  void _applyFilters() {
-    setState(() {
-      _filteredQuestions = _allQuestions.where((q) {
-        // Search filter
-        if (_searchQuery.isNotEmpty) {
-          if (!q.content.toLowerCase().contains(_searchQuery.toLowerCase())) {
-            return false;
-          }
+  List<QuestionModel> _getFilteredQuestionsByType(String type) {
+    return _allQuestions.where((q) {
+      // Type filter
+      bool typeMatch = false;
+      if (type == 'structured') {
+        typeMatch = q.type == 'structured' || !q.isMCQ;
+      } else if (type == 'mcq') {
+        typeMatch = q.type == 'mcq' || q.isMCQ;
+      }
+
+      if (!typeMatch) return false;
+
+      // Search filter
+      if (_searchQuery.isNotEmpty) {
+        if (!q.content.toLowerCase().contains(_searchQuery.toLowerCase())) {
+          return false;
         }
-        
-        // Marks filter
-        if (_marksFilter != 'all' && q.marks != null) {
-          switch (_marksFilter) {
-            case '1-2':
-              if (q.marks! > 2) return false;
-              break;
-            case '3-4':
-              if (q.marks! < 3 || q.marks! > 4) return false;
-              break;
-            case '5+':
-              if (q.marks! < 5) return false;
-              break;
-          }
+      }
+
+      // Marks filter
+      if (_marksFilter != 'all' && q.marks != null) {
+        switch (_marksFilter) {
+          case '1-2':
+            if (q.marks! > 2) return false;
+            break;
+          case '3-4':
+            if (q.marks! < 3 || q.marks! > 4) return false;
+            break;
+          case '5+':
+            if (q.marks! < 5) return false;
+            break;
         }
-        
-        return true;
-      }).toList();
-    });
+      }
+
+      return true;
+    }).toList();
   }
 
   @override
@@ -96,23 +106,28 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
             }
           },
         ),
-        title: Text(
+        title: const Text(
           'Topic Questions',
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: _buildSearchBar(),
+          preferredSize: const Size.fromHeight(120),
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              _buildTabBar(),
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
           // Marks filter chips
           _buildMarksFilter(),
-          
-          // Questions list
+
+          // TabBarView with questions lists
           Expanded(
-            child: _buildQuestionsList(),
+            child: _buildTabBarView(),
           ),
         ],
       ),
@@ -134,8 +149,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
                   icon: const Icon(Icons.clear, color: Colors.white54),
                   onPressed: () {
                     _searchController.clear();
-                    _searchQuery = '';
-                    _applyFilters();
+                    setState(() {
+                      _searchQuery = '';
+                    });
                   },
                 )
               : null,
@@ -148,9 +164,40 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
         onChanged: (value) {
-          _searchQuery = value;
-          _applyFilters();
+          setState(() {
+            _searchQuery = value;
+          });
         },
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicatorColor: Colors.blue,
+        indicatorWeight: 3,
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white54,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+        onTap: (_) => setState(() {}), // Rebuild to update counts
+        tabs: [
+          Tab(
+            icon: const Icon(Icons.edit_document, size: 20),
+            text: 'Structured',
+          ),
+          Tab(
+            icon: const Icon(Icons.quiz, size: 20),
+            text: 'Multiple Choice',
+          ),
+        ],
       ),
     );
   }
@@ -183,7 +230,6 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
         setState(() {
           _marksFilter = value;
         });
-        _applyFilters();
       },
       backgroundColor: AppTheme.surfaceDark,
       selectedColor: Colors.blue.withValues(alpha: 0.3),
@@ -198,7 +244,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
     );
   }
 
-  Widget _buildQuestionsList() {
+  Widget _buildTabBarView() {
     if (_isLoading) {
       return const SkeletonList(itemCount: 5, itemHeight: 100);
     }
@@ -219,29 +265,46 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
       );
     }
 
-    if (_filteredQuestions.isEmpty) {
+    return TabBarView(
+      controller: _tabController,
+      children: [
+        _buildQuestionListForType('structured', 'Structured'),
+        _buildQuestionListForType('mcq', 'Multiple Choice'),
+      ],
+    );
+  }
+
+  Widget _buildQuestionListForType(String type, String typeName) {
+    final filteredQuestions = _getFilteredQuestionsByType(type);
+
+    if (filteredQuestions.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, color: Colors.white24, size: 64),
+            Icon(
+              type == 'mcq' ? Icons.quiz_outlined : Icons.edit_document,
+              color: Colors.white24,
+              size: 64,
+            ),
             const SizedBox(height: 16),
             Text(
-              'No questions match your filters',
+              'No $typeName questions found',
               style: TextStyle(color: Colors.white54, fontSize: 16),
             ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                _searchController.clear();
-                setState(() {
-                  _searchQuery = '';
-                  _marksFilter = 'all';
-                });
-                _applyFilters();
-              },
-              child: const Text('Clear filters'),
-            ),
+            if (_searchQuery.isNotEmpty || _marksFilter != 'all') ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  _searchController.clear();
+                  setState(() {
+                    _searchQuery = '';
+                    _marksFilter = 'all';
+                  });
+                },
+                child: const Text('Clear filters'),
+              ),
+            ],
           ],
         ),
       );
@@ -249,9 +312,25 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _filteredQuestions.length,
+      itemCount: filteredQuestions.length,
       itemBuilder: (context, index) {
-        return QuestionCard(question: _filteredQuestions[index]);
+        final question = filteredQuestions[index];
+
+        // Construct paper name from question metadata
+        String? paperName;
+        if (question.hasPaperInfo) {
+          paperName = '${question.paperYear} ${question.paperSeason}';
+        }
+
+        // Use different card types based on question type
+        if (type == 'mcq') {
+          return MultipleChoiceFeedCard(
+            question: question,
+            paperName: paperName,
+          );
+        } else {
+          return QuestionCard(question: question);
+        }
       },
     );
   }

@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/topic_model.dart';
 import '../models/question_model.dart';
 import '../models/subject_model.dart';
+import '../models/paper_model.dart';
 
 class PastPaperRepository {
   final _supabase = Supabase.instance.client;
@@ -13,35 +14,35 @@ class PastPaperRepository {
           .from('topics')
           .select()
           .eq('subject_id', subjectId);
-      
+
       final List<dynamic> topicsData = topicsResponse as List<dynamic>;
-      
+
       if (topicsData.isEmpty) {
         return [];
       }
-      
+
       // Fetch all questions for this subject to count by topic
       // First get paper IDs for this subject
       final papersResponse = await _supabase
           .from('papers')
           .select('id')
           .eq('subject_id', subjectId);
-      
+
       final paperIds = (papersResponse as List<dynamic>)
           .map((p) => p['id'] as String)
           .toList();
-      
+
       // Count questions per topic
       Map<String, int> topicCounts = {};
-      
+
       if (paperIds.isNotEmpty) {
         final questionsResponse = await _supabase
             .from('questions')
             .select('topic_ids')
             .inFilter('paper_id', paperIds);
-        
+
         final questionsData = questionsResponse as List<dynamic>;
-        
+
         for (var q in questionsData) {
           final topicIds = q['topic_ids'];
           if (topicIds is List) {
@@ -52,7 +53,7 @@ class PastPaperRepository {
           }
         }
       }
-      
+
       // Map topics with counts
       final topics = topicsData.map((e) {
         final map = e as Map<String, dynamic>;
@@ -62,7 +63,7 @@ class PastPaperRepository {
           'question_count': topicCounts[topicId] ?? 0,
         });
       }).toList();
-      
+
       return topics;
     } catch (e, stackTrace) {
       print('ERROR in getTopics: $e');
@@ -79,12 +80,12 @@ class PastPaperRepository {
           .select('*, papers(year, season, variant, paper_type)')
           .eq('id', questionId)
           .single();
-      
+
       // Debug: Print raw response to see what's coming from DB
       print('[DEBUG] getQuestionById raw response: $response');
       print('[DEBUG] type field: ${response['type']}');
       print('[DEBUG] options field: ${response['options']}');
-      
+
       return QuestionModel.fromMap(response as Map<String, dynamic>);
     } catch (e) {
       print('ERROR in getQuestionById: $e');
@@ -100,15 +101,15 @@ class PastPaperRepository {
           .select('*, papers(year, season, variant)')
           .contains('topic_ids', [topicId])
           .order('question_number');
-      
+
       final List<dynamic> data = response as List<dynamic>;
-      
+
       if (data.isEmpty) {
         return [];
       }
-      
+
       final questions = <QuestionModel>[];
-      
+
       for (var item in data) {
         try {
           if (item is Map<String, dynamic>) {
@@ -119,7 +120,7 @@ class PastPaperRepository {
           print('Skipping bad question: $e');
         }
       }
-      
+
       return questions;
     } catch (e, stackTrace) {
       print('ERROR in getQuestionsByTopic: $e');
@@ -132,28 +133,28 @@ class PastPaperRepository {
     try {
       print('DEBUG: Starting getSubjects() method');
       print('DEBUG: About to call Supabase.from("subjects").select()');
-      
+
       final response = await _supabase
           .from('subjects')
           .select()
           .limit(50);
-      
+
       print('DEBUG: Supabase call completed');
       print('DEBUG: Response type: ${response.runtimeType}');
-      
+
       final List<dynamic> data = response as List<dynamic>;
-      
+
       print('RAW DATA: $data');
       print('DEBUG: Data length: ${data.length}');
-      
+
       if (data.isEmpty) {
         print('WARNING: Supabase returned an empty list for subjects');
         return [];
       }
-      
+
       print('DEBUG: Starting to map data to SubjectModel');
       final subjects = <SubjectModel>[];
-      
+
       for (var item in data) {
         try {
           if (item is Map<String, dynamic>) {
@@ -170,7 +171,7 @@ class PastPaperRepository {
           // Continue to next item instead of crashing
         }
       }
-      
+
       print('DEBUG: Successfully mapped ${subjects.length} out of ${data.length} subjects');
       return subjects;
     } catch (e, stackTrace) {
@@ -191,27 +192,27 @@ class PastPaperRepository {
 
       print('DEBUG: Fetching pinned subjects for user: ${user.id}');
       print('DEBUG: About to call Supabase.from("user_subjects").select("subject_id, subjects(*)")');
-      
+
       final response = await _supabase
           .from('user_subjects')
           .select('subject_id, subjects(*)');
-      
+
       print('DEBUG: Supabase call completed');
       print('DEBUG: Response type: ${response.runtimeType}');
-      
+
       final List<dynamic> data = response as List<dynamic>;
-      
+
       print('RAW DATA: $data');
       print('DEBUG: Data length: ${data.length}');
-      
+
       if (data.isEmpty) {
         print('WARNING: Supabase returned an empty list for pinned subjects');
         return [];
       }
-      
+
       print('DEBUG: Starting to map data to SubjectModel');
       final subjects = <SubjectModel>[];
-      
+
       for (var item in data) {
         try {
           if (item is Map<String, dynamic>) {
@@ -233,7 +234,7 @@ class PastPaperRepository {
           print('Stack trace: $stackTrace');
         }
       }
-      
+
       print('DEBUG: Successfully mapped ${subjects.length} out of ${data.length} pinned subjects');
       return subjects;
     } catch (e, stackTrace) {
@@ -252,7 +253,7 @@ class PastPaperRepository {
       }
 
       print('DEBUG: Pinning subject $subjectId for user ${user.id}');
-      
+
       await _supabase.from('user_subjects').upsert(
         {
           'user_id': user.id,
@@ -260,7 +261,7 @@ class PastPaperRepository {
         },
         onConflict: 'user_id,subject_id',
       );
-      
+
       print('DEBUG: Successfully pinned subject $subjectId');
     } catch (e, stackTrace) {
       print('ERROR pinning subject: $e');
@@ -278,13 +279,13 @@ class PastPaperRepository {
       }
 
       print('DEBUG: Unpinning subject $subjectId for user ${user.id}');
-      
+
       await _supabase
           .from('user_subjects')
           .delete()
           .eq('user_id', user.id)
           .eq('subject_id', subjectId);
-      
+
       print('DEBUG: Successfully unpinned subject $subjectId');
     } catch (e, stackTrace) {
       print('ERROR unpinning subject: $e');
@@ -292,5 +293,90 @@ class PastPaperRepository {
       rethrow;
     }
   }
-}
 
+  /// Get papers for a specific year and subject
+  Future<List<PaperModel>> getPapersByYear(int year, String subjectId) async {
+    try {
+      final response = await _supabase
+          .from('papers')
+          .select()
+          .eq('subject_id', subjectId)
+          .eq('year', year)
+          .order('season')
+          .order('variant');
+
+      final List<dynamic> data = response as List<dynamic>;
+
+      return data
+          .map((item) => PaperModel.fromMap(item as Map<String, dynamic>))
+          .toList();
+    } catch (e, stackTrace) {
+      print('ERROR in getPapersByYear: $e');
+      print('STACK TRACE: $stackTrace');
+      return [];
+    }
+  }
+
+  /// Get all questions from a specific paper, ordered by question number
+  Future<List<QuestionModel>> getQuestionsByPaper(String paperId) async {
+    try {
+      final response = await _supabase
+          .from('questions')
+          .select('*, papers(year, season, variant, paper_type)')
+          .eq('paper_id', paperId)
+          .order('question_number', ascending: true);
+
+      final List<dynamic> data = response as List<dynamic>;
+
+      if (data.isEmpty) {
+        return [];
+      }
+
+      final questions = <QuestionModel>[];
+
+      for (var item in data) {
+        try {
+          if (item is Map<String, dynamic>) {
+            final question = QuestionModel.fromMap(item);
+            questions.add(question);
+          }
+        } catch (e) {
+          print('Skipping bad question: $e');
+        }
+      }
+
+      return questions;
+    } catch (e, stackTrace) {
+      print('ERROR in getQuestionsByPaper: $e');
+      print('STACK TRACE: $stackTrace');
+      return [];
+    }
+  }
+
+  /// Get distinct years from papers table
+  Future<List<int>> fetchAvailableYears(String subjectId) async {
+    try {
+      final response = await _supabase
+          .from('papers')
+          .select('year')
+          .eq('subject_id', subjectId)
+          .order('year', ascending: false);
+
+      final List<dynamic> data = response as List<dynamic>;
+
+      // Get distinct years
+      final years = <int>{};
+      for (var item in data) {
+        if (item is Map<String, dynamic> && item['year'] != null) {
+          years.add(item['year'] as int);
+        }
+      }
+
+      return years.toList()..sort((a, b) => b.compareTo(a)); // Descending order
+    } catch (e, stackTrace) {
+      print('ERROR in fetchAvailableYears: $e');
+      print('STACK TRACE: $stackTrace');
+      return [];
+    }
+  }
+}
