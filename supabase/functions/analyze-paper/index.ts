@@ -25,6 +25,8 @@ interface ExtractedQuestion {
   marks?: number
   options?: { label: string; text: string }[]
   correct_answer?: string
+  layout_scan?: string | null  // Forces spatial reasoning
+  figure_description?: string | null  // Forces vision encoder
   figure?: FigureBbox
 }
 
@@ -45,17 +47,17 @@ Deno.serve(async (req) => {
   try {
     const { paperId, pdfUrl, markSchemeUrl, paperType } = await req.json()
     const isObjective = paperType === 'objective'
-    
+
     console.log(`[DEBUG] Paper type received: "${paperType}"`)
     console.log(`[DEBUG] Is objective (MCQ): ${isObjective}`)
-    
+
     if (!paperId || !pdfUrl) {
       return new Response(
-        JSON.stringify({ error: 'Missing paperId or pdfUrl' }), 
+        JSON.stringify({ error: 'Missing paperId or pdfUrl' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    
+
     const hasMarkScheme = !!markSchemeUrl
     console.log(`Mark scheme provided: ${hasMarkScheme}`)
     if (hasMarkScheme) {
@@ -71,7 +73,7 @@ Deno.serve(async (req) => {
     if (!apiKey) {
       console.error('GEMINI_API_KEY not set')
       return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }), 
+        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -88,7 +90,7 @@ Deno.serve(async (req) => {
     if (paperError || !paper) {
       console.error('Paper not found:', paperError)
       return new Response(
-        JSON.stringify({ error: 'Paper not found' }), 
+        JSON.stringify({ error: 'Paper not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -104,7 +106,7 @@ Deno.serve(async (req) => {
     if (topicsError) {
       console.error('Failed to fetch topics:', topicsError)
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch topics' }), 
+        JSON.stringify({ error: 'Failed to fetch topics' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -118,7 +120,7 @@ Deno.serve(async (req) => {
     if (!pdfResponse.ok) {
       console.error('Failed to download PDF:', pdfResponse.status)
       return new Response(
-        JSON.stringify({ error: 'Failed to download PDF' }), 
+        JSON.stringify({ error: 'Failed to download PDF' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -126,7 +128,7 @@ Deno.serve(async (req) => {
     const pdfBlob = await pdfResponse.blob()
     const arrayBuffer = await pdfBlob.arrayBuffer()
     const pdfBytes = new Uint8Array(arrayBuffer)
-    
+
     // Convert to base64 (chunked to avoid stack overflow)
     function uint8ArrayToBase64(bytes: Uint8Array): string {
       const CHUNK_SIZE = 0x8000 // 32KB chunks
@@ -137,76 +139,106 @@ Deno.serve(async (req) => {
       }
       return btoa(binary)
     }
-    
+
     const base64Data = uint8ArrayToBase64(pdfBytes)
     console.log(`PDF downloaded: ${(pdfBytes.length / 1024 / 1024).toFixed(2)} MB`)
 
     // Step 4: Build the prompt for Gemini based on paper type
     const topicsJson = JSON.stringify(topicsList.map(t => ({ id: t.id, name: t.name })))
-    
-    const objectivePrompt = `Analyze this MCQ (Multiple Choice) exam paper. Extract questions as JSON.
 
-TOPICS (use id NOT name in topic_ids):
+    const objectivePrompt = `You are a Biology MCQ exam analyzer.
+
+CRITICAL: Questions often mention "The diagram shows..." THIS MEANS there is an image!
+
+REAL EXAM PATTERN:
+Number: 4
+Intro: "The diagram shows a cross-section through two guard cells..."
+  arrow down
+DIAGRAM with labels W,X,Y,Z
+  arrow down
+Question: "Which labelled structures would also be found in animal cell?"
+  arrow down
+Options: A, B, C, D
+
+DETECTION RULE:
+IF intro mentions "diagram/figure/graph/table" then set has_figure = true and provide coordinates
+
+TOPICS (use id NOT name):
 ${topicsJson}
 
-OUTPUT FORMAT - Return ONLY this JSON:
+OUTPUT JSON:
 {
   "questions": [
     {
-      "question_number": 1,
-      "content": "Question stem ONLY (without A/B/C/D options)",
-      "topic_ids": ["uuid-from-topics-list"],
+      "question_number": 4,
+      "content": "Which labelled structures would also be found in an animal cell?",
+      "topic_ids": ["uuid"],
       "type": "mcq",
       "marks": 1,
-      "options": [{"label":"A","text":"..."},{"label":"B","text":"..."},{"label":"C","text":"..."},{"label":"D","text":"..."}],
-      "correct_answer": "A"
+      "options": [
+        {"label":"A", "text":"W and X"},
+        {"label":"B", "text":"X and Y"},
+        {"label":"C", "text":"Y and Z"},
+        {"label":"D", "text":"Z and W"}
+      ],
+      "correct_answer": "C",
+      "layout_scan": "Found 4. Intro says The diagram shows. Below is labeled diagram. Below diagram is question. DIAGRAM DETECTED.",
+      "figure_description": "Cross-section of two guard cells with labeled structures W,X,Y,Z",
+      "figure": {"page":1, "x":20, "y":30, "width":60, "height":35}
     }
   ]
 }
 
 RULES:
-- "content" = question stem ONLY, NOT the A/B/C/D options
-- "options" = array with label (A/B/C/D) and text
-- "correct_answer" = correct letter if visible in answer key
-- "marks" = usually 1 for MCQ
-- Extract ALL questions from the paper
+1. layout_scan = MANDATORY (describe what you see vertically)
+2. figure_description = Required if image exists
+3. figure = Percentages (0-100) of page width/height
+4. content = Question text ONLY (no A/B/C/D)
+5. Extract ALL questions
 
-Return valid JSON only, no markdown.`
+Return valid JSON, no markdown.`
 
-    const subjectivePrompt = `Analyze this structured/written exam paper. Extract questions as JSON.
+    const subjectivePrompt = `You are a Biology structured question analyzer.
 
-TOPICS (use id NOT name in topic_ids):
+PATTERN: Intro then Diagram then Sub-questions (a)(b)(c)
+
+DETECTION RULE:
+IF intro mentions "diagram/figure/graph" then set has_figure = true and provide coordinates
+
+TOPICS (use id NOT name):
 ${topicsJson}
 
-OUTPUT FORMAT - Return ONLY this JSON:
+OUTPUT JSON:
 {
   "questions": [
     {
       "question_number": 1,
-      "content": "Full question including all sub-parts (a), (b), (i), (ii) etc",
-      "topic_ids": ["uuid-from-topics-list"],
+      "content": "Full question with all parts: (a) Name structure X. (b) Describe function...",
+      "topic_ids": ["uuid"],
       "type": "structured",
       "marks": 6,
-      "figure": {"page":1,"x":10,"y":30,"width":50,"height":40}
+      "layout_scan": "Found 1. Intro says The diagram shows a plant cell. Below is labeled diagram. Below are parts (a)(b). DIAGRAM DETECTED.",
+      "figure_description": "Labeled plant cell diagram showing nucleus, chloroplasts, cell wall",
+      "figure": {"page":1, "x":20, "y":25, "width":60, "height":40}
     }
   ]
 }
 
 RULES:
-- "content" = full question text with ALL sub-parts combined
-- "marks" = total marks (shown as [X] or (X marks))
-- "figure" = ONLY if question has diagram/image. Coordinates are % of page.
-- Combine sub-parts (a,b,c,i,ii) into ONE entry per main question number
-- "type" = "structured" for all written questions
+1. layout_scan = MANDATORY
+2. figure_description = Required if image exists
+3. figure = Percentages (0-100)
+4. content = Combine ALL sub-parts into one text
+5. marks = Total marks
 
-Return valid JSON only, no markdown.`
+Return valid JSON, no markdown.`
 
     const prompt = isObjective ? objectivePrompt : subjectivePrompt
     console.log(`Using ${isObjective ? 'OBJECTIVE (MCQ)' : 'SUBJECTIVE (Written)'} prompt`)
 
     // Step 5: Send to Gemini
     console.log('[5/6] Sending to Gemini for analysis...')
-    
+
     const geminiPayload = {
       contents: [{
         parts: [
@@ -235,33 +267,33 @@ Return valid JSON only, no markdown.`
       const errorText = await geminiRes.text()
       console.error('Gemini API error:', geminiRes.status, errorText)
       return new Response(
-        JSON.stringify({ error: 'Gemini API error', details: errorText }), 
+        JSON.stringify({ error: 'Gemini API error', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const geminiJson = await geminiRes.json()
-    
+
     // Parse Gemini response
     let extractedData: AIResponse
     try {
       let rawText = geminiJson.candidates[0].content.parts[0].text
-      
+
       // Remove markdown code blocks if present
       if (rawText.includes('```')) {
         rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim()
       }
-      
+
       // Try parsing directly first
       try {
         extractedData = JSON.parse(rawText)
       } catch (firstError) {
         console.log('First parse failed, attempting repair...')
-        
+
         // Try to repair common issues
         // 1. Fix unescaped control characters inside strings only
         let repaired = rawText
-        
+
         // Replace unescaped newlines inside string values
         // This regex finds strings and escapes newlines within them
         repaired = repaired.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match) => {
@@ -270,10 +302,10 @@ Return valid JSON only, no markdown.`
             .replace(/\r/g, '\\r')
             .replace(/\t/g, '\\t')
         })
-        
+
         extractedData = JSON.parse(repaired)
       }
-      
+
       console.log(`Gemini extracted ${extractedData.questions.length} questions`)
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', parseError)
@@ -282,27 +314,27 @@ Return valid JSON only, no markdown.`
       console.error('Raw response (first 2000 chars):', rawText.substring(0, 2000))
       console.error('Response length:', rawText.length)
       return new Response(
-        JSON.stringify({ error: 'Failed to parse AI response', details: String(parseError) }), 
+        JSON.stringify({ error: 'Failed to parse AI response', details: String(parseError) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // Step 6: Process figures and insert questions
     console.log('[6/6] Processing questions...')
-    
+
     // Identify questions with figures for later processing
     const questionsWithFigures = extractedData.questions.filter(q => q.figure)
     console.log(`Found ${questionsWithFigures.length} questions with figures`)
 
     // Get valid topic IDs for validation
     const validTopicIds = new Set(topicsList.map(t => t.id))
-    
+
     // UUID regex pattern for validation
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
     // Process each question
     const questionsToInsert = []
-    
+
     for (const question of extractedData.questions) {
       if (question.figure) {
         console.log(`Question ${question.question_number} has figure on page ${question.figure.page}`)
@@ -322,12 +354,14 @@ Return valid JSON only, no markdown.`
           return isValidUuid && existsInDb
         })
       }
-      
+
       console.log(`Q${question.question_number}: ${filteredTopicIds.length} valid topic_ids`)
 
       // Store figure metadata in ai_answer field for now (can be used for future cropping)
       const figureMetadata = question.figure ? {
         has_figure: true,
+        layout_scan: question.layout_scan,
+        figure_description: question.figure_description,
         figure_location: {
           page: question.figure.page,
           x_percent: question.figure.x,
@@ -335,7 +369,10 @@ Return valid JSON only, no markdown.`
           width_percent: question.figure.width,
           height_percent: question.figure.height
         }
-      } : null
+      } : {
+        has_figure: false,
+        layout_scan: question.layout_scan
+      }
 
       questionsToInsert.push({
         paper_id: paperId,
@@ -361,7 +398,7 @@ Return valid JSON only, no markdown.`
     if (insertError) {
       console.error('Failed to insert questions:', insertError)
       return new Response(
-        JSON.stringify({ error: 'Failed to save questions', details: insertError.message }), 
+        JSON.stringify({ error: 'Failed to save questions', details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -372,17 +409,17 @@ Return valid JSON only, no markdown.`
     let figuresCropped = 0
     if (insertedQuestions && questionsWithFigures.length > 0) {
       console.log(`[7/7] Processing ${questionsWithFigures.length} figures with pdf.co...`)
-      
+
       for (const question of questionsWithFigures) {
         const insertedQ = insertedQuestions.find(
           (q: { question_number: number }) => q.question_number === question.question_number
         )
-        
+
         if (!insertedQ || !question.figure) continue
 
         try {
           console.log(`Cropping figure for Q${question.question_number}...`)
-          
+
           // Call crop-figure directly with service role auth
           const cropResponse = await fetch(`${supabaseUrl}/functions/v1/crop-figure`, {
             method: 'POST',
@@ -403,7 +440,7 @@ Return valid JSON only, no markdown.`
               }
             })
           })
-          
+
           const cropResult = await cropResponse.json()
 
           if (!cropResponse.ok || cropResult.error) {
@@ -422,7 +459,7 @@ Return valid JSON only, no markdown.`
     let answersExtracted = 0
     if (hasMarkScheme && insertedQuestions) {
       console.log(`[8/8] Processing mark scheme...`)
-      
+
       try {
         // Download mark scheme PDF
         console.log(`Downloading mark scheme from: ${markSchemeUrl}`)
@@ -435,9 +472,9 @@ Return valid JSON only, no markdown.`
           const msArrayBuffer = await msBlob.arrayBuffer()
           const msBytes = new Uint8Array(msArrayBuffer)
           const msBase64 = uint8ArrayToBase64(msBytes)
-          
+
           console.log(`Mark scheme downloaded: ${(msBytes.length / 1024).toFixed(1)} KB`)
-          
+
           // Build prompt for answer extraction
           const msPrompt = `You are analyzing an EXAM MARK SCHEME / ANSWER SHEET.
 
@@ -472,28 +509,28 @@ Return ONLY valid JSON:
               maxOutputTokens: 8192
             }
           }
-          
+
           const msGeminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(msGeminiPayload)
           })
-          
+
           if (msGeminiRes.ok) {
             const msGeminiJson = await msGeminiRes.json()
             const msRawText = msGeminiJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
             const msCleanJson = msRawText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim()
-            
+
             try {
               const answersData = JSON.parse(msCleanJson)
               console.log(`Extracted ${answersData.answers?.length || 0} answers from mark scheme`)
-              
+
               // Match answers to questions and generate AI solutions
               for (const answer of answersData.answers || []) {
                 const matchingQ = insertedQuestions.find(
                   (q: { question_number: number }) => q.question_number === answer.question_number
                 )
-                
+
                 if (matchingQ) {
                   // Generate AI step-by-step solution
                   const solutionPrompt = `You are a helpful tutor. Generate a clear, student-friendly step-by-step solution.
@@ -519,13 +556,13 @@ Format your response as clear numbered steps. Be concise but thorough.`
                       generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
                     })
                   })
-                  
+
                   let aiSolution = null
                   if (solutionRes.ok) {
                     const solutionJson = await solutionRes.json()
                     aiSolution = solutionJson.candidates?.[0]?.content?.parts?.[0]?.text || null
                   }
-                  
+
                   // Update question with official answer and AI solution
                   await supabase
                     .from('questions')
@@ -538,7 +575,7 @@ Format your response as clear numbered steps. Be concise but thorough.`
                       }
                     })
                     .eq('id', matchingQ.id)
-                  
+
                   answersExtracted++
                   console.log(`✅ Updated Q${answer.question_number} with answer + AI solution`)
                 }
@@ -556,22 +593,22 @@ Format your response as clear numbered steps. Be concise but thorough.`
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: `Extracted and saved ${questionsToInsert.length} questions`,
         questions_count: questionsToInsert.length,
         topics_matched: questionsToInsert.filter(q => q.topic_ids.length > 0).length,
         figures_detected: questionsWithFigures.length,
         figures_cropped: figuresCropped,
         answers_extracted: answersExtracted
-      }), 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
     console.error('Unexpected error:', error)
     return new Response(
-      JSON.stringify({ error: 'Unexpected error', details: String(error) }), 
+      JSON.stringify({ error: 'Unexpected error', details: String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
