@@ -18,7 +18,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String _selectedCurriculum = 'IGCSE';
+  String _selectedCurriculum = 'SPM';
   int? _selectedSubjectIndex;
   String? _selectedSubjectName; // Nullable, initialized to null
   String? _selectedSubjectId; // Store subject ID for filtering
@@ -26,8 +26,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoadingPinnedSubjects = false;
   
   final List<String> _curriculums = [
-    'SPM (Coming Soon)',
-    'IGCSE',
+    'SPM',
+    'IGCSE (Coming Soon)',
     'A-Level (Coming Soon)',
   ];
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/question_model.dart';
 import '../../../core/theme/app_theme.dart';
+import 'topic_tags.dart';
 
 /// Tappable question card that navigates to detail page
 class QuestionCard extends StatelessWidget {
@@ -189,6 +190,12 @@ class QuestionCard extends StatelessWidget {
                   ),
                 ],
               ),
+
+              // Topic tags
+              if (question.topicIds.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                TopicTags(topicIds: question.topicIds),
+              ],
             ],
           ),
         ),

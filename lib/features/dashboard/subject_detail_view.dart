@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/topic_model.dart';
+import '../progress/data/topic_progress_repository.dart';
+import '../past_papers/widgets/circular_topic_progress.dart';
 
 class SubjectDetailView extends StatefulWidget {
   final String subjectName;
@@ -231,69 +234,119 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
           itemCount: topics.length,
           itemBuilder: (context, index) {
             final topic = topics[index];
-            return InkWell(
-              onTap: () {
-                context.push('/topic/${topic.id}');
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border(
-                      top: BorderSide(
-                        color: topic.color,
-                        width: 4,
-                      ),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              topic.name,
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              topic.description,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${topic.questionCount} questions',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: topic.color,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
+            return _buildTopicCard(topic);
           },
         );
       },
     );
+  }
+
+  Widget _buildTopicCard(TopicModel topic) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _getTopicProgress(topic.id),
+      builder: (context, progressSnapshot) {
+        final progress = progressSnapshot.data;
+        final progressPercentage = progress?['progress_percentage'] ?? 0.0;
+        final completedQuestions = progress?['completed_questions'] ?? 0;
+        final totalQuestions = progress?['total_questions'] ?? topic.questionCount;
+
+        return InkWell(
+          onTap: () {
+            context.push('/topic/${topic.id}');
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border(
+                  top: BorderSide(
+                    color: topic.color,
+                    width: 4,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          topic.name,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          topic.description,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    // Circular progress in bottom right
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        CircularTopicProgress(
+                          percentage: progressPercentage,
+                          completedQuestions: completedQuestions,
+                          totalQuestions: totalQuestions,
+                          color: topic.color,
+                          size: 50,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _getTopicProgress(String topicId) async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) {
+        return {
+          'topic_id': topicId,
+          'total_questions': 0,
+          'completed_questions': 0,
+          'progress_percentage': 0.0,
+        };
+      }
+
+      final progressRepo = TopicProgressRepository();
+      return await progressRepo.getTopicProgress(
+        userId: userId,
+        topicId: topicId,
+      );
+    } catch (e) {
+      return {
+        'topic_id': topicId,
+        'total_questions': 0,
+        'completed_questions': 0,
+        'progress_percentage': 0.0,
+      };
+    }
   }
 
   Widget _buildYearsView() {

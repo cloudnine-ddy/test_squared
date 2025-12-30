@@ -6,6 +6,7 @@ import '../data/bookmark_repository.dart';
 import '../data/notes_repository.dart';
 import '../../past_papers/models/question_model.dart';
 import 'note_editor_dialog.dart';
+import '../widgets/bookmark_folder_panel.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({super.key});
@@ -14,7 +15,7 @@ class BookmarksScreen extends StatefulWidget {
   State<BookmarksScreen> createState() => _BookmarksScreenState();
 }
 
-class _BookmarksScreenState extends State<BookmarksScreen> with SingleTickerProviderStateMixin {
+class _BookmarksScreenState extends State<BookmarksScreen> {
   final _bookmarkRepo = BookmarkRepository();
   final _notesRepo = NotesRepository();
   
@@ -23,19 +24,11 @@ class _BookmarksScreenState extends State<BookmarksScreen> with SingleTickerProv
   List<QuestionModel> _questions = [];
   Map<String, bool> _hasNotes = {};
   bool _isLoading = true;
-  
-  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _loadData();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -47,19 +40,11 @@ class _BookmarksScreenState extends State<BookmarksScreen> with SingleTickerProv
         folders.add('My Bookmarks');
       }
 
-      _tabController = TabController(length: folders.length, vsync: this);
-      _tabController.addListener(() {
-        if (_tabController.indexIsChanging) {
-          setState(() {
-            _selectedFolder = folders[_tabController.index];
-          });
-          _loadQuestions();
-        }
-      });
-
       setState(() {
         _folders = folders;
-        _selectedFolder = folders.first;
+        if (!folders.contains(_selectedFolder)) {
+          _selectedFolder = folders.first;
+        }
       });
 
       await _loadQuestions();
@@ -102,25 +87,34 @@ class _BookmarksScreenState extends State<BookmarksScreen> with SingleTickerProv
       appBar: AppBar(
         title: const Text('Bookmarks'),
         backgroundColor: AppTheme.surfaceDark,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.create_new_folder_outlined),
-            onPressed: _showCreateFolderDialog,
-            tooltip: 'New folder',
+      ),
+      body: Row(
+        children: [
+          // Folder panel
+          BookmarkFolderPanel(
+            folders: _folders,
+            selectedFolder: _selectedFolder,
+            onFolderSelected: (folder) {
+              setState(() => _selectedFolder = folder);
+              _loadQuestions();
+            },
+            onCreateFolder: _showCreateFolderDialog,
+            onDeleteFolder: _deleteFolder,
+            onRenameFolder: _renameFolder,
+          ),
+          // Vertical divider
+          Container(
+            width: 1,
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+          // Content area
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildContent(),
           ),
         ],
-        bottom: _folders.isNotEmpty
-            ? TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                indicatorColor: AppTheme.primaryBlue,
-                tabs: _folders.map((folder) => Tab(text: folder)).toList(),
-              )
-            : null,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _buildContent(),
     );
   }
 
@@ -368,7 +362,51 @@ class _BookmarksScreenState extends State<BookmarksScreen> with SingleTickerProv
     );
 
     if (result == true && controller.text.isNotEmpty) {
-      ToastService.showInfo('Add a bookmark to the new folder to create it');
+      setState(() {
+        _folders.add(controller.text);
+        _selectedFolder = controller.text;
+      });
+      ToastService.showSuccess('Folder created');
+      _loadQuestions();
+    }
+  }
+
+  Future<void> _deleteFolder(String folder) async {
+    try {
+      // Move all bookmarks from this folder to "My Bookmarks"
+      await _bookmarkRepo.moveFolderBookmarks(folder, 'My Bookmarks');
+      
+      setState(() {
+        _folders.remove(folder);
+        if (_selectedFolder == folder) {
+          _selectedFolder = 'My Bookmarks';
+        }
+      });
+      
+      ToastService.showSuccess('Folder deleted');
+      _loadQuestions();
+    } catch (e) {
+      ToastService.showError('Failed to delete folder');
+    }
+  }
+
+  Future<void> _renameFolder(String oldName, String newName) async {
+    try {
+      await _bookmarkRepo.renameFolder(oldName, newName);
+      
+      setState(() {
+        final index = _folders.indexOf(oldName);
+        if (index != -1) {
+          _folders[index] = newName;
+        }
+        if (_selectedFolder == oldName) {
+          _selectedFolder = newName;
+        }
+      });
+      
+      ToastService.showSuccess('Folder renamed');
+    } catch (e) {
+      ToastService.showError('Failed to rename folder');
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/analytics_service.dart';
 import '../search_repository.dart';
@@ -27,6 +28,10 @@ class _SearchScreenState extends State<SearchScreen> {
   // Filters
   String? _selectedSubjectId;
   String? _selectedType; // 'mcq' or 'structured'
+  
+  // Debouncing
+  Timer? _debounceTimer;
+  static const _debounceDuration = Duration(milliseconds: 300);
 
   @override
   void initState() {
@@ -37,6 +42,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -49,6 +55,25 @@ class _SearchScreenState extends State<SearchScreen> {
     } catch (e) {
       // Silently fail
     }
+  }
+
+  void _onSearchChanged(String query) {
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+    
+    // If query is empty, clear results
+    if (query.trim().isEmpty) {
+      setState(() {
+        _results = [];
+        _hasSearched = false;
+      });
+      return;
+    }
+    
+    // Start new timer
+    _debounceTimer = Timer(_debounceDuration, () {
+      _performSearch();
+    });
   }
 
   Future<void> _performSearch() async {
@@ -113,7 +138,21 @@ class _SearchScreenState extends State<SearchScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search questions...',
                     hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-                    prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                    prefixIcon: _isLoading
+                        ? Padding(
+                            padding: const EdgeInsets.all(14.0),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ),
+                          )
+                        : const Icon(Icons.search, color: Colors.white54),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, color: Colors.white54),
@@ -134,8 +173,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                   style: const TextStyle(color: Colors.white),
-                  onSubmitted: (_) => _performSearch(),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (value) {
+                    setState(() {}); // Update UI for clear button
+                    _onSearchChanged(value); // Trigger debounced search
+                  },
                 ),
                 const SizedBox(height: 12),
                 // Filter Chips

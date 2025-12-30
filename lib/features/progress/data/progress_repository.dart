@@ -208,6 +208,29 @@ class ProgressRepository {
         .toList();
   }
 
+  /// Get daily question solving statistics
+  Future<List<Map<String, dynamic>>> getDailyQuestionStats({
+    required String userId,
+    int days = 30,
+  }) async {
+    try {
+      final result = await _supabase.rpc(
+        'get_daily_question_stats',
+        params: {
+          'p_user_id': userId,
+          'p_days': days,
+        },
+      );
+
+      if (result == null) return [];
+      
+      return (result as List).map((e) => e as Map<String, dynamic>).toList();
+    } catch (e) {
+      print('Error getting daily stats: $e');
+      return [];
+    }
+  }
+
   /// Refresh materialized view asynchronously
   void _refreshStatsAsync() {
     _supabase.rpc('refresh_user_topic_stats').catchError((error) {

@@ -172,4 +172,16 @@ class BookmarkRepository {
 
     return (data as List).length;
   }
+
+  /// Move all bookmarks from one folder to another
+  Future<void> moveFolderBookmarks(String fromFolder, String toFolder) async {
+    final userId = _supabase.auth.currentUser?.id;
+    if (userId == null) throw Exception('User not authenticated');
+
+    await _supabase
+        .from('user_bookmarks')
+        .update({'folder_name': toFolder})
+        .eq('user_id', userId)
+        .eq('folder_name', fromFolder);
+  }
 }

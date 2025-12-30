@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/question_model.dart';
 import 'formatted_question_text.dart';
 import '../../../core/theme/app_theme.dart';
+import 'topic_tags.dart';
 
 /// A card for MCQ questions in a continuous feed with inline answer checking
 class MultipleChoiceFeedCard extends StatefulWidget {
@@ -161,6 +162,13 @@ class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
               content: widget.question.content,
               fontSize: 15,
             ),
+
+            // Topic tags
+            if (widget.question.topicIds.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              TopicTags(topicIds: widget.question.topicIds),
+            ],
+
             const SizedBox(height: 20),
 
             // Options

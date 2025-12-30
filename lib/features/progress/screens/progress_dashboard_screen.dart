@@ -9,6 +9,7 @@ import '../../past_papers/models/topic_model.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/mastery_badge.dart';
 import '../widgets/streak_indicator.dart';
+import '../widgets/daily_progress_chart.dart';
 
 class ProgressDashboardScreen extends StatefulWidget {
   const ProgressDashboardScreen({super.key});
@@ -95,6 +96,22 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Daily Progress Chart
+                    FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _progressRepo.getDailyQuestionStats(
+                        userId: Supabase.instance.client.auth.currentUser!.id,
+                        days: 7,
+                      ),
+                      builder: (context, snapshot) {
+                        final dailyStats = snapshot.data ?? [];
+                        return DailyProgressChart(
+                          dailyStats: dailyStats,
+                          daysToShow: 7,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 24),
+
                     // Overall Stats Cards
                     _buildOverallStats(),
                     const SizedBox(height: 24),

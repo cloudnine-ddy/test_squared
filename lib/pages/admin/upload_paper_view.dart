@@ -30,6 +30,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   String? _selectedSubjectId;
   String? _selectedSeason;
   String _paperType = 'subjective'; // 'objective' or 'subjective'
+  String _selectedCurriculum = 'SPM'; // Default to SPM
 
   // Question paper file
   String? _selectedFileName;
@@ -40,6 +41,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   Uint8List? _markSchemeFileBytes;
 
   final List<String> _seasons = const ['March', 'June', 'November'];
+  final List<String> _curriculums = const ['SPM', 'IGCSE', 'A-Level'];
 
   @override
   void initState() {
@@ -63,19 +65,20 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       final supabase = Supabase.instance.client;
       final data = await supabase
           .from('subjects')
-          .select('id, name')
+          .select('id, name, curriculum_id')
+          .eq('curriculum_id', _selectedCurriculum)
           .order('name');
       final subjects = List<Map<String, dynamic>>.from(data);
 
       if (mounted) {
         setState(() {
           _subjects = subjects;
-          _selectedSubjectId ??=
-              subjects.isNotEmpty ? subjects.first['id']?.toString() : null;
+          // Reset selected subject when curriculum changes
+          _selectedSubjectId = subjects.isNotEmpty ? subjects.first['id']?.toString() : null;
         });
       }
-    } catch (_) {
-      ToastService.showError('Failed to load subjects');
+    } catch (e) {
+      ToastService.showError('Failed to load subjects: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -418,6 +421,43 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       ],
                     ),
                     const SizedBox(height: 32),
+                    
+                    // Curriculum dropdown
+                    DropdownButtonFormField<String>(
+                      value: _selectedCurriculum,
+                      decoration: InputDecoration(
+                        labelText: 'Exam Type / Curriculum',
+                        filled: true,
+                        fillColor: const Color(0xFF1F2937),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: _curriculums
+                          .map(
+                            (curriculum) => DropdownMenuItem<String>(
+                              value: curriculum,
+                              child: Text(
+                                curriculum,
+                                style: const TextStyle(
+                                  color: AppTheme.textWhite,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _selectedCurriculum = value;
+                          });
+                          _fetchSubjects(); // Reload subjects for new curriculum
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    
                     // Subject dropdown
                     DropdownButtonFormField<String>(
                       value: _selectedSubjectId,
