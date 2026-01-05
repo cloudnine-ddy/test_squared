@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import 'chat_message.dart';
 
@@ -41,12 +42,12 @@ class _AIChatPanelState extends State<AIChatPanel> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
     if (!widget.isPremium) return;
 
     final userMessage = _messageController.text.trim();
-    
+
     setState(() {
       _messages.add({
         'message': userMessage,
@@ -59,12 +60,33 @@ class _AIChatPanelState extends State<AIChatPanel> {
     _messageController.clear();
     _scrollToBottom();
 
-    // Simulate AI response (replace with actual API call)
-    Future.delayed(const Duration(seconds: 2), () {
+    // Call AI Chat Edge Function
+    try {
+      // Prepare conversation history without DateTime objects (can't be JSON serialized)
+      final conversationForAPI = _messages
+          .take(_messages.length - 1) // Exclude the message we just added
+          .map((msg) => {
+                'message': msg['message'],
+                'isAI': msg['isAI'],
+              })
+          .toList();
+
+      final response = await Supabase.instance.client.functions.invoke(
+        'ai-chat',
+        body: {
+          'questionId': widget.questionId,
+          'userMessage': userMessage,
+          'conversationHistory': conversationForAPI,
+        },
+      );
+
       if (mounted) {
+        final aiMessage = response.data['message'] as String? ??
+                         'I apologize, but I couldn\'t process that. Could you try asking in a different way?';
+
         setState(() {
           _messages.add({
-            'message': 'I understand your question. Let me help you with that...\n\nThis is a placeholder response. In the full implementation, this will connect to your AI backend to provide helpful explanations and guidance.',
+            'message': aiMessage,
             'isAI': true,
             'timestamp': DateTime.now(),
           });
@@ -72,7 +94,23 @@ class _AIChatPanelState extends State<AIChatPanel> {
         });
         _scrollToBottom();
       }
-    });
+    } catch (error) {
+      print('❌ Error calling AI chat: $error');
+      print('Error type: ${error.runtimeType}');
+      print('Error details: ${error.toString()}');
+
+      if (mounted) {
+        setState(() {
+          _messages.add({
+            'message': 'I\'m having trouble connecting right now. Please check your connection and try again. 🔌',
+            'isAI': true,
+            'timestamp': DateTime.now(),
+          });
+          _isTyping = false;
+        });
+        _scrollToBottom();
+      }
+    }
   }
 
   void _sendQuickPrompt(String prompt) {
@@ -105,17 +143,17 @@ class _AIChatPanelState extends State<AIChatPanel> {
         children: [
           // Header
           _buildHeader(),
-          
+
           // Messages
           Expanded(
             child: widget.isPremium
                 ? _buildChatArea()
                 : _buildPremiumLock(),
           ),
-          
+
           // Quick prompts
           if (widget.isPremium) _buildQuickPrompts(),
-          
+
           // Input
           _buildInput(),
         ],
@@ -224,7 +262,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
         if (index == _messages.length) {
           return const TypingIndicator();
         }
-        
+
         final msg = _messages[index];
         return ChatMessage(
           message: msg['message'],
@@ -387,7 +425,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
               controller: _messageController,
               enabled: widget.isPremium,
               decoration: InputDecoration(
-                hintText: widget.isPremium 
+                hintText: widget.isPremium
                     ? 'Ask anything about this question...'
                     : 'Upgrade to Premium to chat',
                 hintStyle: TextStyle(

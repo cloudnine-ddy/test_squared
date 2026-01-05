@@ -4,16 +4,19 @@ import 'formatted_question_text.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
 import 'topic_tags.dart';
+import '../../progress/utils/question_status_helper.dart';
 
 /// A card for MCQ questions in a continuous feed with inline answer checking
 class MultipleChoiceFeedCard extends StatefulWidget {
   final QuestionModel question;
   final String? paperName; // Optional paper source info
+  final Map<String, dynamic>? latestAttempt;
 
   const MultipleChoiceFeedCard({
     super.key,
     required this.question,
     this.paperName,
+    this.latestAttempt,
   });
 
   @override
@@ -58,7 +61,7 @@ class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: Question number + marks
+            // Header: Question number + marks + status
             Row(
               children: [
                 Container(
@@ -124,8 +127,42 @@ class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
                     ),
                   ),
                 const Spacer(),
-                // Result badge
-                if (_isChecked)
+
+                // Previous attempt status badge (for attempts from database)
+                if (widget.latestAttempt != null) ...[                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: QuestionStatusHelper.getStatusColor(widget.latestAttempt).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: QuestionStatusHelper.getStatusColor(widget.latestAttempt).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          QuestionStatusHelper.getStatusIcon(widget.latestAttempt),
+                          size: 14,
+                          color: QuestionStatusHelper.getStatusColor(widget.latestAttempt),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getPreviousAttemptText(),
+                          style: TextStyle(
+                            color: QuestionStatusHelper.getStatusColor(widget.latestAttempt),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+
+                // Current inline attempt result badge (only show if checking inline AND no previous attempt)
+                if (_isChecked && widget.latestAttempt == null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -346,5 +383,21 @@ class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
         ),
       ),
     );
+  }
+
+  /// Get text for previous attempt badge
+  String _getPreviousAttemptText() {
+    if (widget.latestAttempt == null) return '';
+
+    final score = widget.latestAttempt!['score'] as int?;
+    final isCorrect = widget.latestAttempt!['is_correct'] as bool?;
+
+    if (isCorrect != null) {
+      return isCorrect ? 'Previously Correct' : 'Try Again';
+    } else if (score != null) {
+      return 'Score: $score';
+    }
+
+    return 'Previously Attempted';
   }
 }

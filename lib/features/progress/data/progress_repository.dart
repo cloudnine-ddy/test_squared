@@ -9,10 +9,72 @@ class ProgressRepository {
   /// Record a new question attempt
   Future<void> recordAttempt(QuestionAttemptModel attempt) async {
     await _supabase.from('user_question_attempts').insert(attempt.toMap());
-    
+
     // Refresh materialized view in background (don't await)
     _refreshStatsAsync();
   }
+
+  /// Get questions with the user's latest attempt for each question
+  Future<List<Map<String, dynamic>>> getQuestionsWithAttempts({
+    required String userId,
+    String? paperId,
+    List<String>? topicIds,
+    int? limit,
+  }) async {
+    dynamic query = _supabase
+        .from('questions')
+        .select('''
+          *,
+          papers(*),
+          user_question_attempts!left(
+            id,
+            score,
+            is_correct,
+            attempted_at,
+            answer_text,
+            selected_option
+          )
+        ''')
+        .eq('user_question_attempts.user_id', userId);
+
+    if (paperId != null) {
+      query = query.eq('paper_id', paperId);
+    }
+
+    if (topicIds != null && topicIds.isNotEmpty) {
+      query = query.overlaps('topic_ids', topicIds);
+    }
+
+    if (limit != null) {
+      query = query.limit(limit);
+    }
+
+    final data = await query;
+
+    // Process the data to get only the latest attempt per question
+    return (data as List).map<Map<String, dynamic>>((questionData) {
+      final attempts = questionData['user_question_attempts'] as List?;
+
+      // Sort attempts by attempted_at descending (most recent first)
+      Map<String, dynamic>? latestAttempt;
+      if (attempts != null && attempts.isNotEmpty) {
+        final sortedAttempts = List<Map<String, dynamic>>.from(attempts);
+        sortedAttempts.sort((a, b) {
+          final aTime = a['attempted_at'] as String?;
+          final bTime = b['attempted_at'] as String?;
+          if (aTime == null || bTime == null) return 0;
+          return bTime.compareTo(aTime); // Descending order
+        });
+        latestAttempt = sortedAttempts.first;
+      }
+
+      return {
+        ...questionData,
+        'latest_attempt': latestAttempt,
+      };
+    }).toList();
+  }
+
 
   /// Get all attempts for a user
   Future<List<QuestionAttemptModel>> getUserAttempts(
@@ -223,7 +285,7 @@ class ProgressRepository {
       );
 
       if (result == null) return [];
-      
+
       return (result as List).map((e) => e as Map<String, dynamic>).toList();
     } catch (e) {
       print('Error getting daily stats: $e');

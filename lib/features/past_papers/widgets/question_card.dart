@@ -4,33 +4,54 @@ import '../models/question_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
 import 'topic_tags.dart';
+import '../../progress/utils/question_status_helper.dart';
 
 /// Tappable question card that navigates to detail page
 class QuestionCard extends StatelessWidget {
   final QuestionModel question;
+  final Map<String, dynamic>? latestAttempt;
+  final VoidCallback? onReturn; // Callback when returning from detail screen
 
   const QuestionCard({
     super.key,
     required this.question,
+    this.latestAttempt,
+    this.onReturn,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Get status color and icon from helper
+    final statusColor = QuestionStatusHelper.getStatusColor(latestAttempt);
+    final statusIcon = QuestionStatusHelper.getStatusIcon(latestAttempt);
+    final hasAttempt = latestAttempt != null;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.border.withValues(alpha: 0.5),
-          width: 1,
+          color: hasAttempt ? statusColor.withValues(alpha: 0.5) : AppColors.border.withValues(alpha: 0.5),
+          width: hasAttempt ? 2 : 1,
         ),
+        // Add subtle glow for attempted questions
+        boxShadow: hasAttempt ? [
+          BoxShadow(
+            color: statusColor.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ] : null,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            context.push('/question/${question.id}');
+          onTap: () async {
+            // Navigate to question detail and refresh on return
+            await context.push('/question/${question.id}');
+            // Trigger refresh when coming back
+            onReturn?.call();
           },
           borderRadius: BorderRadius.circular(12),
           child: Padding(
@@ -158,6 +179,37 @@ class QuestionCard extends StatelessWidget {
 
                     const Spacer(),
 
+                    // Status badge (if attempted)
+                    if (hasAttempt) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 14, color: statusColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              _getScoreText(),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+
                     // Right side indicators
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -201,5 +253,33 @@ class QuestionCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Get score text for display
+  String _getScoreText() {
+    if (latestAttempt == null) return '';
+    
+    final score = latestAttempt!['score'] as int?; // This is 0-100 percentage
+    final isCorrect = latestAttempt!['is_correct'] as bool?;
+    
+    if (score != null) {
+      // Score is stored as percentage (0-100)
+      if (question.marks != null) {
+        // Calculate actual points from percentage
+        final actualScore = (score / 100 * question.marks!).toStringAsFixed(1);
+        // Remove trailing .0 if whole number
+        final scoreStr = actualScore.endsWith('.0') 
+            ? actualScore.substring(0, actualScore.length - 2)
+            : actualScore;
+        return '$scoreStr/${question.marks} ($score%)';
+      } else {
+        // No marks info, just show percentage
+        return '$score%';
+      }
+    } else if (isCorrect != null) {
+      return isCorrect ? 'Correct' : 'Incorrect';
+    }
+    
+    return 'Attempted';
   }
 }

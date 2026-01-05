@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
 import 'widgets/question_card.dart';
@@ -7,6 +8,7 @@ import 'widgets/skeleton_card.dart';
 import 'widgets/multiple_choice_feed_card.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
+import '../progress/data/progress_repository.dart';
 
 /// Topic detail screen with dark theme, search, and marks filter
 class TopicDetailScreen extends StatefulWidget {
@@ -23,11 +25,13 @@ class TopicDetailScreen extends StatefulWidget {
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTickerProviderStateMixin {
   List<QuestionModel> _allQuestions = [];
+  Map<String, Map<String, dynamic>> _attemptsByQuestionId = {}; // questionId -> attempt data
   bool _isLoading = true;
   String _searchQuery = '';
   String _marksFilter = 'all'; // all, 1-2, 3-4, 5+
   final _searchController = TextEditingController();
   late TabController _tabController;
+  final _progressRepo = ProgressRepository();
 
   @override
   void initState() {
@@ -44,12 +48,52 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
   }
 
   Future<void> _loadQuestions() async {
-    final questions = await PastPaperRepository().getQuestionsByTopic(widget.topicId);
-    if (mounted) {
-      setState(() {
-        _allQuestions = questions;
-        _isLoading = false;
-      });
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+
+      // First, get all questions for this topic
+      final questions = await PastPaperRepository().getQuestionsByTopic(widget.topicId);
+
+      // Then, get attempt data if user is logged in
+      Map<String, Map<String, dynamic>> attemptsMap = {};
+      if (userId != null && questions.isNotEmpty) {
+        final questionIds = questions.map((q) => q.id).toList();
+
+        // Get questions with attempts for this topic
+        final questionsWithAttempts = await _progressRepo.getQuestionsWithAttempts(
+          userId: userId,
+          topicIds: [widget.topicId],
+        );
+
+        // Build a map of questionId -> latest attempt
+        for (var qData in questionsWithAttempts) {
+          final qId = qData['id'] as String;
+          final latestAttempt = qData['latest_attempt'] as Map<String, dynamic>?;
+          if (latestAttempt != null) {
+            attemptsMap[qId] = latestAttempt;
+            final score = latestAttempt['score'];
+            final isCorrect = latestAttempt['is_correct'];
+            print('✅ Q[$qId]: score=$score, correct=$isCorrect');
+          }
+        }
+
+        print('✨ Total attempts: ${attemptsMap.length}/${questions.length}');
+      }
+
+      if (mounted) {
+        setState(() {
+          _allQuestions = questions;
+          _attemptsByQuestionId = attemptsMap;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading questions with attempts: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -357,14 +401,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
           paperName = '${question.paperYear} ${question.paperSeason}';
         }
 
+        // Get attempt data for this question
+        final latestAttempt = _attemptsByQuestionId[question.id];
+
         // Use different card types based on question type
         if (type == 'mcq') {
           return MultipleChoiceFeedCard(
             question: question,
             paperName: paperName,
+            latestAttempt: latestAttempt,
           );
         } else {
-          return QuestionCard(question: question);
+          return QuestionCard(
+            question: question,
+            latestAttempt: latestAttempt,
+            onReturn: _loadQuestions, // Refresh when returning from detail
+          );
         }
       },
     );

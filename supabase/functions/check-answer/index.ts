@@ -8,6 +8,10 @@ interface CheckAnswerRequest {
   officialAnswer: string
   studentAnswer: string
   marks?: number
+  userId?: string  // Add userId for saving attempt
+  timeSpent?: number  // Add time tracking
+  hintsUsed?: number  // Add hints tracking
+  selectedOption?: string  // For MCQ questions
 }
 
 interface CheckAnswerResponse {
@@ -17,6 +21,7 @@ interface CheckAnswerResponse {
   hints: string[]
   strengths: string[]
   improvements: string[]
+  attemptId?: string  // Return the saved attempt ID
 }
 
 Deno.serve(async (req) => {
@@ -30,7 +35,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { questionId, questionContent, officialAnswer, studentAnswer, marks } = await req.json() as CheckAnswerRequest
+    const {
+      questionId,
+      questionContent,
+      officialAnswer,
+      studentAnswer,
+      marks,
+      userId,
+      timeSpent,
+      hintsUsed,
+      selectedOption
+    } = await req.json() as CheckAnswerRequest
 
     // Validate inputs
     if (!studentAnswer || studentAnswer.trim().length === 0) {
@@ -39,6 +54,11 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get API key
     const apiKey = Deno.env.get('GEMINI_API_KEY')
@@ -104,19 +124,19 @@ Return ONLY valid JSON, no markdown.`
     }
 
     const geminiJson = await geminiRes.json()
-    
+
     // Parse response
     let result: CheckAnswerResponse
     try {
       let rawText = geminiJson.candidates[0].content.parts[0].text
-      
+
       // Remove markdown if present
       if (rawText.includes('```')) {
         rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim()
       }
-      
+
       result = JSON.parse(rawText)
-      
+
       // Validate and ensure all fields exist
       result = {
         isCorrect: result.isCorrect ?? false,
@@ -126,11 +146,11 @@ Return ONLY valid JSON, no markdown.`
         strengths: Array.isArray(result.strengths) ? result.strengths : [],
         improvements: Array.isArray(result.improvements) ? result.improvements : [],
       }
-      
+
     } catch (parseError) {
       console.error('Failed to parse Gemini response:', parseError)
       console.error('Raw:', geminiJson.candidates?.[0]?.content?.parts?.[0]?.text)
-      
+
       // Return a fallback response
       result = {
         isCorrect: false,
@@ -143,6 +163,40 @@ Return ONLY valid JSON, no markdown.`
     }
 
     console.log(`✅ Answer checked for question ${questionId}: ${result.score}%`)
+
+    // CRITICAL: Save the attempt to database if userId provided
+    if (userId) {
+      try {
+        const attemptData = {
+          user_id: userId,
+          question_id: questionId,
+          answer_text: selectedOption ? null : studentAnswer,  // For structured questions
+          selected_option: selectedOption || null,  // For MCQ questions
+          score: result.score,
+          is_correct: result.isCorrect,
+          time_spent_seconds: timeSpent || 0,
+          hints_used: hintsUsed || 0,
+          attempted_at: new Date().toISOString()
+        }
+
+        const { data: attemptRecord, error: insertError } = await supabase
+          .from('user_question_attempts')
+          .insert(attemptData)
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Failed to save attempt:', insertError)
+          // Don't fail the whole request - return grade but log error
+        } else {
+          result.attemptId = attemptRecord.id
+          console.log(`✅ Progress saved for user ${userId}`)
+        }
+      } catch (dbError) {
+        console.error('Database error:', dbError)
+        // Don't fail - user still gets their grade
+      }
+    }
 
     return new Response(
       JSON.stringify(result),
@@ -157,3 +211,4 @@ Return ONLY valid JSON, no markdown.`
     )
   }
 })
+
