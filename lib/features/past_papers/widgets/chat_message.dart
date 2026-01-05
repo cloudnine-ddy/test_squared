@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Individual chat message bubble
@@ -6,13 +7,17 @@ class ChatMessage extends StatelessWidget {
   final String message;
   final bool isAI;
   final DateTime timestamp;
+  final Widget? contentWidget;
 
   const ChatMessage({
     super.key,
     required this.message,
     required this.isAI,
     required this.timestamp,
+    this.contentWidget,
   });
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -39,13 +44,13 @@ class ChatMessage extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
-          
+
           // Message bubble
           Flexible(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isAI 
+                color: isAI
                     ? const Color(0xFFE8DCC8) // Light tan for AI
                     : AppColors.primary, // Navy for user
                 borderRadius: BorderRadius.only(
@@ -65,19 +70,29 @@ class ChatMessage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message,
-                    style: TextStyle(
-                      color: isAI ? AppColors.textPrimary : Colors.white,
-                      fontSize: 14,
-                      height: 1.5,
+                  MarkdownBody(
+                    data: message,
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                        color: isAI ? AppColors.textPrimary : Colors.white,
+                        fontSize: 14,
+                        height: 1.5,
+                      ),
+                      strong: TextStyle(
+                        color: isAI ? AppColors.textPrimary : Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
+                  if (contentWidget != null) ...[
+                    const SizedBox(height: 12),
+                    contentWidget!,
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(timestamp),
                     style: TextStyle(
-                      color: isAI 
+                      color: isAI
                           ? AppColors.textSecondary.withValues(alpha: 0.6)
                           : Colors.white.withValues(alpha: 0.7),
                       fontSize: 11,
@@ -87,7 +102,7 @@ class ChatMessage extends StatelessWidget {
               ),
             ),
           ),
-          
+
           if (!isAI) ...[
             const SizedBox(width: 8),
             // User Avatar
@@ -164,7 +179,7 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
             ),
           ),
           const SizedBox(width: 8),
-          
+
           // Typing dots
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -186,7 +201,7 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
                     final delay = index * 0.2;
                     final value = (_controller.value - delay).clamp(0.0, 1.0);
                     final opacity = (value * 2).clamp(0.3, 1.0);
-                    
+
                     return Padding(
                       padding: EdgeInsets.only(left: index > 0 ? 4 : 0),
                       child: Opacity(

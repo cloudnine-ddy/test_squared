@@ -20,16 +20,16 @@ class _SearchScreenState extends State<SearchScreen> {
   final _searchRepo = SearchRepository();
   final _paperRepo = PastPaperRepository();
   final _searchController = TextEditingController();
-  
+
   List<QuestionModel> _results = [];
   List<SubjectModel> _subjects = [];
   bool _isLoading = false;
   bool _hasSearched = false;
-  
+
   // Filters
   String? _selectedSubjectId;
   String? _selectedType; // 'mcq' or 'structured'
-  
+
   // Debouncing
   Timer? _debounceTimer;
   static const _debounceDuration = Duration(milliseconds: 300);
@@ -61,7 +61,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _onSearchChanged(String query) {
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     // If query is empty, clear results
     if (query.trim().isEmpty) {
       setState(() {
@@ -70,7 +70,7 @@ class _SearchScreenState extends State<SearchScreen> {
       });
       return;
     }
-    
+
     // Start new timer
     _debounceTimer = Timer(_debounceDuration, () {
       _performSearch();
@@ -123,120 +123,144 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Search Questions'),
-        backgroundColor: AppColors.sidebar,
+        title: const Text(
+          'Search Questions',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.background,
+        elevation: 0,
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Search Bar with light background
           Container(
-            padding: const EdgeInsets.all(16),
-            color: AppColors.sidebar,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: AppColors.background,
             child: Column(
               children: [
-                TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search questions...',
-                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
-                    prefixIcon: _isLoading
-                        ? Padding(
-                            padding: const EdgeInsets.all(14.0),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white.withValues(alpha: 0.6),
-                                ),
-                              ),
-                            ),
-                          )
-                        : const Icon(Icons.search, color: Colors.white54),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.white54),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _results = [];
-                                _hasSearched = false;
-                              });
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: AppColors.background,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  onChanged: (value) {
-                    setState(() {}); // Update UI for clear button
-                    _onSearchChanged(value); // Trigger debounced search
-                  },
-                ),
-                const SizedBox(height: 12),
-                // Filter Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      // Subject Filter
-                      PopupMenuButton<String>(
-                        child: Chip(
-                          label: Text(
-                            _selectedSubjectId != null
-                                ? _subjects.firstWhere((s) => s.id == _selectedSubjectId).name
-                                : 'All Subjects',
-                          ),
-                          deleteIcon: _selectedSubjectId != null ? const Icon(Icons.close, size: 18) : null,
-                          onDeleted: _selectedSubjectId != null
-                              ? () => setState(() => _selectedSubjectId = null)
-                              : null,
-                        ),
-                        itemBuilder: (context) => _subjects.map((subject) {
-                          return PopupMenuItem(
-                            value: subject.id,
-                            child: Text(subject.name),
-                          );
-                        }).toList(),
-                        onSelected: (subjectId) {
-                          setState(() => _selectedSubjectId = subjectId);
-                          if (_hasSearched) _performSearch();
-                        },
+                // Prominent search bar
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
-                      const SizedBox(width: 8),
-                      // Type Filter
-                      FilterChip(
-                        label: const Text('MCQ'),
-                        selected: _selectedType == 'mcq',
-                        onSelected: (selected) {
-                          setState(() => _selectedType = selected ? 'mcq' : null);
-                          if (_hasSearched) _performSearch();
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      FilterChip(
-                        label: const Text('Structured'),
-                        selected: _selectedType == 'structured',
-                        onSelected: (selected) {
-                          setState(() => _selectedType = selected ? 'structured' : null);
-                          if (_hasSearched) _performSearch();
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      if (_selectedSubjectId != null || _selectedType != null)
-                        TextButton.icon(
-                          icon: const Icon(Icons.clear_all, size: 18),
-                          label: const Text('Clear'),
-                          onPressed: _clearFilters,
-                        ),
                     ],
                   ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search questions...',
+                      hintStyle: TextStyle(
+                        color: AppColors.textSecondary.withValues(alpha: 0.5),
+                        fontSize: 15,
+                      ),
+                      prefixIcon: _isLoading
+                          ? Padding(
+                              padding: const EdgeInsets.all(14.0),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Icon(Icons.search, color: AppColors.textSecondary),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _results = [];
+                                  _hasSearched = false;
+                                });
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide(
+                          color: AppColors.primary,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15,
+                    ),
+                    onChanged: (value) {
+                      setState(() {}); // Update UI for clear button
+                      _onSearchChanged(value); // Trigger debounced search
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Filter Chips Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // All Subjects chip
+                    _buildFilterChip(
+                      'All Subjects',
+                      _selectedSubjectId == null && _selectedType == null,
+                      () {
+                        setState(() {
+                          _selectedSubjectId = null;
+                          _selectedType = null;
+                        });
+                        if (_hasSearched) _performSearch();
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    // MCQ chip
+                    _buildFilterChip(
+                      'MCQ',
+                      _selectedType == 'mcq',
+                      () {
+                        setState(() {
+                          _selectedType = _selectedType == 'mcq' ? null : 'mcq';
+                        });
+                        if (_hasSearched) _performSearch();
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    // Structured chip
+                    _buildFilterChip(
+                      'Structured',
+                      _selectedType == 'structured',
+                      () {
+                        setState(() {
+                          _selectedType = _selectedType == 'structured' ? null : 'structured';
+                        });
+                        if (_hasSearched) _performSearch();
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -250,22 +274,56 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.sidebar : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.sidebar : AppColors.border.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.white : AppColors.textPrimary,
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildResults() {
     if (!_hasSearched) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.3),
+            // Empty state illustration
+            Image.asset(
+              'lib/core/assets/images/search_empty_state.png',
+              width: 200,
+              height: 200,
+              errorBuilder: (context, error, stackTrace) {
+                // Fallback if image fails to load
+                return Icon(
+                  Icons.search,
+                  size: 100,
+                  color: AppColors.textSecondary.withValues(alpha: 0.3),
+                );
+              },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
-              'Search for questions',
+              'Start your search or browse by category',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: AppColors.textSecondary,
                 fontSize: 16,
               ),
             ),
@@ -285,22 +343,23 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             Icon(
               Icons.search_off,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.3),
+              size: 80,
+              color: AppColors.textSecondary.withValues(alpha: 0.3),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             Text(
               'No results found',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 16,
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Try different keywords or filters',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: AppColors.textSecondary,
                 fontSize: 14,
               ),
             ),

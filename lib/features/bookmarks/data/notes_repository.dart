@@ -5,7 +5,7 @@ class NotesRepository {
   final _supabase = Supabase.instance.client;
 
   /// Save or update a note
-  Future<void> saveNote(String questionId, String noteText) async {
+  Future<void> saveNote(String questionId, String noteText, {List<String> imageUrls = const []}) async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) throw Exception('User not authenticated');
 
@@ -25,6 +25,7 @@ class NotesRepository {
           .from('question_notes')
           .update({
             'note_text': noteText,
+            'image_urls': imageUrls,
             'updated_at': now.toIso8601String(),
           })
           .eq('user_id', userId)
@@ -35,6 +36,7 @@ class NotesRepository {
         'user_id': userId,
         'question_id': questionId,
         'note_text': noteText,
+        'image_urls': imageUrls,
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
       });

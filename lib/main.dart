@@ -17,6 +17,8 @@ void main() async {
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpeHdodWVxdnRldG5rZ2F6eWl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNDI4MTAsImV4cCI6MjA4MTYxODgxMH0.go4SSD65qzsK8_4Vnrl443rH9EJgSKNRN949NQWhNEE',
   );
 
+
+
   // Initialize accessibility service
   final accessibilityService = AccessibilityService();
   await accessibilityService.init();
@@ -47,13 +49,13 @@ class TestSquaredApp extends StatelessWidget {
         var darkTheme = AppTheme.darkTheme;
 
         if (accessibilityService.dyslexiaFriendlyFont) {
-          // In a real app, you'd add the font asset. 
+          // In a real app, you'd add the font asset.
           // For now we'll use a widely available generic font or just basic sans-serif
           // distinct from the default to show the effect.
           // Or strictly speaking, we just rely on the service to switch usage if we had assets.
           // Since we don't have the asset, let's just make sure text scaling works perfectly first.
           // But I will apply the property so it's ready.
-          /* 
+          /*
           theme = theme.copyWith(textTheme: theme.textTheme.apply(fontFamily: 'OpenDyslexic'));
           darkTheme = darkTheme.copyWith(textTheme: darkTheme.textTheme.apply(fontFamily: 'OpenDyslexic'));
           */

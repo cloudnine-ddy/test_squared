@@ -19,7 +19,7 @@ class BookmarksScreen extends StatefulWidget {
 class _BookmarksScreenState extends State<BookmarksScreen> {
   final _bookmarkRepo = BookmarkRepository();
   final _notesRepo = NotesRepository();
-  
+
   List<String> _folders = [];
   String _selectedFolder = 'My Bookmarks';
   List<QuestionModel> _questions = [];
@@ -195,7 +195,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Q${question.questionNumber}',
+                      question.type == 'ai_generated'
+                          ? 'AI'
+                          : 'Q${question.questionNumber}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -334,7 +336,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   Future<void> _showCreateFolderDialog() async {
     final controller = TextEditingController();
-    
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -376,14 +378,14 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     try {
       // Move all bookmarks from this folder to "My Bookmarks"
       await _bookmarkRepo.moveFolderBookmarks(folder, 'My Bookmarks');
-      
+
       setState(() {
         _folders.remove(folder);
         if (_selectedFolder == folder) {
           _selectedFolder = 'My Bookmarks';
         }
       });
-      
+
       ToastService.showSuccess('Folder deleted');
       _loadQuestions();
     } catch (e) {
@@ -394,7 +396,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   Future<void> _renameFolder(String oldName, String newName) async {
     try {
       await _bookmarkRepo.renameFolder(oldName, newName);
-      
+
       setState(() {
         final index = _folders.indexOf(oldName);
         if (index != -1) {
@@ -404,7 +406,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
           _selectedFolder = newName;
         }
       });
-      
+
       ToastService.showSuccess('Folder renamed');
     } catch (e) {
       ToastService.showError('Failed to rename folder');

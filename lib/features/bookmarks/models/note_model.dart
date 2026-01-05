@@ -3,6 +3,7 @@ class NoteModel {
   final String userId;
   final String questionId;
   final String noteText;
+  final List<String> imageUrls;  // URLs of uploaded images
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -11,6 +12,7 @@ class NoteModel {
     required this.userId,
     required this.questionId,
     required this.noteText,
+    this.imageUrls = const [],  // Default to empty list
     required this.createdAt,
     required this.updatedAt,
   });
@@ -30,6 +32,9 @@ class NoteModel {
       userId: map['user_id']?.toString() ?? '',
       questionId: map['question_id']?.toString() ?? '',
       noteText: map['note_text']?.toString() ?? '',
+      imageUrls: map['image_urls'] != null
+          ? List<String>.from(map['image_urls'])
+          : [],
       createdAt: map['created_at'] is String
           ? DateTime.parse(map['created_at'])
           : map['created_at'] as DateTime,
@@ -45,6 +50,7 @@ class NoteModel {
       'user_id': userId,
       'question_id': questionId,
       'note_text': noteText,
+      'image_urls': imageUrls,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -55,6 +61,7 @@ class NoteModel {
     String? userId,
     String? questionId,
     String? noteText,
+    List<String>? imageUrls,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -63,6 +70,7 @@ class NoteModel {
       userId: userId ?? this.userId,
       questionId: questionId ?? this.questionId,
       noteText: noteText ?? this.noteText,
+      imageUrls: imageUrls ?? this.imageUrls,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import 'chat_message.dart';
+import 'generated_question_card.dart';
 
 /// AI Chat Panel for the right side of split screen
 class AIChatPanel extends StatefulWidget {
@@ -24,15 +25,47 @@ class _AIChatPanelState extends State<AIChatPanel> {
   final List<Map<String, dynamic>> _messages = [];
   bool _isTyping = false;
 
+  // User's attempt context
+  String? _userAnswer;
+  int? _userScore;
+  int _generatedQuestionCount = 0;
+
   @override
   void initState() {
     super.initState();
+    _loadUserAttempt();
     // Welcome message
     _messages.add({
       'message': 'Hi! I\'m your AI study assistant. I can help explain this question, give hints, or check your understanding. How can I help you today?',
       'isAI': true,
       'timestamp': DateTime.now(),
     });
+  }
+
+  Future<void> _loadUserAttempt() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final response = await Supabase.instance.client
+        .from('user_question_attempts')
+        .select('answer_text, selected_option, score')
+        .eq('user_id', userId)
+        .eq('question_id', widget.questionId)
+        .order('attempted_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+      if (response != null && mounted) {
+        setState(() {
+          _userAnswer = response['answer_text'] ?? response['selected_option'];
+          _userScore = response['score'];
+        });
+        print('📝 Loaded user attempt: score=$_userScore');
+      }
+    } catch (e) {
+      print('Error loading user attempt: $e');
+    }
   }
 
   @override
@@ -42,7 +75,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
     super.dispose();
   }
 
-  void _sendMessage() async {
+  void _sendMessage({String? intent}) async {
     if (_messageController.text.trim().isEmpty) return;
     if (!widget.isPremium) return;
 
@@ -62,9 +95,10 @@ class _AIChatPanelState extends State<AIChatPanel> {
 
     // Call AI Chat Edge Function
     try {
-      // Prepare conversation history without DateTime objects (can't be JSON serialized)
+      // Prepare conversation history without DateTime objects
       final conversationForAPI = _messages
-          .take(_messages.length - 1) // Exclude the message we just added
+          .where((m) => m['isAI'] == true || m['message'] != userMessage) // Filter out current message to avoid dupe if logic requires
+          .take(_messages.length - 1) // Logic check: we just added the user message.
           .map((msg) => {
                 'message': msg['message'],
                 'isAI': msg['isAI'],
@@ -77,45 +111,63 @@ class _AIChatPanelState extends State<AIChatPanel> {
           'questionId': widget.questionId,
           'userMessage': userMessage,
           'conversationHistory': conversationForAPI,
+          'userAnswer': _userAnswer,
+          'userScore': _userScore,
+          'intent': intent,
         },
       );
 
       if (mounted) {
-        final aiMessage = response.data['message'] as String? ??
-                         'I apologize, but I couldn\'t process that. Could you try asking in a different way?';
-
+        final data = response.data;
         setState(() {
-          _messages.add({
-            'message': aiMessage,
-            'isAI': true,
-            'timestamp': DateTime.now(),
-          });
           _isTyping = false;
+            if (data != null && data['error'] == null) {
+              int? qIndex;
+              if (data['generated_question'] != null) {
+                _generatedQuestionCount++;
+                qIndex = _generatedQuestionCount;
+              }
+
+              _messages.add({
+                'message': data['message'],
+                'isAI': true,
+                'timestamp': DateTime.now(),
+                'generated_question': data['generated_question'],
+                'questionIndex': qIndex,
+              });
+          } else {
+            _messages.add({
+              'message': data?['error'] ?? 'Something went wrong. Please try again.',
+              'isAI': true,
+              'timestamp': DateTime.now(),
+            });
+          }
         });
         _scrollToBottom();
       }
-    } catch (error) {
-      print('❌ Error calling AI chat: $error');
-      print('Error type: ${error.runtimeType}');
-      print('Error details: ${error.toString()}');
-
+    } catch (e) {
       if (mounted) {
         setState(() {
+          _isTyping = false;
           _messages.add({
-            'message': 'I\'m having trouble connecting right now. Please check your connection and try again. 🔌',
+            'message': 'Error: Unable to connect to AI assistant.',
             'isAI': true,
             'timestamp': DateTime.now(),
           });
-          _isTyping = false;
         });
         _scrollToBottom();
       }
+      print('AI Chat Error: $e');
     }
   }
 
   void _sendQuickPrompt(String prompt) {
     _messageController.text = prompt;
-    _sendMessage();
+    String? intent;
+    if (prompt == 'Generate similar question') {
+      intent = 'generate_question';
+    }
+    _sendMessage(intent: intent);
   }
 
   void _scrollToBottom() {
@@ -153,6 +205,9 @@ class _AIChatPanelState extends State<AIChatPanel> {
 
           // Quick prompts
           if (widget.isPremium) _buildQuickPrompts(),
+
+          // Prominent Generate Button
+          if (widget.isPremium) _buildGenerateButton(),
 
           // Input
           _buildInput(),
@@ -268,9 +323,28 @@ class _AIChatPanelState extends State<AIChatPanel> {
           message: msg['message'],
           isAI: msg['isAI'],
           timestamp: msg['timestamp'],
+          contentWidget: (msg['isAI'] && msg['generated_question'] != null)
+              ? GeneratedQuestionCard(
+                  questionData: msg['generated_question'],
+                  questionIndex: msg['questionIndex'] ?? 1,
+                )
+              : null,
         );
       },
     );
+  }
+
+  Future<void> _saveGeneratedQuestion(Map<String, dynamic> data) async {
+    // Placeholder logic for saving generated question
+    // In a real app, this would insert the question into the DB and create a bookmark
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Question added to your session! (Simulated)'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   Widget _buildPremiumLock() {
@@ -471,6 +545,57 @@ class _AIChatPanelState extends State<AIChatPanel> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGenerateButton() {
+     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      color: AppColors.background,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA)], // Purple gradient
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF8E24AA).withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _sendQuickPrompt('Generate similar question'),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Generate Similar Question',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -15,6 +15,7 @@ import '../bookmarks/widgets/bookmark_button.dart';
 import '../bookmarks/screens/note_editor_dialog.dart';
 import '../bookmarks/data/bookmark_repository.dart';
 import '../bookmarks/data/notes_repository.dart';
+import '../bookmarks/widgets/draggable_note_widget.dart'; // New draggable widget
 import '../progress/data/progress_repository.dart';
 import '../progress/models/question_attempt_model.dart';
 import '../auth/providers/auth_provider.dart';
@@ -43,6 +44,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   bool _isCheckingAnswer = false;
   late TabController _tabController;
   String? _selectedMcqAnswer; // For MCQ questions: 'A', 'B', 'C', or 'D'
+
+  // Draggable Note State
+  bool _isNoteOpen = false;
+  Offset _notePosition = const Offset(20, 100); // Default position
+  String? _loadedNoteText;
+  List<String>? _loadedNoteImages;
 
   // AI Feedback
   Map<String, dynamic>? _aiFeedback;
@@ -170,22 +177,27 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Future<void> _showNoteEditor() async {
+    if (_isNoteOpen) {
+      setState(() => _isNoteOpen = false);
+      return;
+    }
+
     // Load existing note if any
     final existingNote = await _notesRepo.getNote(widget.questionId);
 
     if (!mounted) return;
 
-    final noteText = await showDialog<String>(
-      context: context,
-      builder: (context) => NoteEditorDialog(
-        questionId: widget.questionId,
-        initialNote: existingNote?.noteText,
-      ),
-    );
+    setState(() {
+      _loadedNoteText = existingNote?.noteText;
+      _loadedNoteImages = existingNote?.imageUrls;
+      _isNoteOpen = true;
+    });
+  }
 
-    if (noteText != null && noteText.isNotEmpty) {
+  Future<void> _saveNote(String noteText, List<String> imageUrls) async {
+    if (noteText.isNotEmpty || imageUrls.isNotEmpty) {
       try {
-        await _notesRepo.saveNote(widget.questionId, noteText);
+        await _notesRepo.saveNote(widget.questionId, noteText, imageUrls: imageUrls);
         _loadBookmarkAndNoteStatus(); // Refresh status
 
         if (mounted) {
@@ -872,6 +884,24 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               ),
             ],
           ),
+
+          if (_isNoteOpen)
+            Positioned(
+              left: _notePosition.dx,
+              top: _notePosition.dy,
+              child: DraggableNoteWidget(
+                questionId: widget.questionId,
+                initialNote: _loadedNoteText,
+                initialImageUrls: _loadedNoteImages,
+                onClose: () => setState(() => _isNoteOpen = false),
+                onSave: _saveNote,
+                onDrag: (delta) {
+                  setState(() {
+                    _notePosition += delta;
+                  });
+                },
+              ),
+            ),
         ],
       ),
     );

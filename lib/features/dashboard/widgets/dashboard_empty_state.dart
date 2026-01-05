@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Beautiful empty state for dashboard when no subject is selected
@@ -59,9 +60,9 @@ class DashboardEmptyState extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Welcome message
             Text(
               'Welcome to Test²!',
@@ -72,9 +73,9 @@ class DashboardEmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Subtitle
             Text(
               'Select a subject from the sidebar to start practicing,\nor explore our subjects to begin your learning journey.',
@@ -85,9 +86,9 @@ class DashboardEmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             const SizedBox(height: 40),
-            
+
             // Quick action cards
             Wrap(
               spacing: 24,
@@ -106,24 +107,20 @@ class DashboardEmptyState extends StatelessWidget {
                   title: 'View Progress',
                   description: 'Track your learning journey',
                   color: Colors.green,
-                  onTap: () {
-                    // Navigate to progress
-                  },
+                  onTap: () => context.push('/progress'),
                 ),
                 _buildQuickActionCard(
                   icon: Icons.bookmark_outline,
                   title: 'Saved Questions',
                   description: 'Review bookmarked questions',
                   color: Colors.orange,
-                  onTap: () {
-                    // Navigate to bookmarks
-                  },
+                  onTap: () => context.push('/bookmarks'),
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 60),
-            
+
             // Motivational quote
             Container(
               padding: const EdgeInsets.all(24),
