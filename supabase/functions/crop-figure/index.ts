@@ -27,20 +27,30 @@ Deno.serve(async (req) => {
 
     // Checks
     if (!questionId || !paperId) throw new Error('Missing ID or Paper ID')
-    if (!aiAnswer || !aiAnswer.has_figure || !aiAnswer.figure_location) {
-      console.log(`[Skip] Question ${questionId} has no figure.`)
-      return new Response(JSON.stringify({ message: 'Skipped - No Figure' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+    // Check for either figure or table
+    if (!aiAnswer || (!aiAnswer.has_figure && !aiAnswer.has_table)) {
+      console.log(`[Skip] Question ${questionId} has no figure or table.`)
+      return new Response(JSON.stringify({ message: 'Skipped - No Figure/Table' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const { 
-      page, 
-      x_percent, 
-      y_percent, 
-      width_percent, 
-      height_percent, 
-      source_page_width, 
-      source_page_height 
-    } = aiAnswer.figure_location
+    const isTable = !!aiAnswer.has_table;
+    const locationData = isTable ? aiAnswer.table_location : aiAnswer.figure_location;
+
+    if (!locationData) {
+       console.log(`[Skip] Question ${questionId} marked as having figure/table but missing location data.`)
+       return new Response(JSON.stringify({ message: 'Skipped - Missing Location Data' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    const {
+      page,
+      x_percent,
+      y_percent,
+      width_percent,
+      height_percent,
+      source_page_width,
+      source_page_height
+    } = locationData
 
     console.log(`[Start] Processing Q${questionId} (Page ${page})`)
     console.log(`[Dims] Page: ${source_page_width}x${source_page_height}`)
@@ -71,21 +81,21 @@ Deno.serve(async (req) => {
 
     // --- STEP 2: Calculate Rect for PDF.co ---
     // PDF.co 'rect' format: x,y,width,height string
-    // Coordinates are in points (or whatever unit the source PDF uses). 
+    // Coordinates are in points (or whatever unit the source PDF uses).
     // Since we extracted dimensions via pdf-lib (points), we should map percentages back to points.
-    
-    // Safety Padding (e.g., 5% extra or fixed amount? User said "20px" in previous logic, 
+
+    // Safety Padding (e.g., 5% extra or fixed amount? User said "20px" in previous logic,
     // but that was pixels on a raster. Let's add a small relative buffer or stick to strict bbox if "Remove Hardcoded Dimensions" implies precision.)
     // User instruction: "Remove Hardcoded Dimensions ... stop using 595 and 842. Instead ... accept pageWidth and pageHeight"
     // User instruction: "Refine Math: Use the actual dimensions to calculate the rectString for PDF.co"
-    
+
     const pX = Math.max(0, (x_percent / 100) * source_page_width)
     const pY = Math.max(0, (y_percent / 100) * source_page_height)
     const pW = (width_percent / 100) * source_page_width
     const pH = (height_percent / 100) * source_page_height
 
-    // Add small buffer? 
-    // The previous logic had 20px padding on the *image*. 
+    // Add small buffer?
+    // The previous logic had 20px padding on the *image*.
     // Let's add 10 points padding here to be safe, clamping to page limits.
     const PADDING = 10
     const finalX = Math.max(0, pX - PADDING)
@@ -103,13 +113,13 @@ Deno.serve(async (req) => {
     // PDF.co "pdf/convert/to/png" with 'rect'
     // Note: PDF.co uses 0-based page indexing
     const pageIndex = Math.max(0, page - 1)
-    
+
     console.log(`[PDF.co] Requesting crop on page index ${pageIndex}...`)
 
     const renderPayload = {
       url: pdfUrl,
       pages: String(pageIndex),
-      rect: rectString, 
+      rect: rectString,
       async: false
     }
 
@@ -124,10 +134,10 @@ Deno.serve(async (req) => {
       console.error('[PDF.co Error]', renderJson)
       throw new Error(renderJson.message || 'PDF.co crop failed')
     }
-    
+
     const cropImageUrl = renderJson.urls?.[0] || renderJson.url
     if (!cropImageUrl) throw new Error('No image URL returned from PDF.co')
-    
+
     console.log(`[PDF.co] Success! Image URL: ${cropImageUrl}`)
 
     // --- STEP 4: Download & Storage ---
@@ -139,7 +149,7 @@ Deno.serve(async (req) => {
 
     console.log(`[Upload] Uploading ${resultBytes.length} bytes to storage...`)
     const fileName = `figures/${questionId}.png`
-    
+
     const { error: uploadError } = await supabase.storage
         .from('exam-papers')
         .upload(fileName, resultBytes, {

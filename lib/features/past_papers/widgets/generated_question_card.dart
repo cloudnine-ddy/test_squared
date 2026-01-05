@@ -468,72 +468,171 @@ class _SaveDialogState extends State<_SaveDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Save to Collection'),
-      content: _isLoading
-          ? const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()))
-          : SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Select existing folder:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: _existingFolders.map((f) {
-                      final isSelected = _selectedFolder == f && _newFolderController.text.isEmpty;
-                      return ChoiceChip(
-                        label: Text(f),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
-                            setState(() {
-                              _selectedFolder = f;
-                              _newFolderController.clear();
-                            });
-                          }
-                        },
-                      );
-                    }).toList(),
+    return Dialog(
+      backgroundColor: AppColors.sidebar,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _newFolderController,
-                    decoration: const InputDecoration(
-                      labelText: 'Or create new folder',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (val) {
-                      // If user types here, clear selection
-                      if (val.isNotEmpty && _selectedFolder != null) {
-                         setState(() => _selectedFolder = null);
+                  child: const Icon(Icons.bookmark, color: Colors.amber, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Bookmark Question',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            if (_isLoading)
+               const Center(child: CircularProgressIndicator())
+            else ...[
+              // Folder Selection
+              const Text(
+                'SELECT FOLDER',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 150),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: _existingFolders.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                  itemBuilder: (context, index) {
+                    final folder = _existingFolders[index];
+                    final isSelected = _selectedFolder == folder && _newFolderController.text.isEmpty;
+                    return ListTile(
+                      dense: true,
+                      onTap: () {
+                        setState(() {
+                          _selectedFolder = folder;
+                          _newFolderController.clear();
+                        });
+                      },
+                      leading: Icon(
+                        Icons.folder,
+                        color: isSelected ? Colors.amber : Colors.grey,
+                        size: 20,
+                      ),
+                      title: Text(
+                        folder,
+                        style: TextStyle(
+                          color: isSelected ? Colors.amber : Colors.white,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      trailing: isSelected
+                        ? const Icon(Icons.check, color: Colors.amber, size: 18)
+                        : null,
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Create New Folder
+              const Text(
+                'CREATE NEW FOLDER',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _newFolderController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Enter folder name...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                  prefixIcon: Icon(Icons.create_new_folder, color: Colors.white.withOpacity(0.3), size: 20),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.05),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.amber),
+                  ),
+                ),
+                onChanged: (val) {
+                  if (val.isNotEmpty && _selectedFolder != null) {
+                    setState(() => _selectedFolder = null);
+                  }
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+              // Actions
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () {
+                      String finalFolder = _newFolderController.text.trim();
+                      if (finalFolder.isEmpty) {
+                        finalFolder = _selectedFolder ?? 'Hard Questions';
                       }
+                      Navigator.pop(context, finalFolder);
                     },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                    child: const Text('Save Bookmark', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
-            ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+            ],
+          ],
         ),
-        ElevatedButton(
-          onPressed: () {
-            // Priority: New Folder Text -> Selected Folder -> Default
-            String finalFolder = _newFolderController.text.trim();
-            if (finalFolder.isEmpty) {
-              finalFolder = _selectedFolder ?? 'Hard Questions';
-            }
-            Navigator.pop(context, finalFolder);
-          },
-          child: const Text('Save'),
-        ),
-      ],
+      ),
     );
   }
 }

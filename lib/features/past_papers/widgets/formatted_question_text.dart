@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../core/theme/app_colors.dart';
 
 // Helper enum for identifying block types
@@ -18,11 +19,13 @@ class _TextBlock {
 class FormattedQuestionText extends StatelessWidget {
   final String content;
   final double fontSize;
+  final Color? textColor;
 
   const FormattedQuestionText({
     super.key,
     required this.content,
     this.fontSize = 16,
+    this.textColor,
   });
 
   @override
@@ -104,14 +107,17 @@ class FormattedQuestionText extends StatelessWidget {
       case _BlockType.intro:
         return Padding(
           padding: const EdgeInsets.only(bottom: 20),
-          child: SelectableText(
-            block.content,
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: fontSize,
-              height: 1.5,
-              fontWeight: FontWeight.w600,
-              fontFamily: 'Roboto',
+          child: MarkdownBody(
+            data: block.content,
+            styleSheet: MarkdownStyleSheet(
+              p: TextStyle(
+                color: textColor ?? AppColors.textPrimary,
+                fontSize: fontSize,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+              ),
+              strong: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         );
@@ -137,14 +143,17 @@ class FormattedQuestionText extends StatelessWidget {
               ),
               // Content
               Expanded(
-                child: SelectableText(
-                  block.content,
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: fontSize,
-                    height: 1.5,
-                    fontWeight: FontWeight.w400,
-                    fontFamily: 'Roboto',
+                child: MarkdownBody(
+                  data: block.content,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: textColor ?? AppColors.textPrimary,
+                      fontSize: fontSize,
+                      height: 1.5,
+                      fontWeight: FontWeight.w400,
+                      fontFamily: 'Roboto',
+                    ),
+                    strong: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -164,7 +173,7 @@ class FormattedQuestionText extends StatelessWidget {
                 child: Text(
                   block.label!,
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: textColor ?? AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: fontSize * 0.95,
                     height: 1.5,
@@ -173,13 +182,16 @@ class FormattedQuestionText extends StatelessWidget {
               ),
               // Content
               Expanded(
-                child: SelectableText(
-                  block.content,
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: fontSize * 0.95,
-                    height: 1.5,
-                    fontFamily: 'Roboto',
+                child: MarkdownBody(
+                  data: block.content,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: textColor ?? AppColors.textPrimary,
+                      fontSize: fontSize * 0.95,
+                      height: 1.5,
+                      fontFamily: 'Roboto',
+                    ),
+                    strong: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

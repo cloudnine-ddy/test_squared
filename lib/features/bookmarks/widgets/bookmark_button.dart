@@ -33,12 +33,12 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
   void initState() {
     super.initState();
     _isBookmarked = widget.initialIsBookmarked;
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
@@ -67,7 +67,7 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
           setState(() => _isLoading = false);
           return; // User cancelled
         }
-        
+
         await _bookmarkRepo.addBookmark(widget.questionId, folder: folder);
         ToastService.showSuccess('Bookmarked to $folder!');
         AnalyticsService().trackBookmark(widget.questionId, true);
@@ -89,15 +89,16 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
   Future<String?> _showFolderSelectionDialog() async {
     final folders = await _bookmarkRepo.getFolders();
     final TextEditingController newFolderController = TextEditingController();
-    
+
     return showDialog<String>(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
       builder: (context) => Dialog(
-        backgroundColor: const Color(0xFF1E232F), // Lighter surface
+        backgroundColor: const Color(0xFFF9F6EE), // Cream background
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
+          borderRadius: BorderRadius.circular(24),
         ),
+        elevation: 0,
         child: Container(
           width: 400,
           padding: const EdgeInsets.all(24),
@@ -105,38 +106,40 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header
               Row(
                 children: [
                    Container(
                      padding: const EdgeInsets.all(10),
                      decoration: BoxDecoration(
-                       color: Colors.amber.withValues(alpha: 0.1),
+                       color: const Color(0xFFE4E1D8), // Slightly darker cream/grey
                        borderRadius: BorderRadius.circular(12),
                      ),
-                     child: const Icon(Icons.bookmark_rounded, color: Colors.amber, size: 24),
+                     child: const Icon(Icons.bookmark, color: Color(0xFF2C3E50), size: 24),
                    ),
                    const SizedBox(width: 16),
                    const Text(
                     'Bookmark Question',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF1A1C1E),
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                      letterSpacing: -0.5,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              
+              const SizedBox(height: 32),
+
+              // Folder Selection
               if (folders.isNotEmpty) ...[
-                Text(
+                const Text(
                   'SELECT FOLDER',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: Color(0xFF8E8E93),
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -150,28 +153,27 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
                           onTap: () => Navigator.of(context).pop(folder),
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.05),
+                              color: const Color(0xFFEBE8E0), // Input/Item background
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.folder_rounded, color: Colors.amber, size: 20),
+                                const Icon(Icons.folder, color: Color(0xFF4A4A4A), size: 20),
                                 const SizedBox(width: 12),
                                 Text(
                                   folder,
                                   style: const TextStyle(
-                                    color: Colors.white,
+                                    color: Color(0xFF1A1C1E),
                                     fontWeight: FontWeight.w500,
                                     fontSize: 15,
                                   ),
                                 ),
                                 const Spacer(),
-                                Icon(Icons.arrow_forward_ios_rounded, 
-                                  color: Colors.white.withValues(alpha: 0.3), 
-                                  size: 14
+                                const Icon(Icons.chevron_right,
+                                  color: Color(0xFF8E8E93),
+                                  size: 20
                                 ),
                               ],
                             ),
@@ -183,49 +185,53 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
                 ),
                 const SizedBox(height: 24),
               ],
-              
-              Text(
+
+              // New Folder Input
+              const Text(
                 'CREATE NEW FOLDER',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: Color(0xFF8E8E93),
                   fontSize: 12,
-                  fontWeight: FontWeight.w600, 
-                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: newFolderController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(color: Color(0xFF1A1C1E)),
                 decoration: InputDecoration(
                   hintText: 'Enter folder name...',
-                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                  hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
                   filled: true,
-                  fillColor: Colors.black.withValues(alpha: 0.3),
-                  prefixIcon: Icon(Icons.create_new_folder_outlined, color: Colors.white.withValues(alpha: 0.5)),
-                  border: OutlineInputBorder(
+                  fillColor: Colors.transparent, // Outline style or filled? Design shows outline
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  prefixIcon: const Icon(Icons.create_new_folder_outlined, color: Color(0xFF4A4A4A)),
+                  enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderSide: const BorderSide(color: Color(0xFF8E8E93), width: 1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.amber, width: 1.5),
+                    borderSide: const BorderSide(color: Color(0xFF1A1C1E), width: 1.5),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              
+              const SizedBox(height: 32),
+
+              // Action Buttons
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: TextButton.styleFrom(
-                      foregroundColor: Colors.white.withValues(alpha: 0.7),
+                      foregroundColor: const Color(0xFF4A4A4A),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w600),
                     ),
                     child: const Text('Cancel'),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                   ElevatedButton(
                     onPressed: () {
                       final newFolder = newFolderController.text.trim();
@@ -238,13 +244,13 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      backgroundColor: const Color(0xFFEBC25C), // Mustard/Yellow
+                      foregroundColor: const Color(0xFF1A1C1E),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                       elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30), // Pill shape
+                      ),
                     ),
                     child: const Text('Save Bookmark', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
@@ -267,7 +273,7 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-             gradient: _isBookmarked 
+             gradient: _isBookmarked
                 ? const LinearGradient(
                     colors: [Color(0xFFFFD700), Color(0xFFFFA000)],
                     begin: Alignment.topLeft,
@@ -280,7 +286,7 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
                   ),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: _isBookmarked 
+              color: _isBookmarked
                   ? Colors.white.withValues(alpha: 0.3)
                   : Colors.white.withValues(alpha: 0.1),
               width: 1,
@@ -300,7 +306,7 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2, 
+                      strokeWidth: 2,
                       color: _isBookmarked ? Colors.black : Colors.white
                     ),
                   ),

@@ -1,403 +1,623 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Riverpod
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../models/question_model.dart';
-import 'formatted_question_text.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/app_colors.dart';
-import 'topic_tags.dart';
 import '../../progress/utils/question_status_helper.dart';
+import 'formatted_question_text.dart';
+import 'topic_tags.dart';
+import '../../bookmarks/widgets/bookmark_button.dart';
+import '../../auth/providers/auth_provider.dart'; // Auth Provider
+import 'ai_chat_panel.dart'; // AI Chat Panel
 
-/// A card for MCQ questions in a continuous feed with inline answer checking
-class MultipleChoiceFeedCard extends StatefulWidget {
+class MultipleChoiceFeedCard extends ConsumerStatefulWidget {
   final QuestionModel question;
-  final String? paperName; // Optional paper source info
+  final String? paperName;
   final Map<String, dynamic>? latestAttempt;
+  final Function(String?)? onAnswerChanged;
+  final Function(bool)? onCheckResult;
 
   const MultipleChoiceFeedCard({
     super.key,
     required this.question,
     this.paperName,
     this.latestAttempt,
+    this.onAnswerChanged,
+    this.onCheckResult,
   });
 
   @override
-  State<MultipleChoiceFeedCard> createState() => _MultipleChoiceFeedCardState();
+  ConsumerState<MultipleChoiceFeedCard> createState() => _MultipleChoiceFeedCardState();
 }
 
-class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
+class _MultipleChoiceFeedCardState extends ConsumerState<MultipleChoiceFeedCard> {
   String? _selectedAnswer;
   bool _isChecked = false;
+  bool _isCorrect = false;
   bool _showExplanation = false;
+  bool _isRevealed = false; // New state for 'Reveal Answer'
 
-  void _selectAnswer(String label) {
-    if (!_isChecked) {
-      setState(() {
-        _selectedAnswer = label;
-      });
+  @override
+  void initState() {
+    super.initState();
+    if (widget.latestAttempt != null) {
+      // If there is a previous attempt, restore it (optional, or just show status)
+      // For this feed card, we usually start fresh or show the status badge.
+      // If we wanted to lock the state:
+      // _selectedAnswer = widget.latestAttempt!['selected_option'];
+      // _isChecked = true;
+      // _isCorrect = widget.latestAttempt!['is_correct'] ?? false;
     }
   }
 
+  void _selectAnswer(String answer) {
+    if (_isChecked || _isRevealed) return; // Prevent changing after check/reveal
+    setState(() {
+      _selectedAnswer = answer;
+    });
+    widget.onAnswerChanged?.call(answer);
+  }
+
   void _checkAnswer() {
+    if (_selectedAnswer == null) return;
+
+    final correct = widget.question.effectiveCorrectAnswer;
+    final isCorrect = _selectedAnswer == correct;
+
     setState(() {
       _isChecked = true;
+      _isCorrect = isCorrect;
+      _showExplanation = true; // Show explanation immediately on check
+    });
+
+    widget.onCheckResult?.call(isCorrect);
+  }
+
+  void _retry() {
+    setState(() {
+      _selectedAnswer = null;
+      _isChecked = false;
+      _isCorrect = false;
+      _isRevealed = false;
+      _showExplanation = false;
+    });
+    widget.onAnswerChanged?.call(null);
+  }
+
+  void _revealAnswer() {
+    setState(() {
+      _isRevealed = true;
+      _isChecked = true; // Treat as checked so options lock
+      _showExplanation = true;
     });
   }
 
-  bool get _isCorrect {
-    if (!_isChecked || _selectedAnswer == null) return false;
-    return _selectedAnswer == widget.question.effectiveCorrectAnswer;
+  // Opens the AI Chat Side Panel
+  void _askAi() {
+    // Get premium status
+    // Use read/watch. Using watch inside a callback is generally okay in latest Riverpod if just reading once,
+    // but ref.read is safer for callbacks to avoid widget rebuilds if provider changes (though isPremium is stable).
+    // Using ref.read as it's an event handler.
+    final isPremium = ref.read(isPremiumProvider);
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'AI Chat',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.centerRight,
+          child: Material(
+            color: Colors.transparent, // Let panel handle bg
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width > 600 ? 450 : MediaQuery.of(context).size.width * 0.90,
+              height: double.infinity,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
+                child: AIChatPanel(
+                  questionId: widget.question.id,
+                  isPremium: isPremium,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+         final curvedAnimation = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+         return SlideTransition(
+           position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(curvedAnimation),
+           child: child,
+         );
+      },
+    );
+  }
+
+  // Placeholder for "Add Note"
+  void _addNote() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Note feature coming soon to feed card!')),
+    );
+  }
+
+  String _getPreviousAttemptText() {
+    if (widget.latestAttempt == null) return '';
+    final score = widget.latestAttempt!['score'];
+    final isCorrect = widget.latestAttempt!['is_correct'] ?? false;
+
+    if (isCorrect) return 'Solved';
+    return '$score%';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    // Determine status color for border/glow
+    final statusColor = QuestionStatusHelper.getStatusColor(widget.latestAttempt);
+    // If checked inline, use green/red based on _isCorrect
+    final effectiveStatusColor = _isChecked
+        ? (_isCorrect ? Colors.green : Colors.red)
+        : (widget.latestAttempt != null ? statusColor : AppColors.border.withValues(alpha: 0.5));
+
+    final hasAttempt = widget.latestAttempt != null || _isChecked;
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 24),
-      color: AppColors.sidebar,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(
+          color: hasAttempt ? effectiveStatusColor.withValues(alpha: 0.5) : AppColors.border.withValues(alpha: 0.5),
+          width: hasAttempt ? 2 : 1,
+        ),
+        boxShadow: hasAttempt ? [
+          BoxShadow(
+            color: effectiveStatusColor.withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ] : null,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header: Question number + marks + status
-            Row(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Q${widget.question.questionNumber}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Paper source badge
-                if (widget.paperName != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2E1A47), // Dark purple
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.5)),
-                    ),
-                    child: Text(
-                      widget.paperName!,
-                      style: const TextStyle(
-                        color: Colors.purpleAccent,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                if (widget.question.marks != null)
-                  const SizedBox(width: 12),
-                if (widget.question.marks != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${widget.question.marks}',
-                          style: const TextStyle(
-                            color: Colors.amber,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                const Spacer(),
-
-                // Previous attempt status badge (for attempts from database)
-                if (widget.latestAttempt != null) ...[                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: QuestionStatusHelper.getStatusColor(widget.latestAttempt).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: QuestionStatusHelper.getStatusColor(widget.latestAttempt).withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          QuestionStatusHelper.getStatusIcon(widget.latestAttempt),
-                          size: 14,
-                          color: QuestionStatusHelper.getStatusColor(widget.latestAttempt),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _getPreviousAttemptText(),
-                          style: TextStyle(
-                            color: QuestionStatusHelper.getStatusColor(widget.latestAttempt),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-
-                // Current inline attempt result badge (only show if checking inline AND no previous attempt)
-                if (_isChecked && widget.latestAttempt == null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: (_isCorrect ? Colors.green : Colors.red).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _isCorrect ? Icons.check_circle : Icons.cancel,
-                          color: _isCorrect ? Colors.green : Colors.red,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _isCorrect ? 'Correct' : 'Incorrect',
-                          style: TextStyle(
-                            color: _isCorrect ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 16),
-
-            // Question text
-            FormattedQuestionText(
-              content: widget.question.content,
-              fontSize: 15,
-            ),
-
-            // Topic tags
-            if (widget.question.topicIds.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              TopicTags(topicIds: widget.question.topicIds),
-            ],
-
-            const SizedBox(height: 20),
-
-            // Options
-            if (widget.question.hasOptions) ...[
-              ...widget.question.options!.map((option) {
-                final label = option['label'] ?? '';
-                final text = option['text'] ?? '';
-                final isSelected = _selectedAnswer == label;
-                final isCorrectOption = label == widget.question.effectiveCorrectAnswer;
-                final showAsCorrect = _isChecked && isCorrectOption;
-                final showAsWrong = _isChecked && isSelected && !isCorrectOption;
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: InkWell(
-                    onTap: () => _selectAnswer(label),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
+                // TOP ROW: Question Number + Question Text
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Question Number Box
+                    Container(
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: showAsCorrect
-                            ? Colors.green.withValues(alpha: 0.2)
-                            : showAsWrong
-                                ? Colors.red.withValues(alpha: 0.2)
-                                : isSelected
-                                    ? Colors.blue.withValues(alpha: 0.2)
-                                    : AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: showAsCorrect
-                              ? Colors.green
-                              : showAsWrong
-                                  ? Colors.red
-                                  : isSelected
-                                      ? Colors.blue
-                                      : Colors.white.withValues(alpha: 0.2),
-                          width: showAsCorrect || showAsWrong || isSelected ? 2 : 1,
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${widget.question.questionNumber}',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          // Option label circle
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
+                    ),
+                    const SizedBox(width: 16),
+
+                    // Question Text (Formatted)
+                    Expanded(
+                      child: FormattedQuestionText(
+                        content: widget.question.content,
+                        fontSize: 16,
+                        textColor: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // OPTIONS
+                if (widget.question.hasOptions) ...[
+                  ...widget.question.options!.map((option) {
+                    final label = option['label'] ?? '';
+                    final text = option['text'] ?? '';
+                    final isSelected = _selectedAnswer == label;
+                    final isCorrectOption = label == widget.question.effectiveCorrectAnswer;
+
+                    // Logic for display state
+                    bool showAsCorrect = false;
+                    bool showAsWrong = false;
+
+                    if (_isRevealed) {
+                        // If revealed, show the correct answer as Green
+                        if (isCorrectOption) showAsCorrect = true;
+                        // If user selected this but it's wrong
+                        if (isSelected && !isCorrectOption) showAsWrong = true;
+                    } else if (_isChecked) {
+                        // Normal check logic
+                        if (isCorrectOption) showAsCorrect = true;
+                        if (isSelected && !isCorrectOption) showAsWrong = true;
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        onTap: () => _selectAnswer(label),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: showAsCorrect
+                                ? Colors.green.withValues(alpha: 0.2)
+                                : showAsWrong
+                                    ? Colors.red.withValues(alpha: 0.2)
+                                    : isSelected
+                                        ? AppColors.primary.withValues(alpha: 0.15)
+                                        : AppColors.background,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
                               color: showAsCorrect
                                   ? Colors.green
                                   : showAsWrong
                                       ? Colors.red
                                       : isSelected
-                                          ? Colors.blue
-                                          : Colors.white.withValues(alpha: 0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: showAsCorrect
-                                  ? const Icon(Icons.check, color: Colors.white, size: 18)
-                                  : showAsWrong
-                                      ? const Icon(Icons.close, color: Colors.white, size: 18)
-                                      : Text(
-                                          label,
-                                          style: TextStyle(
-                                            color: isSelected ? Colors.white : Colors.white70,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
+                                          ? AppColors.primary
+                                          : AppColors.border.withValues(alpha: 0.5),
+                              width: showAsCorrect || showAsWrong || isSelected ? 2 : 1,
                             ),
                           ),
-                          const SizedBox(width: 14),
-                          // Option text
-                          Expanded(
-                            child: Text(
-                              text,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 14,
-                                height: 1.4,
+                          child: Row(
+                            children: [
+                              // Option label circle
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: showAsCorrect
+                                      ? Colors.green
+                                      : showAsWrong
+                                          ? Colors.red
+                                          : isSelected
+                                              ? AppColors.primary
+                                              : AppColors.surface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected || showAsCorrect || showAsWrong
+                                        ? Colors.transparent
+                                        : AppColors.border,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: showAsCorrect
+                                      ? const Icon(Icons.check, color: Colors.white, size: 18)
+                                      : showAsWrong
+                                          ? const Icon(Icons.close, color: Colors.white, size: 18)
+                                          : Text(
+                                              label,
+                                              style: TextStyle(
+                                                color: isSelected ? Colors.white : AppColors.textSecondary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              // Option text
+                              Expanded(
+                                child: Text(
+                                  text,
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 15,
+                                    height: 1.4,
+                                    fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+
+                // Action Buttons (Retry, Check, Reveal)
+                const SizedBox(height: 12),
+                if (!_isChecked && !_isRevealed) ...[
+                  // Initial State: Check Answer Button
+                   SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _selectedAnswer != null ? _checkAnswer : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 2,
+                        disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+                      ),
+                      child: const Text(
+                        'Check Answer',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                   // Checked/Revealed State: Retry + (Reveal if wrong)
+                   Row(
+                     children: [
+                       Expanded(
+                         child: ElevatedButton.icon(
+                            onPressed: _retry,
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Retry'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surface,
+                              foregroundColor: AppColors.textPrimary,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                               shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: AppColors.border),
                               ),
                             ),
+                         ),
+                       ),
+                       // If checked but wrong (and NOT revealed yet), show Reveal Button
+                       if (!_isRevealed && _isChecked && !_isCorrect) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _revealAnswer,
+                              icon: const Icon(Icons.visibility_outlined, size: 18),
+                              label: const Text('Reveal Answer'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue, // Blue for reveal
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                       ],
+                     ],
+                   ),
+                ],
+
+                // AI Explanation toggle
+                if ((_isChecked || _isRevealed) && widget.question.hasAiSolution) ...[
+                  const SizedBox(height: 20),
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _showExplanation = !_showExplanation;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
+                          const SizedBox(width: 10),
+                          Text(
+                            'AI Explanation',
+                            style: TextStyle(
+                              color: Colors.amber[700] ?? Colors.amber,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const Spacer(),
+                          Icon(
+                            _showExplanation ? Icons.expand_less : Icons.expand_more,
+                            color: Colors.amber[700] ?? Colors.amber,
                           ),
                         ],
                       ),
                     ),
                   ),
-                );
-              }),
-            ],
+                ],
 
-            // Check answer button
-            if (_selectedAnswer != null && !_isChecked) ...[
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _checkAnswer,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
+                // Expanded AI explanation
+                if (_showExplanation && widget.question.hasAiSolution) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.background,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+                    ),
+                    child: MarkdownBody(
+                      data: widget.question.aiSolution,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          color: AppColors.textPrimary.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          height: 1.6,
+                        ),
+                      ),
                     ),
                   ),
-                  child: const Text(
-                    'Check Answer',
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                  ),
-                ),
-              ),
-            ],
+                ],
 
-            // AI Explanation toggle
-            if (_isChecked && widget.question.hasAiSolution) ...[
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _showExplanation = !_showExplanation;
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.purple.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
-                  ),
+                const SizedBox(height: 24),
+                const Divider(height: 1, color: AppColors.border),
+                const SizedBox(height: 16),
+
+                // FOOTER: Metadata
+                Row(
+                  children: [
+                    // Type indicator
+                    Icon(
+                      Icons.radio_button_checked,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Multiple Choice',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+
+                    // Divider
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.textSecondary.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Paper info
+                    if (widget.paperName != null) ...[
+                      Text(
+                        widget.paperName!,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary.withValues(alpha: 0.4),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+
+                    // Marks
+                    if (widget.question.marks != null) ...[
+                      const Icon(Icons.star_rounded, size: 16, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${widget.question.marks} marks',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+
+                    const Spacer(),
+
+                    // Attempt Status Text (Footer version)
+                    if (hasAttempt)
+                      Text(
+                            _getPreviousAttemptText(),
+                            style: TextStyle(
+                              color: effectiveStatusColor,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ],
+                ),
+
+                // Topic Tags
+                if (widget.question.topicIds.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  TopicTags(topicIds: widget.question.topicIds),
+                ],
+              ],
+            ),
+          ),
+
+          // BOTTOM ACTION BAR (Attached to card, grey bg)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+            decoration: BoxDecoration(
+              color: AppColors.background.withValues(alpha: 0.5), // Slightly darker/different bg
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // Ask AI
+                InkWell(
+                  onTap: _askAi,
                   child: Row(
                     children: [
-                      const Icon(Icons.auto_awesome, color: Colors.purple, size: 18),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'AI Explanation',
+                      Icon(Icons.auto_awesome, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Ask AI',
                         style: TextStyle(
-                          color: Colors.purple,
+                          color: AppColors.textSecondary,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
                       ),
-                      const Spacer(),
-                      Icon(
-                        _showExplanation ? Icons.expand_less : Icons.expand_more,
-                        color: Colors.purple,
+                    ],
+                  ),
+                ),
+
+                // Bookmark (Reusable Widget handles state)
+                BookmarkButton(
+                  questionId: widget.question.id,
+                  // We can pass a simplified builder or custom child if needed, but default is icon
+                ),
+
+                // Add Note
+                InkWell(
+                  onTap: _addNote,
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_note, size: 20, color: AppColors.textSecondary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Add Note',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
-
-            // Expanded AI explanation
-            if (_showExplanation && widget.question.hasAiSolution) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A2E),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
-                ),
-                child: SelectableText(
-                  widget.question.aiSolution,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 14,
-                    height: 1.6,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  /// Get text for previous attempt badge
-  String _getPreviousAttemptText() {
-    if (widget.latestAttempt == null) return '';
-
-    final score = widget.latestAttempt!['score'] as int?;
-    final isCorrect = widget.latestAttempt!['is_correct'] as bool?;
-
-    if (isCorrect != null) {
-      return isCorrect ? 'Previously Correct' : 'Try Again';
-    } else if (score != null) {
-      return 'Score: $score';
-    }
-
-    return 'Previously Attempted';
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
@@ -167,14 +168,26 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   }
 
   Widget _buildQuestionCard(QuestionModel question, bool hasNote) {
+    final isAI = question.type == 'ai_generated';
+    final cardColor = isAI ? const Color(0xFFF5F0E1) : AppColors.sidebar;
+    final textColor = isAI ? const Color(0xFF2D2D2D) : Colors.white;
+    final borderColor = isAI ? const Color(0xFFE8DCC8) : Colors.white.withValues(alpha: 0.1);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: borderColor),
+        boxShadow: isAI
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                )
+              ]
+            : null,
       ),
       child: InkWell(
         onTap: () => context.push('/question/${question.id}'),
@@ -189,15 +202,16 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                      ),
+                      color: isAI ? AppColors.primary : null,
+                      gradient: isAI
+                          ? null
+                          : const LinearGradient(
+                              colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
+                            ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      question.type == 'ai_generated'
-                          ? 'AI'
-                          : 'Q${question.questionNumber}',
+                      isAI ? 'AI Generated' : 'Q${question.questionNumber}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -206,7 +220,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (question.isMCQ)
+                  if (question.isMCQ && !isAI)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
@@ -226,14 +240,14 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                   if (hasNote)
                     Icon(
                       Icons.note,
-                      color: Colors.amber,
+                      color: isAI ? Colors.orange : Colors.amber,
                       size: 18,
                     ),
                   const SizedBox(width: 8),
                   PopupMenuButton(
                     icon: Icon(
                       Icons.more_vert,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: textColor.withValues(alpha: 0.6),
                     ),
                     color: AppColors.sidebar,
                     itemBuilder: (context) => [
@@ -241,9 +255,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                         value: 'move',
                         child: const Row(
                           children: [
-                            Icon(Icons.folder_outlined, size: 18),
+                            Icon(Icons.folder_outlined, size: 18, color: Colors.white),
                             SizedBox(width: 8),
-                            Text('Move to folder'),
+                            Text('Move to folder', style: TextStyle(color: Colors.white)),
                           ],
                         ),
                       ),
@@ -269,21 +283,25 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                question.content,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
+              MarkdownBody(
+                data: question.content.length > 150
+                    ? '${question.content.substring(0, 150)}...'
+                    : question.content,
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                  strong: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
               ),
               if (question.hasPaperInfo) ...[
                 const SizedBox(height: 8),
                 Text(
                   question.paperLabel,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: textColor.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),

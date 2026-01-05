@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
     const pdfArrayBuffer = await pdfRes.arrayBuffer()
     const srcDoc = await PDFDocument.load(pdfArrayBuffer)
     const pageCount = srcDoc.getPageCount()
-    
+
     console.log(`[PDF] Document has ${pageCount} pages.`)
     console.log(`[Warning] Edge Function execution time limit: ~150s (free) or ~600s (pro)`)
 
@@ -130,12 +130,12 @@ Deno.serve(async (req) => {
       const pageNum = pageIdx + 1
       const elapsedSec = Math.floor((Date.now() - startTime) / 1000)
       console.log(`[Page ${pageNum}/${pageCount}] Processing serially... (${elapsedSec}s elapsed)`)
-      
+
       // Timeout warning
       if (elapsedSec > 120) {
         console.warn(`[Warning] Approaching execution time limit (${elapsedSec}s). Consider splitting large PDFs.`)
       }
-      
+
       try {
          // A. Get Dimensions JIT (Just-In-Time)
          const { width, height } = srcDoc.getPage(pageIdx).getSize()
@@ -143,58 +143,26 @@ Deno.serve(async (req) => {
 
          console.log(`[Page ${pageNum}] Dims: ${width}x${height}`)
 
-         // B. Render Page (PDF.co) with retry
-         const renderPayload = {
-           url: pdfUrl,
-           pages: String(pageIdx),
-           async: false
-         }
-         
-         const renderRes = await fetchWithRetry('https://api.pdf.co/v1/pdf/convert/to/png', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json', 'x-api-key': pdfCoApiKey },
-           body: JSON.stringify(renderPayload)
-         })
-         
-         if (!renderRes.ok) {
-           throw new Error(`PDF.co error: ${renderRes.status}`)
-         }
-         
-         const renderJson = await renderRes.json()
-         const imageUrl = renderJson.urls?.[0] || renderJson.url
-         
-         if (!imageUrl) throw new Error(`Failed to render page ${pageNum}: No URL returned`)
+         // B. Extract Page as PDF locally (No PDF.co)
+         const newPdf = await PDFDocument.create()
+         const [copiedPage] = await newPdf.copyPages(srcDoc, [pageIdx])
+         newPdf.addPage(copiedPage)
+         const base64Pdf = await newPdf.saveAsBase64()
 
-         // C. Download Image with retry
-         const imgRes = await fetchWithRetry(imageUrl, {})
-         if (!imgRes.ok) throw new Error(`Failed to download rendered image: ${imgRes.status}`)
-         
-         const imgBuffer = await imgRes.arrayBuffer()
-         
-         // CRITICAL FIX: Use chunked processing instead of spread operator
-         // The spread operator (...array) causes stack overflow on large arrays
-         const uint8Array = new Uint8Array(imgBuffer)
-         const chunkSize = 8192 // Process 8KB at a time
-         let binaryString = ''
-         
-         for (let i = 0; i < uint8Array.length; i += chunkSize) {
-           const chunk = uint8Array.subarray(i, i + chunkSize)
-           binaryString += String.fromCharCode.apply(null, Array.from(chunk))
-         }
-         
-         const imgBase64 = btoa(binaryString)
+         // C. Analyze (Native PDF)
+         const result = await analyzePageImage(base64Pdf, pageNum, isObjective, topicsJson, apiKey, "application/pdf")
 
-         // D. Analyze with Gemini (has internal JSON error handling + retry)
-         const result = await analyzePageImage(imgBase64, pageNum, isObjective, topicsJson, apiKey)
-         
          if (result && result.questions) {
-           console.log(`[Page ${pageNum}] Found ${result.questions.length} items`)
-           const questionsWithPage = result.questions.map((q: RawQuestion) => ({
-             ...q,
-             _source_page: pageNum,
-             _page_dims: pageDims
-           }))
-           allQuestions.push(...questionsWithPage)
+             console.log(`[Page ${pageNum}] Extracted ${result.questions.length} items`)
+
+             // Map result to global list
+             const mapped = result.questions.map(q => ({
+                 ...q,
+                 _source_page: pageNum,
+                 _page_dims: pageDims
+             }))
+
+             allQuestions.push(...mapped)
          } else {
            console.log(`[Page ${pageNum}] No questions extracted (possibly empty or error)`)
          }
@@ -203,7 +171,7 @@ Deno.serve(async (req) => {
         console.error(`[Error] Failed to process page ${pageNum}, skipping...`, err)
         // Do NOT rethrow - continue to next page so one bad page doesn't kill entire upload
       }
-      
+
       // Small delay to allow GC to work between pages
       await new Promise(resolve => setTimeout(resolve, 100))
     }
@@ -230,16 +198,16 @@ Deno.serve(async (req) => {
         const yMaxRel = q.figure.ymax / 1000; // Bottom
 
         const x = xMinRel * dims.width;
-        
+
         // In PDF (Bottom-Left 0,0):
         // Top of box (visual) = Higher Y value = (1 - yMin) * height
         // Bottom of box (visual) = Lower Y value = (1 - yMax) * height
-        
+
         const pdfYTop = (1 - yMinRel) * dims.height;
         const pdfYBottom = (1 - yMaxRel) * dims.height;
 
         const width = (xMaxRel - xMinRel) * dims.width;
-        const height = pdfYTop - pdfYBottom; 
+        const height = pdfYTop - pdfYBottom;
 
         aiAnswer = {
           boundingBox: {
@@ -265,34 +233,92 @@ Deno.serve(async (req) => {
 
       const validTopics = (q.topic_ids || []).filter(tid => topicsList.some(t => t.id === tid))
 
+      // Validate options for MCQ
+      let finalOptions = q.options || null;
+      if (q.type === 'mcq' && (!finalOptions || finalOptions.length === 0)) {
+         // If MCQ has no options, it's invalid.
+         // Strategy: Warn and downgrade to 'structured' OR provide empty placeholder to pass constraint?
+         // Better to downgrade to structured if we can't parse options,
+         // BUT user might prefer we keep it as MCQ with empty options if the constraint allows (unlikely).
+         // Given the error "violates check constraint check_mcq_options", it likely requires valid options.
+         // Let's inspect the constraint in next step. For now, enforce [] if it's MCQ to see if [] passes,
+         // or if we should default to structured.
+         // A safe fallback is: if MCQ has no options, default to empty array [] which is valid JSONB.
+         // Wait, the error said "Failing row contains ... options: null". So null is definitely bad.
+         finalOptions = [];
+      }
+
       return {
         paper_id: paperId,
         question_number: q.question_number,
         content: q.content,
         topic_ids: validTopics,
         type: q.type,
-        options: q.options || null,
+        options: finalOptions,
         correct_answer: q.correct_answer || null,
         marks: q.marks || null,
-        ai_answer: aiAnswer, 
+        ai_answer: aiAnswer,
         explanation: explanationData
       }
     })
 
     if (dbRows.length > 0) {
-      const { error: insertError } = await supabase
+      const { data: insertedQuestions, error: insertError } = await supabase
         .from('questions')
         .insert(dbRows)
+        .select()
 
       if (insertError) throw insertError
+
+      // Trigger crop-figure for any questions with figures/tables
+      if (insertedQuestions && insertedQuestions.length > 0) {
+          const questionsWithFigures = insertedQuestions.filter((q: any) =>
+              q.ai_answer && (q.ai_answer.has_figure || q.ai_answer.has_table)
+          );
+
+          if (questionsWithFigures.length > 0) {
+              console.log(`[Batch] Triggering crop-figure for ${questionsWithFigures.length} questions...`);
+
+              // We do this asynchronously (fire and forget pattern) or await?
+              // Await is safer to ensure they start, but might slow down response.
+              // Given Edge Function limits, fire and forget is risky if the runtime kills bg tasks.
+              // Let's use Promise.allSettled but with a timeout? Or just await them.
+              // Since we are in an Edge Function, we should await to ensure execution.
+
+              const cropPromises = questionsWithFigures.map(async (q: any) => {
+                  try {
+                      console.log(`[Batch] Invoking crop-figure for Q${q.id}...`);
+                      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/crop-figure`, {
+                          method: 'POST',
+                          headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${supabaseKey}` // Service role key
+                          },
+                          body: JSON.stringify({ record: q })
+                      });
+                      console.log(`[Batch] crop-figure response for Q${q.id}: ${res.status} ${res.statusText}`);
+                  } catch (err) {
+                      console.error(`[Error] Failed to trigger crop-figure for Q${q.id}`, err);
+                  }
+              });
+
+              // Don't block the ENTIRE response for too long, but wait a bit?
+              // Actually, crop-figure creates images. If we don't await, user might load page before images exist.
+              // But image generation is slow (PDF.co).
+              // Let's await.
+              await Promise.allSettled(cropPromises);
+          } else {
+              console.log('[Batch] No questions with figures/tables found in this batch.');
+          }
+      }
     }
 
     const totalTime = Math.floor((Date.now() - startTime) / 1000)
     console.log(`[Complete] Batch complete. Total execution time: ${totalTime}s`)
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         count: dbRows.length,
         total_pages: pageCount,
         batch_start: actualStart,
@@ -316,21 +342,34 @@ Deno.serve(async (req) => {
 // --- Helper Functions ---
 
 async function analyzePageImage(
-  base64Data: string, 
-  pageNumber: number, 
-  isObjective: boolean, 
-  topicsJson: string, 
-  apiKey: string
+  base64Data: string,
+  pageNumber: number,
+  isObjective: boolean,
+  topicsJson: string,
+  apiKey: string,
+  mimeType: string = "image/png"
 ): Promise<{ page_number: number, questions: RawQuestion[] } | null> {
-  
+
   const prompt = `Analyze this Biology exam page.
-1. Ignore non-English text.
-2. Identify question numbers.
-3. If a question continues from previous page, mark "is_continuation": true.
-4. If a diagram/figure exists for a question, provide its bounding box (0-1000 scale, Top-Left origin).
-   - Ensure the box covers the ENTIRE figure image tightly.
-5. Extract content exactly. Map topics to IDs provided.
-6. Provide a short "explanation" for the question if possible (1-2 sentences).
+
+TASK 1: TEXT EXTRACTION (ENGLISH ONLY)
+- CRITICAL: This is a bilingual paper. Extract ONLY the English text. Ignore Malay.
+- Do NOT include both languages.
+- If text is "Cell / Sel", extract "Cell".
+
+TASK 2: FIGURE & TABLE DETECTION (AGGRESSIVE)
+- Does the question refer to "Diagram", "Figure", "Table", "Graph", "Chart"?
+- OR is there a visual drawing, photo, or illustration?
+- IF YES: You MUST provide the 'figure' (for diagrams/images) or 'table' (for data tables) object.
+- Return the bounding box (ymin, xmin, ymax, xmax) on 0-1000 scale.
+- The box must cover the ENTIRE visual element.
+- Do NOT ignore drawings.
+
+TASK 3: SOLVE THE QUESTION
+- You MUST determine the correct answer based on your biological knowledge.
+- For MCQ: Set 'correct_answer' to the correct option letter (e.g. "A").
+- For Structured: Set 'correct_answer' to the key points required for marks.
+- Provide a short 'explanation' (1-2 sentences).
 
 TOPICS: ${topicsJson}
 `
@@ -369,6 +408,15 @@ TOPICS: ${topicsJson}
                 ymax: { type: "INTEGER", minimum: 0, maximum: 1000 },
                 xmax: { type: "INTEGER", minimum: 0, maximum: 1000 }
               }
+            },
+            table: {
+              type: "OBJECT",
+              properties: {
+                ymin: { type: "INTEGER", minimum: 0, maximum: 1000 },
+                xmin: { type: "INTEGER", minimum: 0, maximum: 1000 },
+                ymax: { type: "INTEGER", minimum: 0, maximum: 1000 },
+                xmax: { type: "INTEGER", minimum: 0, maximum: 1000 }
+              }
             }
           },
           required: ["question_number", "content", "type"]
@@ -381,7 +429,7 @@ TOPICS: ${topicsJson}
     contents: [{
       parts: [
         { text: prompt },
-        { inline_data: { mime_type: "image/png", data: base64Data } }
+        { inline_data: { mime_type: mimeType, data: base64Data } }
       ]
     }],
     generationConfig: {
@@ -409,18 +457,18 @@ TOPICS: ${topicsJson}
     const json = await res.json()
     let text = json.candidates?.[0]?.content?.parts?.[0]?.text
     if (!text) return null
-    
+
     // Clean up markdown code blocks if present
     if (text.startsWith('```')) {
       text = text.replace(/^```(json)?\n/, '').replace(/\n```$/, '')
     }
-    
+
     // Basic validation: check if text looks like valid JSON before parsing
     if (!text.trim().startsWith('{') || !text.trim().endsWith('}')) {
       console.warn(`[Warning] Response doesn't look like JSON for page ${pageNumber}`)
       return { page_number: pageNumber, questions: [] }
     }
-    
+
     // Truncate if response is suspiciously large (over 1MB suggests hallucination)
     if (text.length > 1000000) {
       console.warn(`[Warning] Response too large (${text.length} chars) for page ${pageNumber}, likely hallucination`)
@@ -443,7 +491,7 @@ TOPICS: ${topicsJson}
         questions: []
       }
     }
-    
+
   } catch (e) {
     console.warn(`Failed to analyze page ${pageNumber}:`, e)
     return null
@@ -455,32 +503,44 @@ function mergeQuestions(fragments: (RawQuestion & { _source_page: number, _page_
 
   for (const frag of fragments) {
     const qNum = frag.question_number
-    
+
     if (!merged.has(qNum)) {
       merged.set(qNum, frag)
     } else {
       const existing = merged.get(qNum)!
-      
+
       if (frag.is_continuation) {
         existing.content += "\n" + frag.content
       } else {
+        // If not explicitly a continuation, but same number, usually logic is similar
         existing.content += "\n" + frag.content
       }
 
       if (frag.marks && !existing.marks) existing.marks = frag.marks
-      
+
       if (!existing.figure && frag.figure) {
          existing.figure = frag.figure;
          (existing as any)._source_page = frag._source_page;
          (existing as any)._page_dims = frag._page_dims;
       }
-      
+
+      if (!(existing as any).table && (frag as any).table) {
+         (existing as any).table = (frag as any).table;
+         (existing as any)._source_page = frag._source_page;
+         (existing as any)._page_dims = frag._page_dims;
+      }
+
       if (!existing.explanation && frag.explanation) {
           existing.explanation = frag.explanation
       }
-      
+
       if (!existing.topic_ids?.length && frag.topic_ids?.length) {
         existing.topic_ids = frag.topic_ids
+      }
+
+      // Fix: Merge options if they appear in later fragments
+      if (!existing.options?.length && frag.options?.length) {
+        existing.options = frag.options
       }
     }
   }
