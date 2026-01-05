@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 import 'question_editor.dart';
 import 'pdf_preview_dialog.dart';
@@ -104,11 +105,11 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        title: const Text('Delete Paper', style: TextStyle(color: Colors.white)),
+        backgroundColor: AppColors.sidebar,
+        title: const Text('Delete Paper', style: TextStyle(color: AppColors.textPrimary)),
         content: Text(
           'Delete "$paperLabel" and all its questions?\nThis cannot be undone.',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+          style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.7)),
         ),
         actions: [
           TextButton(
@@ -168,11 +169,11 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
-        title: const Text('Delete Question', style: TextStyle(color: Colors.white)),
+        backgroundColor: AppColors.sidebar,
+        title: const Text('Delete Question', style: TextStyle(color: AppColors.textPrimary)),
         content: Text(
           'Delete this question? This cannot be undone.',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+          style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.7)),
         ),
         actions: [
           TextButton(
@@ -204,14 +205,14 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppTheme.backgroundDeepest,
+      color: AppColors.background,
       child: Row(
         children: [
           // Left panel - Tree navigation
           Container(
             width: 350,
             decoration: BoxDecoration(
-              color: AppTheme.surfaceDark,
+              color: AppColors.sidebar,
               border: Border(
                 right: BorderSide(
                   color: Colors.white.withValues(alpha: 0.1),
@@ -267,7 +268,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           Text(
             'Question Manager',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: AppColors.textPrimary.withValues(alpha: 0.9),
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -302,7 +303,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
             Text(
               'No subjects found',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: AppColors.textPrimary.withValues(alpha: 0.4),
               ),
             ),
           ],
@@ -364,7 +365,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                   child: Text(
                     subject['name'] ?? 'Unknown',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: AppColors.textPrimary.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -378,7 +379,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                   child: Text(
                     '${papers.length}P / ${totalQuestions}Q',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
+                      color: AppColors.textPrimary.withValues(alpha: 0.5),
                       fontSize: 11,
                     ),
                   ),
@@ -445,7 +446,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                   child: Text(
                     paperLabel,
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: AppColors.textPrimary.withValues(alpha: 0.8),
                       fontSize: 13,
                     ),
                   ),
@@ -453,7 +454,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                 Text(
                   '${questions.length}',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
+                    color: AppColors.textPrimary.withValues(alpha: 0.4),
                     fontSize: 12,
                   ),
                 ),
@@ -614,7 +615,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           Text(
             'Select a question to edit',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: AppColors.textPrimary.withValues(alpha: 0.5),
               fontSize: 18,
             ),
           ),
@@ -622,7 +623,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           Text(
             'Use the tree on the left to navigate',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: AppColors.textPrimary.withValues(alpha: 0.3),
               fontSize: 14,
             ),
           ),

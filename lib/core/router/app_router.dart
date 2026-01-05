@@ -1,22 +1,31 @@
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/landing/landing_page.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/past_papers/topic_detail_screen.dart';
 import '../../features/past_papers/question_detail_screen.dart';
+import '../../features/past_papers/question_detail_screen_with_chat.dart';
 import '../../features/past_papers/paper_selection_screen.dart';
 import '../../features/past_papers/paper_detail_screen.dart';
+import '../../features/past_papers/paper_debug_screen.dart';
 import '../../pages/admin/admin_shell.dart';
 import '../../features/progress/screens/progress_dashboard_screen.dart';
 import '../../features/bookmarks/screens/bookmarks_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/settings/screens/accessibility_settings_screen.dart';
+import '../../features/premium/premium_page.dart';
 
 final goRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(
       path: '/',
+      builder: (context, state) => const LandingPage(),
+    ),
+    GoRoute(
+      path: '/login',
       builder: (context, state) => const LoginScreen(),
     ),
     GoRoute(
@@ -42,7 +51,7 @@ final goRouter = GoRouter(
       path: '/question/:questionId',
       builder: (context, state) {
         final questionId = state.pathParameters['questionId']!;
-        return QuestionDetailScreen(questionId: questionId);
+        return QuestionDetailScreenWithChat(questionId: questionId);
       },
     ),
     GoRoute(
@@ -58,6 +67,10 @@ final goRouter = GoRouter(
       builder: (context, state) => const SearchScreen(),
     ),
     GoRoute(
+      path: '/premium',
+      builder: (context, state) => const PremiumPage(),
+    ),
+    GoRoute(
       path: '/papers/year/:year/subject/:subjectId',
       builder: (context, state) {
         final year = int.parse(state.pathParameters['year']!);
@@ -70,6 +83,13 @@ final goRouter = GoRouter(
       builder: (context, state) {
         final paperId = state.pathParameters['paperId']!;
         return PaperDetailScreen(paperId: paperId);
+      },
+    ),
+    GoRoute(
+      path: '/paper/:paperId/debug',
+      builder: (context, state) {
+        final paperId = state.pathParameters['paperId']!;
+        return PaperDebugScreen(paperId: paperId);
       },
     ),
     GoRoute(

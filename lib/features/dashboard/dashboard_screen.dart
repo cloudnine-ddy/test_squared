@@ -3,12 +3,14 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
 import '../auth/services/auth_service.dart';
 import 'subject_detail_view.dart';
+import 'widgets/dashboard_empty_state.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -67,7 +69,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Custom Sidebar
           Container(
             width: 260,
-            color: AppTheme.surfaceDark,
+            decoration: BoxDecoration(
+              color: AppColors.sidebar,
+              border: Border(
+                right: BorderSide(color: AppColors.border, width: 1),
+              ),
+            ),
             child: Column(
               children: [
                 // Header Section
@@ -77,12 +84,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // App Logo
-                      const Text(
+                      Text(
                         'Test²',
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.textWhite,
+                          color: AppColors.primary,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -92,20 +99,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        color: const Color(0xFF1F2937),
+                        color: AppColors.surface,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               _selectedCurriculum,
-                              style: const TextStyle(
-                                color: AppTheme.textWhite,
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
                                 fontSize: 14,
                               ),
                             ),
-                            const Icon(
+                            Icon(
                               Icons.keyboard_arrow_down,
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                               size: 20,
                             ),
                           ],
@@ -116,8 +123,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               value: curriculum,
                               child: Text(
                                 curriculum,
-                                style: const TextStyle(
-                                  color: AppTheme.textWhite,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
                                   fontSize: 14,
                                 ),
                               ),
@@ -150,8 +157,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: const Icon(Icons.grid_view),
                       label: const Text('Explore Subjects'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryBlue,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.textOnDark,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -162,8 +169,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 20),
                 // Divider
-                const Divider(
-                  color: Colors.white10,
+                Divider(
+                  color: AppColors.divider,
                   thickness: 1,
                   height: 1,
                 ),
@@ -178,7 +185,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textGray,
+                        color: AppColors.textSecondary,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -188,16 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 // Pinned Subjects List
                 Expanded(
                   child: _isLoadingPinnedSubjects
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        )
+                      ? const Center(child: CircularProgressIndicator())
                       : _pinnedSubjects.isEmpty
                           ? Center(
                               child: Padding(
@@ -205,50 +203,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: Text(
                                   'No pinned subjects',
                                   style: TextStyle(
-                                    color: AppTheme.textGray,
+                                    color: AppColors.textSecondary,
                                     fontSize: 12,
                                   ),
                                 ),
                               ),
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
                               itemCount: _pinnedSubjects.length,
                               itemBuilder: (context, index) {
                                 final subject = _pinnedSubjects[index];
                                 final isSelected = _selectedSubjectIndex == index;
+
                                 return Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: ListTile(
-                                    selected: isSelected,
-                                    selectedTileColor: AppTheme.primaryBlue.withOpacity(0.1),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    title: Text(
-                                      subject.name,
-                                      style: TextStyle(
-                                        color: isSelected
-                                            ? AppTheme.primaryBlue
-                                            : AppTheme.textWhite,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedSubjectIndex = index;
+                                          _selectedSubjectName = subject.name;
+                                          _selectedSubjectId = subject.id;
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? AppColors.primary.withValues(alpha: 0.1)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : Colors.transparent,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          subject.name,
+                                          style: TextStyle(
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : AppColors.textPrimary,
+                                            fontWeight: isSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                    onTap: () {
-                                      setState(() {
-                                        _selectedSubjectIndex = index;
-                                        _selectedSubjectName = subject.name;
-                                        _selectedSubjectId = subject.id;
-                                      });
-                                    },
                                   ),
                                 );
                               },
                             ),
                 ),
-                const SizedBox(height: 20),
                 // Navigation Items
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -281,8 +298,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      const Divider(
-                        color: Colors.white10,
+                      // Premium Upgrade Banner
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary,
+                              AppColors.accent,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => context.push('/premium'),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.workspace_premium,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Upgrade to Premium',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.white,
+                                    size: 12,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Divider(
+                        color: AppColors.divider,
                         thickness: 1,
                         height: 1,
                       ),
@@ -299,7 +367,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundColor: AppTheme.primaryBlue,
+                                backgroundColor: AppColors.primary,
                                 child: Text(
                                   avatarText,
                                   style: const TextStyle(
@@ -317,8 +385,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   children: [
                                     Text(
                                       userName,
-                                      style: const TextStyle(
-                                        color: AppTheme.textWhite,
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -327,7 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     Text(
                                       userEmail,
                                       style: TextStyle(
-                                        color: AppTheme.textGray,
+                                        color: AppColors.textSecondary,
                                         fontSize: 12,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -336,12 +404,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                               ),
                           PopupMenuButton<String>(
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.settings,
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                               size: 20,
                             ),
-                            color: AppTheme.surfaceDark,
+                            color: AppColors.surface,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -355,7 +423,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         themeProvider.isDarkMode 
                                             ? Icons.light_mode 
                                             : Icons.dark_mode,
-                                        color: AppTheme.textWhite,
+                                        color: AppColors.textPrimary,
                                         size: 20,
                                       ),
                                       const SizedBox(width: 12),
@@ -363,8 +431,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         themeProvider.isDarkMode 
                                             ? 'Light Mode' 
                                             : 'Dark Mode',
-                                        style: const TextStyle(
-                                          color: AppTheme.textWhite,
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                     ],
@@ -377,14 +445,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   children: [
                                     Icon(
                                       Icons.accessibility_new,
-                                      color: AppTheme.textWhite,
+                                      color: AppColors.textPrimary,
                                       size: 20,
                                     ),
                                     SizedBox(width: 12),
                                     Text(
                                       'Accessibility',
                                       style: TextStyle(
-                                        color: AppTheme.textWhite,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                   ],
@@ -396,14 +464,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   children: [
                                     Icon(
                                       Icons.logout,
-                                      color: AppTheme.textWhite,
+                                      color: AppColors.textPrimary,
                                       size: 20,
                                     ),
                                     SizedBox(width: 12),
                                     Text(
                                       'Logout',
                                       style: TextStyle(
-                                        color: AppTheme.textWhite,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
                                   ],
@@ -436,7 +504,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Vertical Divider
           Container(
             width: 1,
-            color: Colors.white10,
+            color: AppColors.divider,
           ),
           // Main Content Area
           Expanded(
@@ -455,25 +523,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.school_outlined,
-            size: 64,
-            color: Colors.white10,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Select a subject from the sidebar to start',
-            style: TextStyle(
-              color: Colors.white10,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
+    return DashboardEmptyState(
+      onExploreSubjects: () => _showSubjectSelector(context),
     );
   }
 
@@ -487,7 +538,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              backgroundColor: AppTheme.surfaceDark,
+              backgroundColor: AppColors.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -505,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textWhite,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -514,19 +565,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       controller: searchController,
                       decoration: InputDecoration(
                         hintText: 'Search for Biology, History...',
-                        hintStyle: const TextStyle(color: AppTheme.textGray),
-                        prefixIcon: const Icon(
+                        hintStyle: TextStyle(color: AppColors.textSecondary),
+                        prefixIcon: Icon(
                           Icons.search,
-                          color: AppTheme.textGray,
+                          color: AppColors.textSecondary,
                         ),
                         filled: true,
-                        fillColor: AppTheme.backgroundDeepest,
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                       ),
-                      style: const TextStyle(color: AppTheme.textWhite),
+                      style: TextStyle(color: AppColors.textPrimary),
                       onChanged: (value) {
                         setDialogState(() {
                           searchQuery = value;
@@ -537,7 +588,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     // Subjects List with FutureBuilder
                     Flexible(
                       child: FutureBuilder<List<SubjectModel>>(
-                        future: PastPaperRepository().getSubjects(),
+                        future: PastPaperRepository().getSubjects(curriculum: 'SPM'),
                         builder: (context, snapshot) {
                           // Loading State
                           if (snapshot.connectionState ==
@@ -564,7 +615,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: Text(
                                   'Failed to load subjects',
                                   style: TextStyle(
-                                    color: AppTheme.textWhite,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -579,7 +630,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: Text(
                                   'No subjects found',
                                   style: TextStyle(
-                                    color: AppTheme.textWhite,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -602,7 +653,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 child: Text(
                                   'No subjects match your search',
                                   style: TextStyle(
-                                    color: AppTheme.textWhite,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -617,8 +668,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               return ListTile(
                                 title: Text(
                                   subject.name,
-                                  style: const TextStyle(
-                                    color: AppTheme.textWhite,
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -679,20 +730,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppTheme.backgroundDeepest,
+          color: AppColors.accent.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
+            color: AppColors.accent.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppTheme.primaryBlue, size: 20),
+            Icon(icon, color: AppColors.primary, size: 20),
             const SizedBox(width: 12),
             Text(
               label,
-              style: const TextStyle(
-                color: AppTheme.textWhite,
+              style: TextStyle(
+                color: AppColors.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),

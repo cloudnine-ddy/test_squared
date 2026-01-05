@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/toast_service.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/app_colors.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -281,7 +282,8 @@ class _AdminPageState extends State<AdminPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Portal'),
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.textOnDark,
       ),
       body: _isCheckingAccess
           ? const Center(
@@ -293,7 +295,9 @@ class _AdminPageState extends State<AdminPage> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 600),
                   child: Card(
-                    color: AppTheme.surfaceDark,
+                    color: AppColors.surface,
+                    elevation: 4,
+                    shadowColor: AppColors.shadow,
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Form(
@@ -304,7 +308,7 @@ class _AdminPageState extends State<AdminPage> {
                             const Text(
                               'Upload Exam Paper',
                               style: TextStyle(
-                                color: AppTheme.textWhite,
+                                color: AppColors.textPrimary,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -314,8 +318,9 @@ class _AdminPageState extends State<AdminPage> {
                               value: _selectedSubjectId,
                               decoration: InputDecoration(
                                 labelText: 'Subject',
+                                labelStyle: TextStyle(color: AppColors.textSecondary),
                                 filled: true,
-                                fillColor: const Color(0xFF1F2937),
+                                fillColor: AppColors.background,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
@@ -328,8 +333,8 @@ class _AdminPageState extends State<AdminPage> {
                                       child: Text(
                                         subject['name']?.toString() ??
                                             'Unknown',
-                                        style: const TextStyle(
-                                          color: AppTheme.textWhite,
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                     ),
@@ -354,8 +359,9 @@ class _AdminPageState extends State<AdminPage> {
                               controller: _yearController,
                               decoration: InputDecoration(
                                 labelText: 'Year',
+                                labelStyle: TextStyle(color: AppColors.textSecondary),
                                 filled: true,
-                                fillColor: const Color(0xFF1F2937),
+                                fillColor: AppColors.background,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
@@ -381,8 +387,9 @@ class _AdminPageState extends State<AdminPage> {
                               value: _selectedSeason,
                               decoration: InputDecoration(
                                 labelText: 'Season',
+                                labelStyle: TextStyle(color: AppColors.textSecondary),
                                 filled: true,
-                                fillColor: const Color(0xFF1F2937),
+                                fillColor: AppColors.background,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
@@ -394,8 +401,8 @@ class _AdminPageState extends State<AdminPage> {
                                       value: season,
                                       child: Text(
                                         season,
-                                        style: const TextStyle(
-                                          color: AppTheme.textWhite,
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                     ),
@@ -418,8 +425,9 @@ class _AdminPageState extends State<AdminPage> {
                               controller: _variantController,
                               decoration: InputDecoration(
                                 labelText: 'Variant',
+                                labelStyle: TextStyle(color: AppColors.textSecondary),
                                 filled: true,
-                                fillColor: const Color(0xFF1F2937),
+                                fillColor: AppColors.background,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide.none,
@@ -450,8 +458,8 @@ class _AdminPageState extends State<AdminPage> {
                               const SizedBox(height: 8),
                               Text(
                                 _selectedFileName!,
-                                style: const TextStyle(
-                                  color: AppTheme.textGray,
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -480,8 +488,8 @@ class _AdminPageState extends State<AdminPage> {
                               Text(
                                 _statusMessage!,
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: AppTheme.textGray,
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

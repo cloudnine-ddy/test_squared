@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../data/bookmark_repository.dart';
 import '../../../core/services/toast_service.dart';
 import '../../../core/services/analytics_service.dart';
@@ -89,61 +92,167 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
     
     return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1D24),
-        title: const Text('Select Folder', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (folders.isNotEmpty) ...[
-              const Text('Existing Folders:', style: TextStyle(color: Colors.white70, fontSize: 12)),
-              const SizedBox(height: 8),
-              ...folders.map((folder) => ListTile(
-                title: Text(folder, style: const TextStyle(color: Colors.white)),
-                leading: const Icon(Icons.folder, color: Colors.amber),
-                onTap: () => Navigator.of(context).pop(folder),
-              )),
-              const Divider(color: Colors.white24),
-            ],
-            const SizedBox(height: 8),
-            const Text('Or create new:', style: TextStyle(color: Colors.white70, fontSize: 12)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: newFolderController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'New folder name',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-                filled: true,
-                fillColor: const Color(0xFF0A0D12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1E232F), // Lighter surface
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.1), width: 1),
+        ),
+        child: Container(
+          width: 400,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                   Container(
+                     padding: const EdgeInsets.all(10),
+                     decoration: BoxDecoration(
+                       color: Colors.amber.withValues(alpha: 0.1),
+                       borderRadius: BorderRadius.circular(12),
+                     ),
+                     child: const Icon(Icons.bookmark_rounded, color: Colors.amber, size: 24),
+                   ),
+                   const SizedBox(width: 16),
+                   const Text(
+                    'Bookmark Question',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              if (folders.isNotEmpty) ...[
+                Text(
+                  'SELECT FOLDER',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 150),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: folders.map((folder) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(folder),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.folder_rounded, color: Colors.amber, size: 20),
+                                const SizedBox(width: 12),
+                                Text(
+                                  folder,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.arrow_forward_ios_rounded, 
+                                  color: Colors.white.withValues(alpha: 0.3), 
+                                  size: 14
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )).toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+              
+              Text(
+                'CREATE NEW FOLDER',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600, 
+                  letterSpacing: 1.2,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: newFolderController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Enter folder name...',
+                  hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                  filled: true,
+                  fillColor: Colors.black.withValues(alpha: 0.3),
+                  prefixIcon: Icon(Icons.create_new_folder_outlined, color: Colors.white.withValues(alpha: 0.5)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.amber, width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white.withValues(alpha: 0.7),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final newFolder = newFolderController.text.trim();
+                      if (newFolder.isNotEmpty) {
+                        Navigator.of(context).pop(newFolder);
+                      } else if (folders.isNotEmpty) {
+                        Navigator.of(context).pop(folders.first);
+                      } else {
+                        Navigator.of(context).pop('My Bookmarks');
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text('Save Bookmark', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final newFolder = newFolderController.text.trim();
-              if (newFolder.isNotEmpty) {
-                Navigator.of(context).pop(newFolder);
-              } else if (folders.isNotEmpty) {
-                Navigator.of(context).pop(folders.first);
-              } else {
-                Navigator.of(context).pop('My Bookmarks');
-              }
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
@@ -152,19 +261,56 @@ class _BookmarkButtonState extends State<BookmarkButton> with SingleTickerProvid
   Widget build(BuildContext context) {
     return ScaleTransition(
       scale: _scaleAnimation,
-      child: IconButton(
-        icon: _isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(
-                _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                color: _isBookmarked ? Colors.amber : Colors.white.withValues(alpha: 0.7),
-              ),
-        onPressed: _toggleBookmark,
-        tooltip: _isBookmarked ? 'Remove bookmark' : 'Bookmark',
+      child: GestureDetector(
+        onTap: _toggleBookmark,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+             gradient: _isBookmarked 
+                ? const LinearGradient(
+                    colors: [Color(0xFFFFD700), Color(0xFFFFA000)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : LinearGradient(
+                    colors: [const Color(0xFF384050), const Color(0xFF2B3240)], // Lighter Grey
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: _isBookmarked 
+                  ? Colors.white.withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.1),
+              width: 1,
+            ),
+            boxShadow: [
+              if (_isBookmarked)
+                BoxShadow(
+                  color: Colors.amber.withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          child: _isLoading
+              ? Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2, 
+                      color: _isBookmarked ? Colors.black : Colors.white
+                    ),
+                  ),
+                )
+              : Icon(
+                  _isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+                  color: _isBookmarked ? Colors.black : Colors.white,
+                  size: 22,
+                ),
+        ),
       ),
     );
   }

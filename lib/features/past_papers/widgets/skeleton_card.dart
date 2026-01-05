@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Skeleton loading card with shimmer animation effect
 class SkeletonCard extends StatefulWidget {
@@ -54,9 +55,9 @@ class _SkeletonCardState extends State<SkeletonCard>
               begin: Alignment(-1 + _animation.value, 0),
               end: Alignment(_animation.value, 0),
               colors: [
-                AppTheme.surfaceDark,
-                AppTheme.surfaceDark.withValues(alpha: 0.5),
-                AppTheme.surfaceDark,
+                AppColors.sidebar,
+                AppColors.sidebar.withValues(alpha: 0.5),
+                AppColors.sidebar,
               ],
               stops: const [0.0, 0.5, 1.0],
             ),

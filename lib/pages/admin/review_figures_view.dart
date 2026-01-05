@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 import 'figure_crop_editor.dart';
 
@@ -94,7 +95,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
     }
 
     return Container(
-      color: AppTheme.backgroundDeepest,
+      color: AppColors.background,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -112,7 +113,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
                 Text(
                   'Review Figure Crops',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: AppColors.textPrimary.withValues(alpha: 0.9),
                     fontSize: 24,
                     fontWeight: FontWeight.w600,
                   ),
@@ -195,7 +196,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: AppColors.textPrimary.withValues(alpha: 0.7),
               fontSize: 13,
             ),
           ),
@@ -218,7 +219,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
           Text(
             'No figures to review',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: AppColors.textPrimary.withValues(alpha: 0.5),
               fontSize: 18,
             ),
           ),
@@ -226,7 +227,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
           Text(
             'Upload a PDF with figures to get started',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: AppColors.textPrimary.withValues(alpha: 0.3),
               fontSize: 14,
             ),
           ),
@@ -257,7 +258,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
         : 'Unknown Paper';
     
     return Card(
-      color: AppTheme.surfaceDark,
+      color: AppColors.sidebar,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -333,7 +334,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
                         Text(
                           paperInfo,
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: AppColors.textPrimary.withValues(alpha: 0.6),
                             fontSize: 13,
                           ),
                         ),
@@ -371,7 +372,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
+                        color: AppColors.textPrimary.withValues(alpha: 0.7),
                         fontSize: 13,
                       ),
                     ),
@@ -380,7 +381,7 @@ class _ReviewFiguresViewState extends State<ReviewFiguresView> {
                       Text(
                         'Page ${figureLocation['page']} • Position: ${figureLocation['x_percent']?.toStringAsFixed(0)}%, ${figureLocation['y_percent']?.toStringAsFixed(0)}%',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: AppColors.textPrimary.withValues(alpha: 0.4),
                           fontSize: 11,
                         ),
                       ),

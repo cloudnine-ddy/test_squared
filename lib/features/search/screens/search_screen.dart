@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/services/analytics_service.dart';
 import '../search_repository.dart';
 import '../../past_papers/models/question_model.dart';
@@ -120,17 +121,17 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Search Questions'),
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
       ),
       body: Column(
         children: [
           // Search Bar
           Container(
             padding: const EdgeInsets.all(16),
-            color: AppTheme.surfaceDark,
+            color: AppColors.sidebar,
             child: Column(
               children: [
                 TextField(
@@ -166,7 +167,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: AppTheme.backgroundDeepest,
+                    fillColor: AppColors.background,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -322,7 +323,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),

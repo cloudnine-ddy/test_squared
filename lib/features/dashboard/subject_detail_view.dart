@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/topic_model.dart';
@@ -30,11 +31,22 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
   String _viewMode = 'Topics'; // 'Topics' or 'Years'
   bool _isPinned = false;
   bool _isTogglingPin = false;
+  
+  // Search and filter state
+  String _searchQuery = '';
+  String _sortBy = 'Alphabetical'; // 'Alphabetical', 'Progress', 'Questions'
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _isPinned = widget.isPinned;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -53,7 +65,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
+            color: AppColors.sidebar,
             border: Border(
               bottom: BorderSide(
                 color: Colors.white10,
@@ -69,7 +81,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textWhite,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const Spacer(),
@@ -92,10 +104,10 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                   });
                 },
                 style: SegmentedButton.styleFrom(
-                  selectedBackgroundColor: AppTheme.primaryBlue,
+                  selectedBackgroundColor: AppColors.primary,
                   selectedForegroundColor: Colors.white,
-                  backgroundColor: AppTheme.surfaceDark,
-                  foregroundColor: AppTheme.textGray,
+                  backgroundColor: AppColors.sidebar,
+                  foregroundColor: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(width: 16),
@@ -108,13 +120,13 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            AppTheme.primaryBlue,
+                            AppColors.primary,
                           ),
                         ),
                       )
                     : Icon(
                         _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                        color: _isPinned ? AppTheme.primaryBlue : AppTheme.textGray,
+                        color: _isPinned ? AppColors.primary : AppColors.textSecondary,
                       ),
                 tooltip: _isPinned ? 'Unpin' : 'Pin to Sidebar',
                 onPressed: _isTogglingPin ? null : _handlePinToggle,
@@ -221,21 +233,109 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
           );
         }
 
-        final topics = snapshot.data!;
+        var topics = snapshot.data!;
+        
+        // Apply search filter
+        if (_searchQuery.isNotEmpty) {
+          topics = topics.where((topic) {
+            return topic.name.toLowerCase().contains(_searchQuery.toLowerCase());
+          }).toList();
+        }
+        
+        // Default alphabetical sort
+        topics = List.from(topics);
+        topics.sort((a, b) => a.name.compareTo(b.name));
 
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.2,
-          ),
-          itemCount: topics.length,
-          itemBuilder: (context, index) {
-            final topic = topics[index];
-            return _buildTopicCard(topic);
-          },
+        return Column(
+          children: [
+            // Search Bar Only
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.sidebar,
+                border: Border(
+                  bottom: BorderSide(color: AppColors.border, width: 1),
+                ),
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search topics...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                ),
+                style: TextStyle(color: AppColors.textPrimary),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+            ),
+            
+            // Topics Grid
+            Expanded(
+              child: topics.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off, size: 64, color: Colors.white24),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No topics found',
+                            style: TextStyle(color: Colors.grey[400], fontSize: 18),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try a different search term',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 300,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.2,
+                      ),
+                      itemCount: topics.length,
+                      itemBuilder: (context, index) {
+                        final topic = topics[index];
+                        return _buildTopicCard(topic);
+                      },
+                    ),
+            ),
+          ],
         );
       },
     );
@@ -250,71 +350,195 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         final completedQuestions = progress?['completed_questions'] ?? 0;
         final totalQuestions = progress?['total_questions'] ?? topic.questionCount;
 
+        // Determine progress color
+        Color progressColor = topic.color;
+        if (progressPercentage == 0) {
+          progressColor = Colors.grey;
+        } else if (progressPercentage < 50) {
+          progressColor = Colors.orange;
+        } else if (progressPercentage < 100) {
+          progressColor = Colors.blue;
+        } else {
+          progressColor = Colors.green;
+        }
+
         return InkWell(
           onTap: () {
             context.push('/topic/${topic.id}');
           },
-          borderRadius: BorderRadius.circular(12),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.surface,
+                  AppColors.surface.withValues(alpha: 0.8),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: progressColor.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border(
-                  top: BorderSide(
-                    color: topic.color,
-                    width: 4,
+            child: Stack(
+              children: [
+                // Background gradient accent
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: [
+                          progressColor.withValues(alpha: 0.15),
+                          Colors.transparent,
+                        ],
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(16),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          topic.name,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header Row with topic name and icon
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Topic icon/badge
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: progressColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.school,
+                              size: 20,
+                              color: progressColor,
+                            ),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          topic.description,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                          const SizedBox(width: 12),
+                          // Topic name
+                          Expanded(
+                            child: Text(
+                              topic.name,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                                height: 1.3,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        ],
+                      ),
+                      
+                      const Spacer(),
+                      
+                      // Question count badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.blue.withValues(alpha: 0.3),
+                          ),
                         ),
-                      ],
-                    ),
-                    // Circular progress in bottom right
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        CircularTopicProgress(
-                          percentage: progressPercentage,
-                          completedQuestions: completedQuestions,
-                          totalQuestions: totalQuestions,
-                          color: topic.color,
-                          size: 50,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.quiz,
+                              size: 14,
+                              color: Colors.blue,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$totalQuestions question${totalQuestions != 1 ? 's' : ''}',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      // Progress bar and percentage
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Progress',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                '${progressPercentage.toInt()}%',
+                                style: TextStyle(
+                                  color: progressColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          // Progress bar
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: progressPercentage / 100,
+                              backgroundColor: Colors.white.withValues(alpha: 0.1),
+                              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                              minHeight: 6,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$completedQuestions/$totalQuestions completed',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         );
@@ -358,7 +582,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
             child: CircularProgressIndicator(
-              color: AppTheme.primaryBlue,
+              color: AppColors.primary,
             ),
           );
         }

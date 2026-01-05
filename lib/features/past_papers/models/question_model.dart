@@ -7,8 +7,9 @@ class QuestionModel {
   final String officialAnswer;
   final String? imageUrl;
   final int? marks;
-  final String aiSolution;
-  final Map<String, dynamic>? aiAnswerRaw;
+  final String aiSolution; // Legacy AI steps
+  final Map<String, dynamic>? aiAnswerRaw; // Full JSON including boundingBox
+  final Map<String, dynamic>? explanationRaw; // New explanation field
   
   // MCQ-specific fields
   final String type; // 'mcq' or 'structured'
@@ -32,6 +33,7 @@ class QuestionModel {
     this.marks,
     required this.aiSolution,
     this.aiAnswerRaw,
+    this.explanationRaw,
     this.type = 'structured',
     this.options,
     this.correctAnswer,
@@ -48,7 +50,46 @@ class QuestionModel {
   bool get hasPaperInfo => paperYear != null && paperSeason != null;
   bool get isMCQ => type == 'mcq';
   bool get hasOptions => options != null && options!.isNotEmpty;
-  
+  bool get hasExplanation => explanationRaw != null || (aiAnswerRaw != null && aiAnswerRaw!.containsKey('explanation')); // Check both location
+
+  /// Returns the AI answer text string for display
+  String? get aiAnswer {
+    // Try to get from aiAnswerRaw.text first (preferred format)
+    if (aiAnswerRaw != null && aiAnswerRaw!['text'] != null) {
+      return aiAnswerRaw!['text'].toString();
+    }
+    // Fallback: if aiAnswerRaw exists but has no text field, convert entire JSON to string for now
+    if (aiAnswerRaw != null) {
+      return aiAnswerRaw.toString();
+    }
+    // Last fallback to aiSolution if available
+    if (aiSolution.isNotEmpty) {
+      return aiSolution;
+    }
+    return null;
+  }
+
+  /// Returns the static explanation text if available
+  String? get explanationText {
+    if (explanationRaw != null && explanationRaw!['text'] != null) {
+      return explanationRaw!['text'].toString();
+    }
+    // Fallback if stored inside ai_answer in old format (unlikely after migration but good safety)
+    if (aiAnswerRaw != null && aiAnswerRaw!['explanation'] != null) {
+      return aiAnswerRaw!['explanation'].toString();
+    }
+    return null;
+  }
+
+  /// Returns the bounding box map {x, y, width, height, page_width...} if available
+  Map<String, dynamic>? get boundingBoxMap {
+    if (aiAnswerRaw != null && aiAnswerRaw!.containsKey('boundingBox')) {
+      return aiAnswerRaw!['boundingBox'];
+    }
+    // Backward compatibility for old format if needed (skippable for now as we did a clean migration)
+    return null;
+  }
+
   /// Gets the correct answer for MCQ - uses correctAnswer if available,
   /// otherwise falls back to parsing first letter from officialAnswer
   String? get effectiveCorrectAnswer {
@@ -108,6 +149,7 @@ class QuestionModel {
         // Check 'text' first as per new requirement, then fallback to 'ai_solution'
         aiSolution = aiAnswerData['text']?.toString() ?? aiAnswerData['ai_solution']?.toString() ?? '';
       } else if (aiAnswerData is List && aiAnswerData.isNotEmpty) {
+        // Handle legacy array format if exists
         final steps = aiAnswerData
             .whereType<Map<String, dynamic>>()
             .map((step) => step['description']?.toString() ?? '')
@@ -115,6 +157,16 @@ class QuestionModel {
             .toList();
         aiSolution = steps.join('\n');
       }
+    }
+
+    // Handle new explanation column
+    Map<String, dynamic>? explanationRaw;
+    final explanationData = map['explanation'];
+    if (explanationData != null && explanationData is Map<String, dynamic>) {
+      explanationRaw = explanationData;
+    } else if (explanationData is String) {
+        // If somehow text is stored directly
+        explanationRaw = {'text': explanationData};
     }
 
     // Read marks from proper column first, fallback to ai_answer.marks for old data
@@ -159,6 +211,7 @@ class QuestionModel {
       marks: marks,
       aiSolution: aiSolution,
       aiAnswerRaw: aiAnswerRaw,
+      explanationRaw: explanationRaw,
       type: type,
       options: options,
       correctAnswer: correctAnswer,
@@ -179,6 +232,7 @@ class QuestionModel {
       'official_answer': officialAnswer,
       'image_url': imageUrl,
       'ai_answer': aiAnswerRaw,
+      'explanation': explanationRaw,
     };
   }
 
@@ -207,6 +261,7 @@ class QuestionModel {
       marks: marks ?? this.marks,
       aiSolution: aiSolution ?? this.aiSolution,
       aiAnswerRaw: aiAnswerRaw,
+      explanationRaw: explanationRaw,
       paperYear: paperYear ?? this.paperYear,
       paperSeason: paperSeason ?? this.paperSeason,
       paperVariant: paperVariant ?? this.paperVariant,

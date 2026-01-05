@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/services/toast_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Upload paper view - extracted from the original admin page
 class UploadPaperView extends StatefulWidget {
@@ -63,10 +64,11 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
     try {
       final supabase = Supabase.instance.client;
+      // UPDATED: Filter by 'curriculum' column (text) instead of 'curriculum_id'
       final data = await supabase
           .from('subjects')
-          .select('id, name, curriculum_id')
-          .eq('curriculum_id', _selectedCurriculum)
+          .select('id, name, curriculum')
+          .eq('curriculum', _selectedCurriculum)
           .order('name');
       final subjects = List<Map<String, dynamic>>.from(data);
 
@@ -272,24 +274,20 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       'paper_type': paperType,
     }).select().single();
 
-    // Step 2: Analyzing
+    // Step 2: Analyzing in batches
     if (mounted) {
       setState(() {
         _uploadStep = 2;
-        _statusMessage = markSchemeUrl != null 
-            ? 'Analyzing paper + extracting answers...'
-            : 'Analyzing with AI...';
+        _statusMessage = 'Starting AI analysis...';
       });
     }
 
-    await supabase.functions.invoke(
-      'analyze-paper',
-      body: {
-        'paperId': newPaper['id'],
-        'pdfUrl': publicUrl,
-        'paperType': paperType,
-        if (markSchemeUrl != null) 'markSchemeUrl': markSchemeUrl,
-      },
+    // Process in batches of 10 pages
+    await _processPdfInBatches(
+      paperId: newPaper['id'],
+      pdfUrl: publicUrl,
+      paperType: paperType,
+      markSchemeUrl: markSchemeUrl,
     );
 
     if (mounted) {
@@ -297,6 +295,94 @@ class _UploadPaperViewState extends State<UploadPaperView> {
         _uploadStep = 5;
         _statusMessage = 'Success! Questions Extracted.';
       });
+    }
+  }
+
+  Future<void> _processPdfInBatches({
+    required String paperId,
+    required String pdfUrl,
+    required String paperType,
+    String? markSchemeUrl,
+  }) async {
+    const int batchSize = 6; // Reduced from 10 to fit within 150s timeout
+    final supabase = Supabase.instance.client;
+    
+    // First batch to get total page count
+    if (mounted) {
+      setState(() {
+        _statusMessage = 'Analyzing pages 1-$batchSize...';
+      });
+    }
+
+    try {
+      final firstBatch = await supabase.functions.invoke(
+        'analyze-paper',
+        body: {
+          'paperId': paperId,
+          'pdfUrl': pdfUrl,
+          'paperType': paperType,
+          'startPage': 0,
+          'endPage': batchSize,
+          if (markSchemeUrl != null) 'markSchemeUrl': markSchemeUrl,
+        },
+      );
+
+      if (firstBatch.data == null || firstBatch.data['success'] != true) {
+        throw Exception('First batch failed');
+      }
+
+      final int totalPages = firstBatch.data['total_pages'] ?? batchSize;
+      final bool hasMore = firstBatch.data['has_more'] ?? false;
+
+      if (!hasMore) {
+        // PDF was small, completed in one batch
+        print('PDF analysis completed in single batch');
+        return;
+      }
+
+      // Process remaining batches
+      for (int start = batchSize; start < totalPages; start += batchSize) {
+        final end = (start + batchSize > totalPages) ? totalPages : start + batchSize;
+        
+        if (mounted) {
+          setState(() {
+            _statusMessage = 'Analyzing pages ${start + 1}-$end...';
+          });
+        }
+
+        print('[Batch] Processing pages ${start + 1} to $end of $totalPages');
+
+        try {
+          final batchResponse = await supabase.functions.invoke(
+            'analyze-paper',
+            body: {
+              'paperId': paperId,
+              'pdfUrl': pdfUrl,
+              'paperType': paperType,
+              'startPage': start,
+              'endPage': end,
+              if (markSchemeUrl != null) 'markSchemeUrl': markSchemeUrl,
+            },
+          );
+
+          if (batchResponse.data?['success'] == true) {
+            print('[Batch] Success: ${batchResponse.data['count']} questions extracted');
+          } else {
+            print('[Batch] Warning: Batch $start-$end may have failed');
+          }
+        } catch (e) {
+          print('[Batch] Error processing pages $start-$end: $e');
+          // Continue with next batch even if this one failed
+        }
+
+        // Small delay between batches
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      print('[Complete] All batches processed. Total pages: $totalPages');
+    } catch (e) {
+      print('[Error] Batch processing failed: $e');
+      rethrow;
     }
   }
 
@@ -348,7 +434,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: AppColors.textPrimary.withValues(alpha: 0.5),
                     fontSize: 12,
                   ),
                 ),
@@ -368,7 +454,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: Card(
-            color: AppTheme.surfaceDark,
+            color: AppColors.sidebar,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -402,7 +488,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                               Text(
                                 'Upload Exam Paper',
                                 style: TextStyle(
-                                  color: AppTheme.textWhite,
+                                  color: AppColors.textPrimary,
                                   fontSize: 22,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -411,7 +497,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                               Text(
                                 'Upload a PDF and AI will extract questions',
                                 style: TextStyle(
-                                  color: AppTheme.textGray,
+                                  color: AppColors.textSecondary,
                                   fontSize: 14,
                                 ),
                               ),
@@ -428,7 +514,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       decoration: InputDecoration(
                         labelText: 'Exam Type / Curriculum',
                         filled: true,
-                        fillColor: const Color(0xFF1F2937),
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -441,7 +527,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                               child: Text(
                                 curriculum,
                                 style: const TextStyle(
-                                  color: AppTheme.textWhite,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -464,7 +550,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       decoration: InputDecoration(
                         labelText: 'Subject',
                         filled: true,
-                        fillColor: const Color(0xFF1F2937),
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -477,7 +563,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                               child: Text(
                                 subject['name']?.toString() ?? 'Unknown',
                                 style: const TextStyle(
-                                  color: AppTheme.textWhite,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -506,7 +592,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         Text(
                           'Paper Type',
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: AppColors.textPrimary.withValues(alpha: 0.7),
                             fontSize: 14,
                           ),
                         ),
@@ -521,7 +607,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                   decoration: BoxDecoration(
                                     color: _paperType == 'objective'
                                         ? Colors.blue.withValues(alpha: 0.2)
-                                        : const Color(0xFF1F2937),
+                                        : AppColors.background,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: _paperType == 'objective'
@@ -565,7 +651,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                   decoration: BoxDecoration(
                                     color: _paperType == 'subjective'
                                         ? Colors.purple.withValues(alpha: 0.2)
-                                        : const Color(0xFF1F2937),
+                                        : AppColors.background,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: _paperType == 'subjective'
@@ -612,13 +698,13 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         labelText: 'Year',
                         hintText: 'e.g. 2024',
                         filled: true,
-                        fillColor: const Color(0xFF1F2937),
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                       ),
-                      style: const TextStyle(color: AppTheme.textWhite),
+                      style: const TextStyle(color: AppColors.textPrimary),
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
@@ -640,7 +726,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       decoration: InputDecoration(
                         labelText: 'Season',
                         filled: true,
-                        fillColor: const Color(0xFF1F2937),
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -653,7 +739,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                               child: Text(
                                 season,
                                 style: const TextStyle(
-                                  color: AppTheme.textWhite,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -679,13 +765,13 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         labelText: 'Variant',
                         hintText: 'e.g. 1, 2, 3',
                         filled: true,
-                        fillColor: const Color(0xFF1F2937),
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
                         ),
                       ),
-                      style: const TextStyle(color: AppTheme.textWhite),
+                      style: const TextStyle(color: AppColors.textPrimary),
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
@@ -705,12 +791,12 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1F2937),
+                        color: AppColors.background,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _selectedFileName != null
                               ? const Color(0xFF6366F1).withValues(alpha: 0.5)
-                              : Colors.white.withValues(alpha: 0.1),
+                              : AppColors.border,
                           width: _selectedFileName != null ? 2 : 1,
                         ),
                       ),
@@ -722,7 +808,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                 : Icons.cloud_upload_outlined,
                             color: _selectedFileName != null
                                 ? const Color(0xFF10B981)
-                                : Colors.white.withValues(alpha: 0.5),
+                                : AppColors.textSecondary,
                             size: 40,
                           ),
                           const SizedBox(height: 12),
@@ -730,7 +816,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                             Text(
                               _selectedFileName!,
                               style: const TextStyle(
-                                color: AppTheme.textWhite,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w500,
                               ),
                               textAlign: TextAlign.center,
@@ -761,12 +847,12 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1F2937),
+                        color: AppColors.background,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _markSchemeFileName != null
                               ? Colors.green.withValues(alpha: 0.5)
-                              : Colors.white.withValues(alpha: 0.1),
+                              : AppColors.border,
                           width: _markSchemeFileName != null ? 2 : 1,
                         ),
                       ),
@@ -780,7 +866,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                     : Icons.description_outlined,
                                 color: _markSchemeFileName != null
                                     ? const Color(0xFF10B981)
-                                    : Colors.white.withValues(alpha: 0.5),
+                                    : AppColors.textSecondary,
                                 size: 24,
                               ),
                               const SizedBox(width: 12),
@@ -792,8 +878,8 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                       _markSchemeFileName ?? 'Mark Scheme (Optional)',
                                       style: TextStyle(
                                         color: _markSchemeFileName != null
-                                            ? AppTheme.textWhite
-                                            : Colors.white.withValues(alpha: 0.7),
+                                            ? AppColors.textPrimary
+                                            : AppColors.textPrimary,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -801,7 +887,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                       Text(
                                         'AI will extract answers & generate solutions',
                                         style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.4),
+                                          color: AppColors.textPrimary.withValues(alpha: 0.4),
                                           fontSize: 12,
                                         ),
                                       ),
@@ -877,10 +963,10 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1F2937),
+                          color: AppColors.background,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.1),
+                            color: AppColors.border,
                           ),
                         ),
                         child: Column(
@@ -889,7 +975,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                             const Text(
                               'Upload Progress',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),

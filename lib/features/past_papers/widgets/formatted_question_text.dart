@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 
 // Helper enum for identifying block types
 enum _BlockType { intro, mainQuestion, subQuestion }
@@ -106,7 +107,7 @@ class FormattedQuestionText extends StatelessWidget {
           child: SelectableText(
             block.content,
             style: TextStyle(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontSize: fontSize,
               height: 1.5,
               fontWeight: FontWeight.w600,
@@ -139,7 +140,7 @@ class FormattedQuestionText extends StatelessWidget {
                 child: SelectableText(
                   block.content,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: fontSize,
                     height: 1.5,
                     fontWeight: FontWeight.w400,
@@ -163,7 +164,7 @@ class FormattedQuestionText extends StatelessWidget {
                 child: Text(
                   block.label!,
                   style: TextStyle(
-                    color: Colors.white, // Often looks cleaner in white or slightly muted
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: fontSize * 0.95,
                     height: 1.5,
@@ -175,7 +176,7 @@ class FormattedQuestionText extends StatelessWidget {
                 child: SelectableText(
                   block.content,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: AppColors.textPrimary,
                     fontSize: fontSize * 0.95,
                     height: 1.5,
                     fontFamily: 'Roboto',

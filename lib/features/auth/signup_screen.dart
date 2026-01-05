@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 import 'services/auth_service.dart';
 
@@ -75,29 +76,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
-          color: AppTheme.backgroundDeepest,
-          // Subtle gradient for premium look
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.backgroundDeepest,
-              AppTheme.backgroundDeepest,
-              const Color(0xFF0F172A), // Slightly lighter for subtle effect
-            ],
-          ),
-        ),
+        color: AppColors.background,
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 500),
               child: Card(
-                color: AppTheme.surfaceDark,
+                color: AppColors.surface,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  side: BorderSide(color: Colors.white10, width: 1),
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: AppColors.border, width: 1),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(40),
@@ -114,7 +103,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.textWhite,
+                            color: AppColors.textPrimary,
                             letterSpacing: 1.2,
                           ),
                         ),
@@ -126,7 +115,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.textWhite,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -136,7 +125,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,
-                            color: AppTheme.textGray,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         const SizedBox(height: 32),
@@ -148,35 +137,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Full Name',
                             labelStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             hintText: 'Enter your full name',
                             hintStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF1F2937),
+                            fillColor: AppColors.background,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: AppTheme.primaryBlue,
+                                color: AppColors.primary,
                                 width: 2,
                               ),
                             ),
                             prefixIcon: const Icon(
                               Icons.person_outlined,
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                          style: const TextStyle(color: AppTheme.textWhite),
+                          style: const TextStyle(color: AppColors.textPrimary),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your full name';
@@ -195,35 +184,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Email Address',
                             labelStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             hintText: 'Enter your email',
                             hintStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF1F2937),
+                            fillColor: AppColors.background,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: AppTheme.primaryBlue,
+                                color: AppColors.primary,
                                 width: 2,
                               ),
                             ),
                             prefixIcon: const Icon(
                               Icons.email_outlined,
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                           ),
-                          style: const TextStyle(color: AppTheme.textWhite),
+                          style: const TextStyle(color: AppColors.textPrimary),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your email';
@@ -242,39 +231,39 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Password',
                             labelStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             hintText: 'Enter your password',
                             hintStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF1F2937),
+                            fillColor: AppColors.background,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: AppTheme.primaryBlue,
+                                color: AppColors.primary,
                                 width: 2,
                               ),
                             ),
                             prefixIcon: const Icon(
                               Icons.lock_outlined,
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_outlined
                                     : Icons.visibility_off_outlined,
-                                color: AppTheme.textGray,
+                                color: AppColors.textSecondary,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -283,7 +272,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               },
                             ),
                           ),
-                          style: const TextStyle(color: AppTheme.textWhite),
+                          style: const TextStyle(color: AppColors.textPrimary),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please enter your password';
@@ -302,39 +291,39 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           decoration: InputDecoration(
                             labelText: 'Confirm Password',
                             labelStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             hintText: 'Re-enter your password',
                             hintStyle: const TextStyle(
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             filled: true,
-                            fillColor: const Color(0xFF1F2937),
+                            fillColor: AppColors.background,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
+                              borderSide: BorderSide(color: AppColors.border, width: 1.5),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: const BorderSide(
-                                color: AppTheme.primaryBlue,
+                                color: AppColors.primary,
                                 width: 2,
                               ),
                             ),
                             prefixIcon: const Icon(
                               Icons.lock_outlined,
-                              color: AppTheme.textGray,
+                              color: AppColors.textSecondary,
                             ),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscureConfirmPassword
                                     ? Icons.visibility_outlined
                                     : Icons.visibility_off_outlined,
-                                color: AppTheme.textGray,
+                                color: AppColors.textSecondary,
                               ),
                               onPressed: () {
                                 setState(() {
@@ -344,7 +333,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               },
                             ),
                           ),
-                          style: const TextStyle(color: AppTheme.textWhite),
+                          style: const TextStyle(color: AppColors.textPrimary),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
                               return 'Please confirm your password';
@@ -362,7 +351,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           child: ElevatedButton(
                             onPressed: _isLoading ? null : _handleSignUp,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryBlue,
+                              backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -397,7 +386,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             Text(
                               'Already have an account? ',
                               style: TextStyle(
-                                color: AppTheme.textGray,
+                                color: AppColors.textSecondary,
                                 fontSize: 14,
                               ),
                             ),
@@ -408,7 +397,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               child: const Text(
                                 'Login',
                                 style: TextStyle(
-                                  color: AppTheme.primaryBlue,
+                                  color: AppColors.primary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),

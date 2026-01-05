@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/question_model.dart';
 import 'formatted_question_text.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import 'topic_tags.dart';
 
 /// A card for MCQ questions in a continuous feed with inline answer checking
@@ -47,7 +48,7 @@ class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 24),
-      color: AppTheme.surfaceDark,
+      color: AppColors.sidebar,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
@@ -195,7 +196,7 @@ class _MultipleChoiceFeedCardState extends State<MultipleChoiceFeedCard> {
                                 ? Colors.red.withValues(alpha: 0.2)
                                 : isSelected
                                     ? Colors.blue.withValues(alpha: 0.2)
-                                    : AppTheme.backgroundDeepest,
+                                    : AppColors.background,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: showAsCorrect

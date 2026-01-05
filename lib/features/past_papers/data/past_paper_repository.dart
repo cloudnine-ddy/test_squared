@@ -9,6 +9,8 @@ class PastPaperRepository {
 
   Future<List<TopicModel>> getTopics({required String subjectId}) async {
     try {
+      print('DEBUG getTopics: Starting for subjectId=$subjectId');
+      
       // Fetch topics for this subject
       final topicsResponse = await _supabase
           .from('topics')
@@ -16,8 +18,10 @@ class PastPaperRepository {
           .eq('subject_id', subjectId);
 
       final List<dynamic> topicsData = topicsResponse as List<dynamic>;
+      print('DEBUG getTopics: Found ${topicsData.length} topics');
 
       if (topicsData.isEmpty) {
+        print('DEBUG getTopics: No topics found for subject $subjectId');
         return [];
       }
 
@@ -31,6 +35,7 @@ class PastPaperRepository {
       final paperIds = (papersResponse as List<dynamic>)
           .map((p) => p['id'] as String)
           .toList();
+      print('DEBUG getTopics: Found ${paperIds.length} papers');
 
       // Count questions per topic
       Map<String, int> topicCounts = {};
@@ -42,6 +47,7 @@ class PastPaperRepository {
             .inFilter('paper_id', paperIds);
 
         final questionsData = questionsResponse as List<dynamic>;
+        print('DEBUG getTopics: Found ${questionsData.length} questions');
 
         for (var q in questionsData) {
           final topicIds = q['topic_ids'];
@@ -54,6 +60,8 @@ class PastPaperRepository {
         }
       }
 
+      print('DEBUG getTopics: Topic counts: $topicCounts');
+
       // Map topics with counts
       final topics = topicsData.map((e) {
         final map = e as Map<String, dynamic>;
@@ -64,6 +72,7 @@ class PastPaperRepository {
         });
       }).toList();
 
+      print('DEBUG getTopics: Returning ${topics.length} topics');
       return topics;
     } catch (e, stackTrace) {
       print('ERROR in getTopics: $e');
@@ -129,15 +138,21 @@ class PastPaperRepository {
     }
   }
 
-  Future<List<SubjectModel>> getSubjects() async {
+  Future<List<SubjectModel>> getSubjects({String? curriculum}) async {
     try {
-      print('DEBUG: Starting getSubjects() method');
-      print('DEBUG: About to call Supabase.from("subjects").select()');
-
-      final response = await _supabase
-          .from('subjects')
-          .select()
-          .limit(50);
+      dynamic response;
+      
+      if (curriculum != null) {
+        response = await _supabase
+            .from('subjects')
+            .select()
+            .eq('curriculum', curriculum);
+      } else {
+        response = await _supabase
+            .from('subjects')
+            .select()
+            .limit(50);
+      }
 
       print('DEBUG: Supabase call completed');
       print('DEBUG: Response type: ${response.runtimeType}');
@@ -183,59 +198,43 @@ class PastPaperRepository {
 
   Future<List<SubjectModel>> getPinnedSubjects() async {
     try {
-      print('DEBUG: Starting getPinnedSubjects() method');
       final user = _supabase.auth.currentUser;
       if (user == null) {
-        print('WARNING: No current user, returning empty list');
         return [];
       }
 
-      print('DEBUG: Fetching pinned subjects for user: ${user.id}');
-      print('DEBUG: About to call Supabase.from("user_subjects").select("subject_id, subjects(*)")');
+      // Get pinned subject IDs from user profile
+      final profileResponse = await _supabase
+          .from('profiles')
+          .select('pinned_subject_ids')
+          .eq('id', user.id)
+          .single();
 
-      final response = await _supabase
-          .from('user_subjects')
-          .select('subject_id, subjects(*)');
-
-      print('DEBUG: Supabase call completed');
-      print('DEBUG: Response type: ${response.runtimeType}');
-
-      final List<dynamic> data = response as List<dynamic>;
-
-      print('RAW DATA: $data');
-      print('DEBUG: Data length: ${data.length}');
-
-      if (data.isEmpty) {
-        print('WARNING: Supabase returned an empty list for pinned subjects');
+      final List<dynamic> pinnedIds = profileResponse['pinned_subject_ids'] ?? [];
+      
+      if (pinnedIds.isEmpty) {
         return [];
       }
 
-      print('DEBUG: Starting to map data to SubjectModel');
+      // Fetch the actual subject data
+      final subjectsResponse = await _supabase
+          .from('subjects')
+          .select()
+          .inFilter('id', pinnedIds.map((e) => e.toString()).toList());
+
+      final List<dynamic> data = subjectsResponse as List<dynamic>;
+      
       final subjects = <SubjectModel>[];
-
       for (var item in data) {
         try {
           if (item is Map<String, dynamic>) {
-            print('DEBUG: Mapping pinned subject item: $item');
-            // The nested subject data is in item['subjects']
-            final subjectData = item['subjects'];
-            if (subjectData != null && subjectData is Map<String, dynamic>) {
-              final subject = SubjectModel.fromMap(subjectData);
-              subjects.add(subject);
-            } else {
-              print('WARNING: Subject data is null or not a Map: $subjectData');
-            }
-          } else {
-            print('WARNING: Skipping invalid pinned subject item (not a Map): $item');
+            subjects.add(SubjectModel.fromMap(item));
           }
-        } catch (e, stackTrace) {
-          print('Skipping bad pinned subject: $e');
-          print('Item that failed: $item');
-          print('Stack trace: $stackTrace');
+        } catch (e) {
+          print('Skipping bad subject: $e');
         }
       }
 
-      print('DEBUG: Successfully mapped ${subjects.length} out of ${data.length} pinned subjects');
       return subjects;
     } catch (e, stackTrace) {
       print('ERROR: $e');
@@ -246,23 +245,30 @@ class PastPaperRepository {
 
   Future<void> pinSubject(String subjectId) async {
     try {
-      print('DEBUG: Starting pinSubject() method');
       final user = _supabase.auth.currentUser;
       if (user == null) {
         throw Exception('No current user');
       }
 
-      print('DEBUG: Pinning subject $subjectId for user ${user.id}');
+      // Get current pinned IDs
+      final response = await _supabase
+          .from('profiles')
+          .select('pinned_subject_ids')
+          .eq('id', user.id)
+          .single();
 
-      await _supabase.from('user_subjects').upsert(
-        {
-          'user_id': user.id,
-          'subject_id': subjectId,
-        },
-        onConflict: 'user_id,subject_id',
-      );
+      final List<dynamic> current = response['pinned_subject_ids'] ?? [];
+      final List<String> pinnedIds = current.map((e) => e.toString()).toList();
 
-      print('DEBUG: Successfully pinned subject $subjectId');
+      // Add if not already pinned
+      if (!pinnedIds.contains(subjectId)) {
+        pinnedIds.add(subjectId);
+        
+        await _supabase
+            .from('profiles')
+            .update({'pinned_subject_ids': pinnedIds})
+            .eq('id', user.id);
+      }
     } catch (e, stackTrace) {
       print('ERROR pinning subject: $e');
       print('STACK TRACE: $stackTrace');
@@ -272,21 +278,28 @@ class PastPaperRepository {
 
   Future<void> unpinSubject(String subjectId) async {
     try {
-      print('DEBUG: Starting unpinSubject() method');
       final user = _supabase.auth.currentUser;
       if (user == null) {
         throw Exception('No current user');
       }
 
-      print('DEBUG: Unpinning subject $subjectId for user ${user.id}');
+      // Get current pinned IDs
+      final response = await _supabase
+          .from('profiles')
+          .select('pinned_subject_ids')
+          .eq('id', user.id)
+          .single();
 
+      final List<dynamic> current = response['pinned_subject_ids'] ?? [];
+      final List<String> pinnedIds = current.map((e) => e.toString()).toList();
+
+      // Remove the subject ID
+      pinnedIds.remove(subjectId);
+      
       await _supabase
-          .from('user_subjects')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('subject_id', subjectId);
-
-      print('DEBUG: Successfully unpinned subject $subjectId');
+          .from('profiles')
+          .update({'pinned_subject_ids': pinnedIds})
+          .eq('id', user.id);
     } catch (e, stackTrace) {
       print('ERROR unpinning subject: $e');
       print('STACK TRACE: $stackTrace');
@@ -377,6 +390,21 @@ class PastPaperRepository {
       print('ERROR in fetchAvailableYears: $e');
       print('STACK TRACE: $stackTrace');
       return [];
+    }
+  }
+
+  // Get paper details by ID (for debug view)
+  Future<Map<String, dynamic>?> getPaperById(String paperId) async {
+    try {
+      final data = await _supabase
+          .from('papers')
+          .select('id, pdf_url, year, season, variant, subject_id')
+          .eq('id', paperId)
+          .maybeSingle();
+      return data;
+    } catch (e) {
+      print('ERROR in getPaperById: $e');
+      return null;
     }
   }
 }

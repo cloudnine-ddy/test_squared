@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 import '../../features/admin/data/analytics_repository.dart';
 
@@ -54,7 +55,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -173,7 +174,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -221,7 +222,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -282,7 +283,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -335,7 +336,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
                   LinearProgressIndicator(
                     value: attempts / (_topicPopularity.first['attempt_count'] as int),
                     backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation(AppTheme.primaryBlue),
+                    valueColor: const AlwaysStoppedAnimation(AppColors.primary),
                   ),
                 ],
               ),

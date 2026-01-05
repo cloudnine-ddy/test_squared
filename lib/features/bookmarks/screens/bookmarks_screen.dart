@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/services/toast_service.dart';
 import '../data/bookmark_repository.dart';
 import '../data/notes_repository.dart';
@@ -83,10 +84,10 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Bookmarks'),
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
       ),
       body: Row(
         children: [
@@ -169,7 +170,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -232,7 +233,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                       Icons.more_vert,
                       color: Colors.white.withValues(alpha: 0.6),
                     ),
-                    color: AppTheme.surfaceDark,
+                    color: AppColors.sidebar,
                     itemBuilder: (context) => [
                       PopupMenuItem(
                         value: 'move',
@@ -306,7 +307,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     final newFolder = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
         title: const Text('Move to folder', style: TextStyle(color: Colors.white)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -337,7 +338,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
         title: const Text('New Folder', style: TextStyle(color: Colors.white)),
         content: TextField(
           controller: controller,

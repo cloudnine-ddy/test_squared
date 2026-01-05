@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/services/toast_service.dart';
 import '../data/progress_repository.dart';
 import '../models/topic_stats_model.dart';
@@ -81,10 +82,10 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('My Progress'),
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -205,7 +206,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppTheme.surfaceDark,
+            color: AppColors.sidebar,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: Colors.orange.withValues(alpha: 0.3),
@@ -259,7 +260,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
       return Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceDark,
+          color: AppColors.sidebar,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Center(
@@ -306,7 +307,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),

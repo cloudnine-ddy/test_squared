@@ -6,6 +6,7 @@ import 'widgets/question_card.dart';
 import 'widgets/skeleton_card.dart';
 import 'widgets/multiple_choice_feed_card.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Topic detail screen with dark theme, search, and marks filter
 class TopicDetailScreen extends StatefulWidget {
@@ -93,9 +94,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
@@ -107,23 +108,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
           },
         ),
         title: const Text(
-          'Topic Questions',
-          style: TextStyle(color: Colors.white),
+          'Questions',
+          style: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(120),
-          child: Column(
-            children: [
-              _buildSearchBar(),
-              _buildTabBar(),
-            ],
-          ),
-        ),
+        centerTitle: false,
       ),
       body: Column(
         children: [
-          // Marks filter chips
-          _buildMarksFilter(),
+          // Modern filter bar with search and tabs
+          _buildModernFilterBar(),
 
           // TabBarView with questions lists
           Expanded(
@@ -134,115 +127,157 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
     );
   }
 
-  Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: TextField(
-        controller: _searchController,
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: 'Search questions...',
-          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-          prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.5)),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: Colors.white54),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {
-                      _searchQuery = '';
-                    });
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.1),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
+  Widget _buildModernFilterBar() {
     return Container(
       decoration: BoxDecoration(
+        color: AppColors.sidebar,
         border: Border(
           bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
       ),
-      child: TabBar(
-        controller: _tabController,
-        indicatorColor: Colors.blue,
-        indicatorWeight: 3,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white54,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
-        onTap: (_) => setState(() {}), // Rebuild to update counts
-        tabs: [
-          Tab(
-            icon: const Icon(Icons.edit_document, size: 20),
-            text: 'Structured',
-          ),
-          Tab(
-            icon: const Icon(Icons.quiz, size: 20),
-            text: 'Multiple Choice',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMarksFilter() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
+      child: Column(
         children: [
-          _buildFilterChip('All', 'all'),
-          const SizedBox(width: 8),
-          _buildFilterChip('1-2 marks', '1-2'),
-          const SizedBox(width: 8),
-          _buildFilterChip('3-4 marks', '3-4'),
-          const SizedBox(width: 8),
-          _buildFilterChip('5+ marks', '5+'),
+          // Search and Marks Filter Row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Row(
+              children: [
+                // Search Field
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Search questions...',
+                      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.5)),
+                      prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.7), size: 20),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.white54, size: 20),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: AppColors.surface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.border),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: AppColors.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.blue, width: 2),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      isDense: true,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Marks Filter Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _marksFilter,
+                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textPrimary, size: 20),
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                      dropdownColor: AppColors.surface,
+                      isDense: true,
+                      items: [
+                        DropdownMenuItem(value: 'all', child: Row(
+                          children: [
+                            Icon(Icons.filter_alt, size: 16, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text('All Marks'),
+                          ],
+                        )),
+                        DropdownMenuItem(value: '1-2', child: Text('1-2 marks')),
+                        DropdownMenuItem(value: '3-4', child: Text('3-4 marks')),
+                        DropdownMenuItem(value: '5+', child: Text('5+ marks')),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _marksFilter = value!;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Modern Tab Selector
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              indicatorPadding: const EdgeInsets.all(4),
+              labelColor: Colors.white,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
+              dividerColor: Colors.transparent,
+              onTap: (_) => setState(() {}),
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit_document, size: 18),
+                      SizedBox(width: 8),
+                      Text('Structured'),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.quiz, size: 18),
+                      SizedBox(width: 8),
+                      Text('MCQ'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value) {
-    final isSelected = _marksFilter == value;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) {
-        setState(() {
-          _marksFilter = value;
-        });
-      },
-      backgroundColor: AppTheme.surfaceDark,
-      selectedColor: Colors.blue.withValues(alpha: 0.3),
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.blue : Colors.white70,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-      ),
-      side: BorderSide(
-        color: isSelected ? Colors.blue : Colors.white24,
-      ),
-      checkmarkColor: Colors.blue,
-    );
-  }
+
 
   Widget _buildTabBarView() {
     if (_isLoading) {

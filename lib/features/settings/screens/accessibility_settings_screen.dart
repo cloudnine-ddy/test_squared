@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/services/accessibility_service.dart';
 
 class AccessibilitySettingsScreen extends StatelessWidget {
@@ -9,10 +10,10 @@ class AccessibilitySettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Accessibility'),
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
       ),
       body: Consumer<AccessibilityService>(
         builder: (context, accessibilityService, child) {
@@ -121,7 +122,7 @@ class AccessibilitySettingsScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceDark,
+                    color: AppColors.sidebar,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.1),
@@ -132,7 +133,7 @@ class AccessibilitySettingsScreen extends StatelessWidget {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.preview, color: AppTheme.primaryBlue, size: 24),
+                          Icon(Icons.preview, color: AppColors.primary, size: 24),
                           SizedBox(width: 12),
                           Text(
                             'Preview',
@@ -193,7 +194,7 @@ class AccessibilitySettingsScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -204,7 +205,7 @@ class AccessibilitySettingsScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: AppTheme.primaryBlue, size: 24),
+              Icon(icon, color: AppColors.primary, size: 24),
               const SizedBox(width: 12),
               Text(
                 title,

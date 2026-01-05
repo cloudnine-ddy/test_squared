@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 
 /// PDF Preview Widget using iframe for Flutter Web
 class PdfPreviewDialog extends StatefulWidget {
@@ -43,7 +44,7 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppTheme.surfaceDark,
+      backgroundColor: AppColors.sidebar,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         width: MediaQuery.of(context).size.width * 0.8,
@@ -68,7 +69,7 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
                   child: Text(
                     widget.title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -79,12 +80,12 @@ class _PdfPreviewDialogState extends State<PdfPreviewDialog> {
                     // Open in new tab
                     html.window.open(widget.pdfUrl, '_blank');
                   },
-                  icon: const Icon(Icons.open_in_new, color: Colors.white70),
+                  icon: const Icon(Icons.open_in_new, color: AppColors.textSecondary),
                   tooltip: 'Open in new tab',
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: Colors.white70),
+                  icon: const Icon(Icons.close, color: AppColors.textSecondary),
                   tooltip: 'Close',
                 ),
               ],

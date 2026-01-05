@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/question_model.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import 'topic_tags.dart';
 
 /// Tappable question card that navigates to detail page
@@ -15,188 +16,187 @@ class QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: AppTheme.surfaceDark.withValues(alpha: 0.7),
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.08),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.border.withValues(alpha: 0.5),
+          width: 1,
         ),
       ),
-      child: InkWell(
-        onTap: () {
-          context.push('/question/${question.id}');
-        },
-        borderRadius: BorderRadius.circular(16),
-        hoverColor: Colors.white.withValues(alpha: 0.03),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header row
-              Row(
-                children: [
-                  // Question number badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.blue.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      'Q${question.questionNumber}',
-                      style: const TextStyle(
-                        color: Colors.blueAccent,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  
-                  // Question type icon (MCQ or Written)
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: question.isMCQ 
-                          ? Colors.cyan.withValues(alpha: 0.15)
-                          : Colors.orange.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      question.isMCQ ? Icons.quiz_outlined : Icons.edit_document,
-                      color: question.isMCQ ? Colors.cyan : Colors.orange,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Paper info badge (year/season)
-                  if (question.hasPaperInfo)
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            context.push('/question/${question.id}');
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Question content - The hero element
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Question number indicator
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.15),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.purple.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
                       ),
+                      alignment: Alignment.center,
                       child: Text(
-                        question.paperLabel,
-                        style: const TextStyle(
-                          color: Colors.purpleAccent,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 12,
+                        '${question.questionNumber}',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ),
-
-                  const SizedBox(width: 8),
-
-                  // Marks badge (if available)
-                  if (question.marks != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.amber.withValues(alpha: 0.3),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                    const SizedBox(width: 12),
+                    // Question text
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                          const SizedBox(width: 4),
                           Text(
-                            '${question.marks}',
-                            style: const TextStyle(
-                              color: Colors.amber,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                            question.content,
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
                   ],
+                ),
 
-                  const Spacer(),
+                const SizedBox(height: 12),
 
-                  // Status icons
-                  if (question.hasFigure)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Tooltip(
-                        message: 'Has Figure',
-                        child: Icon(
-                          Icons.image_outlined,
-                          color: Colors.greenAccent.withValues(alpha: 0.8),
-                          size: 20,
+                // Metadata footer - Subtle, condensed
+                Row(
+                  children: [
+                    // Type indicator
+                    Icon(
+                      question.isMCQ ? Icons.radio_button_checked : Icons.edit,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      question.isMCQ ? 'MCQ' : 'Written',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+
+                    // Divider dot
+                    if (question.hasPaperInfo || question.marks != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                          shape: BoxShape.circle,
                         ),
                       ),
-                    ),
-                  if (question.hasAiSolution)
-                    Tooltip(
-                      message: 'AI Solution Available',
-                      child: Icon(
-                        Icons.auto_awesome,
-                        color: Colors.amberAccent.withValues(alpha: 0.8),
-                        size: 20,
+                      const SizedBox(width: 8),
+                    ],
+
+                    // Paper info
+                    if (question.hasPaperInfo) ...[
+                      Text(
+                        question.paperLabel,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
                       ),
-                    ),
-                ],
-              ),
+                    ],
 
-              const SizedBox(height: 16),
-
-              // Question content preview (truncated)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Text(
-                      question.content,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        height: 1.6,
-                        letterSpacing: 0.2,
-                        fontFamily: 'Inter', // Assuming Inter or similar is available, otherwise falls back
+                    // Divider dot
+                    if (question.hasPaperInfo && question.marks != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white.withValues(alpha: 0.3),
-                    size: 28,
-                  ),
-                ],
-              ),
+                      const SizedBox(width: 8),
+                    ],
 
-              // Topic tags
-              if (question.topicIds.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                TopicTags(topicIds: question.topicIds),
+                    // Marks
+                    if (question.marks != null) ...[
+                      Icon(Icons.star, size: 13, color: Colors.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${question.marks} ${question.marks == 1 ? 'mark' : 'marks'}',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+
+                    const Spacer(),
+
+                    // Right side indicators
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (question.hasFigure)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Icon(
+                              Icons.image,
+                              size: 16,
+                              color: Colors.green.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        if (question.hasAiSolution)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Icon(
+                              Icons.auto_awesome,
+                              size: 16,
+                              color: Colors.amber.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        Icon(
+                          Icons.chevron_right,
+                          size: 18,
+                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                // Topic tags (if present)
+                if (question.topicIds.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  TopicTags(topicIds: question.topicIds),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

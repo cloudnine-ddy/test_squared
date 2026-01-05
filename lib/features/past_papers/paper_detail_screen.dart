@@ -5,6 +5,7 @@ import 'models/question_model.dart';
 import 'widgets/question_card.dart';
 import 'widgets/multiple_choice_feed_card.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Screen showing all questions from a specific paper
 class PaperDetailScreen extends StatefulWidget {
@@ -48,9 +49,9 @@ class _PaperDetailScreenState extends State<PaperDetailScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
@@ -63,8 +64,17 @@ class _PaperDetailScreenState extends State<PaperDetailScreen> {
         ),
         title: Text(
           paperTitle,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppColors.textPrimary),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.visibility, color: AppColors.textSecondary),
+            tooltip: 'Debug Bounding Boxes',
+            onPressed: () {
+              GoRouter.of(context).push('/paper/${widget.paperId}/debug');
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.blue))

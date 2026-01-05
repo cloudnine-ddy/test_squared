@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:ui';
 import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import 'widgets/question_image_header.dart';
 import 'widgets/question_action_bar.dart';
 import 'widgets/answer_reveal_sheet.dart';
@@ -14,9 +17,11 @@ import '../bookmarks/data/bookmark_repository.dart';
 import '../bookmarks/data/notes_repository.dart';
 import '../progress/data/progress_repository.dart';
 import '../progress/models/question_attempt_model.dart';
+import '../auth/providers/auth_provider.dart';
+import '../../core/services/access_control_service.dart';
 
 /// Full-page question detail view with figure and answer reveals
-class QuestionDetailScreen extends StatefulWidget {
+class QuestionDetailScreen extends ConsumerStatefulWidget {
   final String questionId;
 
   const QuestionDetailScreen({
@@ -25,10 +30,10 @@ class QuestionDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<QuestionDetailScreen> createState() => _QuestionDetailScreenState();
+  ConsumerState<QuestionDetailScreen> createState() => _QuestionDetailScreenState();
 }
 
-class _QuestionDetailScreenState extends State<QuestionDetailScreen> 
+class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen> 
     with SingleTickerProviderStateMixin {
   QuestionModel? _question;
   bool _isLoading = true;
@@ -56,9 +61,25 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
     _questionStartTime = DateTime.now(); // Start tracking time
     _loadQuestion();
     _loadBookmarkAndNoteStatus();
+  }
+
+  void _onTabChanged() {
+    // When user taps on Official Answer tab (index 2), check if logged in
+    if (_tabController.index == 2) {
+      final isAuthenticated = ref.read(isAuthenticatedProvider);
+      if (!isAuthenticated) {
+        // Switch back to previous tab
+        setState(() {
+          _tabController.index = _tabController.previousIndex;
+        });
+        // Show login dialog
+        AccessControlService.checkLogin(context, ref);
+      }
+    }
   }
 
   @override
@@ -162,6 +183,21 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   Future<void> _checkAnswer() async {
     if (_question == null || _studentAnswerController.text.trim().isEmpty) return;
     
+    // Check premium access for AI answer checking
+    if (!AccessControlService.checkPremium(
+      context,
+      ref,
+      featureName: 'AI Answer Checking',
+      highlights: [
+        'Instant AI-powered feedback',
+        'Detailed scoring and analysis',
+        'Personalized improvement hints',
+        'Track your progress over time',
+      ],
+    )) {
+      return;
+    }
+    
     setState(() {
       _isCheckingAnswer = true;
     });
@@ -222,16 +258,31 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   }
 
   Future<void> _showAiExplainDialog() async {
+    // Check premium access
+    if (!AccessControlService.checkPremium(
+      context,
+      ref,
+      featureName: 'AI Explanation',
+      highlights: [
+        'Get step-by-step explanations',
+        'Understand key concepts deeply',
+        'Learn from AI-powered insights',
+        'Improve faster with guided learning',
+      ],
+    )) {
+      return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             const Icon(Icons.psychology, color: Colors.cyan),
             const SizedBox(width: 12),
-            const Text('AI Explanation', style: TextStyle(color: Colors.white)),
+            const Text('AI Explanation', style: TextStyle(color: AppColors.textPrimary)),
           ],
         ),
         content: SizedBox(
@@ -242,7 +293,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
             children: [
               Text(
                 'This feature will use AI to provide additional explanation for the question context and concepts.',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 16),
               Container(
@@ -250,7 +301,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 decoration: BoxDecoration(
                   color: Colors.cyan.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.cyan.withValues(alpha: 0.6)),
                 ),
                 child: Row(
                   children: [
@@ -301,7 +352,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 maxHeight: MediaQuery.of(context).size.height * 0.8,
               ),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1D24),
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: ClipRRect(
@@ -342,7 +393,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0A0D12),
+        backgroundColor: AppColors.background,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -362,7 +413,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
               Text(
                 'Loading question...',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppColors.textPrimary.withValues(alpha: 0.5),
                   fontSize: 14,
                 ),
               ),
@@ -374,14 +425,14 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
 
     if (_question == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0A0D12),
+        backgroundColor: AppColors.background,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.error_outline, color: Colors.red.withValues(alpha: 0.5), size: 48),
               const SizedBox(height: 16),
-              const Text('Question not found', style: TextStyle(color: Colors.white70)),
+              const Text('Question not found', style: TextStyle(color: AppColors.textSecondary)),
             ],
           ),
         ),
@@ -389,7 +440,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0D12),
+      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           // Background gradient
@@ -433,7 +484,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
             slivers: [
               // Simple App Bar (no figure)
               SliverAppBar(
-                backgroundColor: const Color(0xFF0A0D12),
+                backgroundColor: AppColors.background,
                 floating: false,
                 pinned: true,
                 elevation: 0,
@@ -449,38 +500,92 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                     },
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1A1D24),
+                        color: AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                       ),
-                      child: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 18),
+                      child: const Icon(Icons.arrow_back_ios_new, color: AppColors.textSecondary, size: 18),
                     ),
                   ),
                 ),
                 actions: [
                   // Note button with indicator
                   Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.note_add_outlined),
-                        onPressed: _showNoteEditor,
-                        tooltip: 'Add note',
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: _hasNote
+                              ? const LinearGradient(
+                                  colors: [Color(0xFF2979FF), Color(0xFF2962FF)], // Brighter Blue
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                )
+                              : LinearGradient(
+                                  colors: [
+                                    const Color(0xFF384050), // Much Lighter Grey
+                                    const Color(0xFF2B3240)
+                                  ], 
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _hasNote
+                                ? Colors.white.withValues(alpha: 0.3)
+                                : Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            if (_hasNote)
+                              BoxShadow(
+                                color: Colors.blueAccent.withValues(alpha: 0.4),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            _hasNote ? Icons.note_alt_rounded : Icons.note_add_outlined,
+                            color: _hasNote ? Colors.white : Colors.white,
+                            size: 22,
+                          ),
+                          onPressed: _showNoteEditor,
+                          tooltip: 'Add note',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          style: IconButton.styleFrom(
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
                       ),
                       if (_hasNote)
                         Positioned(
-                          right: 8,
-                          top: 8,
+                          right: -2,
+                          top: -2,
                           child: Container(
-                            width: 8,
-                            height: 8,
+                            padding: const EdgeInsets.all(2),
                             decoration: const BoxDecoration(
-                              color: Colors.amber,
+                              color: Color(0xFF1E232F), // Match bg to create cutout effect
                               shape: BoxShape.circle,
+                            ),
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: Colors.amber, // Keep amber dot for attention
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 1.5),
+                              ),
                             ),
                           ),
                         ),
                     ],
                   ),
+                  const SizedBox(width: 12),
                   // Bookmark button
                   BookmarkButton(
                     questionId: widget.questionId,
@@ -493,25 +598,33 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                       margin: const EdgeInsets.only(right: 16),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [
-                            Colors.amber.withValues(alpha: 0.3),
-                            Colors.orange.withValues(alpha: 0.2),
+                            Color(0xFFFFB300), // Amber 600
+                            Color(0xFFFFCA28), // Amber 400
                           ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                        boxShadow: [
+                           BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                          const Icon(Icons.star_rounded, color: Color(0xFF232832), size: 18),
                           const SizedBox(width: 6),
                           Text(
                             '${_question!.marks} marks',
                             style: const TextStyle(
-                              color: Colors.amber,
-                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF232832), // Dark text on bright background
+                              fontWeight: FontWeight.bold,
                               fontSize: 13,
                             ),
                           ),
@@ -521,7 +634,76 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 ],
               ),
 
-              // Figure Card (full display, tap to zoom)
+              // Question Header Card (MOVED BEFORE FIGURE)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.border, width: 1),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.shadow.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Question number badge
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Question ${_question!.questionNumber}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            if (_question!.hasPaperInfo)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  _question!.paperLabel,
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        // Question content
+                        FormattedQuestionText(
+                          content: _question!.content,
+                          fontSize: 16,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Figure Card (MOVED AFTER QUESTION TEXT, with zoom)
               if (_question!.hasFigure)
                 SliverToBoxAdapter(
                   child: Padding(
@@ -529,13 +711,16 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                     child: GestureDetector(
                       onTap: () => _showFullFigure(),
                       child: Container(
+                        constraints: BoxConstraints(
+                          maxHeight: 300, // Limit height
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1A1D24),
+                          color: AppColors.surface,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
+                              color: Colors.black.withValues(alpha: 0.6),
                               blurRadius: 15,
                               offset: const Offset(0, 5),
                             ),
@@ -543,6 +728,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             // Figure label
                             Container(
@@ -561,34 +747,36 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                                   Text(
                                     'Figure',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.7),
+                                      color: AppColors.textPrimary.withValues(alpha: 0.7),
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   const Spacer(),
-                                  Icon(Icons.zoom_in, color: Colors.white.withValues(alpha: 0.4), size: 18),
+                                  Icon(Icons.zoom_in, color: Colors.white.withValues(alpha: 0.7), size: 18),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Tap to zoom',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.4),
+                                      color: AppColors.textPrimary.withValues(alpha: 0.7),
                                       fontSize: 12,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            // Figure image
-                            ClipRRect(
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(16),
-                                bottomRight: Radius.circular(16),
-                              ),
-                              child: Image.network(
-                                _question!.imageUrl!,
-                                fit: BoxFit.contain,
-                                width: double.infinity,
+                            // Figure image (tap for fullscreen zoom)
+                            Flexible(
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(16),
+                                ),
+                                child: Image.network(
+                                  _question!.imageUrl!,
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                ),
                               ),
                             ),
                           ],
@@ -597,84 +785,6 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                     ),
                   ),
                 ),
-
-              // Question Header Card
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFF1A1D24),
-                          const Color(0xFF151820),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Question number badge
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'Question ${_question!.questionNumber}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            if (_question!.hasPaperInfo)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  _question!.paperLabel,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.5),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        // Question content
-                        FormattedQuestionText(
-                          content: _question!.content,
-                          fontSize: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
 
               // Tabbed Answer Card
               SliverToBoxAdapter(
@@ -698,21 +808,14 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   Widget _buildTabbedCard() {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF1E2233),
-            const Color(0xFF171B28),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: AppColors.shadow.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -721,15 +824,15 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
           // Tab Bar
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.03),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              color: AppColors.accent.withValues(alpha: 0.15),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: TabBar(
               controller: _tabController,
-              indicatorColor: Colors.blue,
+              indicatorColor: AppColors.primary,
               indicatorWeight: 3,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white54,
+              labelColor: AppColors.textPrimary,
+              unselectedLabelColor: AppColors.textSecondary,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
               dividerColor: Colors.transparent,
@@ -743,12 +846,12 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                   text: 'Your Answer',
                 ),
                 const Tab(
-                  icon: Icon(Icons.auto_awesome, size: 20),
-                  text: 'AI Solution',
-                ),
-                const Tab(
                   icon: Icon(Icons.verified_outlined, size: 20),
                   text: 'Official',
+                ),
+                const Tab(
+                  icon: Icon(Icons.auto_awesome, size: 20),
+                  text: 'AI Explanation',
                 ),
               ],
             ),
@@ -761,8 +864,8 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
               controller: _tabController,
               children: [
                 _buildAnswerTab(),
-                _buildAiSolutionTab(),
                 _buildOfficialAnswerTab(),
+                _buildAiSolutionTab(),
               ],
             ),
           ),
@@ -816,7 +919,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                       },
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('Retry'),
-                      style: TextButton.styleFrom(foregroundColor: Colors.white70),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
                     ),
                 ],
               ),
@@ -848,8 +951,8 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                           : isWrong
                               ? Colors.red.withValues(alpha: 0.2)
                               : isSelected
-                                  ? Colors.blue.withValues(alpha: 0.2)
-                                  : const Color(0xFF0D1117),
+                                  ? AppColors.primary.withValues(alpha: 0.15)
+                                  : AppColors.background,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: isCorrect
@@ -885,7 +988,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                                     : Text(
                                         option['label'] ?? '',
                                         style: TextStyle(
-                                          color: isSelected ? Colors.white : Colors.white70,
+                                          color: isSelected ? Colors.white : AppColors.textSecondary,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
                                         ),
@@ -897,7 +1000,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                           child: Text(
                             option['text'] ?? '',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
+                              color: AppColors.textPrimary.withValues(alpha: 0.9),
                               fontSize: 15,
                             ),
                           ),
@@ -928,7 +1031,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       disabledBackgroundColor: _answerSubmitted 
                           ? Colors.green.withValues(alpha: 0.5) 
-                          : Colors.blue.withValues(alpha: 0.3),
+                          : Colors.blue.withValues(alpha: 0.6),
                     ),
                     child: Text(
                       _answerSubmitted ? 'Submitted ✓' : 'Submit Answer',
@@ -963,19 +1066,23 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
               controller: _studentAnswerController,
               maxLines: 5,
               enabled: !_answerSubmitted && !_isCheckingAnswer,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'Type your answer here...',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                hintStyle: TextStyle(color: AppColors.textSecondary),
                 filled: true,
-                fillColor: const Color(0xFF0D1117),
+                fillColor: AppColors.background,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.border, width: 1.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.border, width: 1.5),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: Colors.blue.withValues(alpha: 0.5)),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
                 ),
               ),
             ),
@@ -996,7 +1103,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  disabledBackgroundColor: Colors.blue.withValues(alpha: 0.3),
+                  disabledBackgroundColor: Colors.blue.withValues(alpha: 0.6),
                 ),
                 child: _isCheckingAnswer
                     ? const SizedBox(
@@ -1017,7 +1124,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
             const SizedBox(height: 20),
             Text(
               _aiFeedback!['feedback'] ?? '',
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), height: 1.5),
+              style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), height: 1.5),
             ),
             if ((_aiFeedback!['hints'] as List?)?.isNotEmpty ?? false) ...[
               const SizedBox(height: 12),
@@ -1030,19 +1137,225 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   }
 
   Widget _buildAiSolutionTab() {
-    if (!_question!.hasAiSolution) {
+    final isPremium = ref.watch(isPremiumProvider);
+    
+    // Always show the tab - display message if no content
+    final hasContent = _question!.aiAnswer != null && _question!.aiAnswer!.isNotEmpty;
+    
+    if (!hasContent) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.auto_awesome_outlined, color: Colors.white24, size: 48),
             const SizedBox(height: 12),
-            Text('AI solution not available', style: TextStyle(color: Colors.white38)),
+            Text('AI explanation not available', style: TextStyle(color: Colors.white38)),
           ],
         ),
       );
     }
     
+    // If not premium, show blurred content with upgrade prompt
+    if (!isPremium) {
+      return Stack(
+        children: [
+          // Blurred content
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'AI Explanation',
+                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white12),
+                  const SizedBox(height: 16),
+                  Text(
+                    _question!.aiAnswer ?? 'AI explanation not available for this question yet.',
+                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Premium upgrade overlay
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.surface.withValues(alpha: 0.7),
+                    AppColors.surface.withValues(alpha: 0.9),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.surface,
+                        const Color(0xFF1A1D28),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.6),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.amber.withValues(alpha: 0.2),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.amber.withValues(alpha: 0.6),
+                              Colors.orange.withValues(alpha: 0.2),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: Colors.amber.withValues(alpha: 0.7),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.amber.withValues(alpha: 0.6),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          size: 32,
+                          color: Colors.amber,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Premium Feature',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Upgrade to access AI step-by-step solutions',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFB800), Color(0xFFFF8800)],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.amber.withValues(alpha: 0.6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Show full premium dialog
+                              AccessControlService.checkPremium(
+                                context,
+                                ref,
+                                featureName: 'AI Solution',
+                                highlights: [
+                                  'Step-by-step AI explanations',
+                                  'Understand complex problems',
+                                  'Learn optimal solving methods',
+                                  'Improve faster with guidance',
+                                ],
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              shadowColor: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.workspace_premium, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Upgrade to Premium',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    // Premium users see the normal content
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1061,7 +1374,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
               const SizedBox(width: 12),
               const Text(
                 'AI Step-by-Step Solution',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ],
           ),
@@ -1070,7 +1383,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
           const SizedBox(height: 16),
           Text(
             _question!.aiSolution,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+            style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
           ),
         ],
       ),
@@ -1078,6 +1391,8 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
   }
 
   Widget _buildOfficialAnswerTab() {
+    final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    
     if (!_question!.hasOfficialAnswer) {
       return Center(
         child: Column(
@@ -1091,6 +1406,158 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
       );
     }
     
+    // If not authenticated, show blurred content with login prompt
+    if (!isAuthenticated) {
+      return Stack(
+        children: [
+          // Blurred content
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.verified, color: Colors.green, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Official Mark Scheme',
+                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(color: Colors.white12),
+                  const SizedBox(height: 16),
+                  Text(
+                    _question!.officialAnswer,
+                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          // Login prompt overlay
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.surface.withValues(alpha: 0.7),
+                    AppColors.surface.withValues(alpha: 0.9),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: AppColors.background.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.6),
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.blue.withValues(alpha: 0.6),
+                              Colors.cyan.withValues(alpha: 0.2),
+                            ],
+                          ),
+                          border: Border.all(
+                            color: Colors.blue.withValues(alpha: 0.7),
+                            width: 2,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.lock_outline,
+                          size: 32,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Login to View Answer',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Create a free account to access official answers',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => context.go('/login'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Login / Sign Up',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    
+    // Authenticated users see the normal content
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1109,7 +1576,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
               const SizedBox(width: 12),
               const Text(
                 'Official Mark Scheme',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ],
           ),
@@ -1118,7 +1585,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
           const SizedBox(height: 16),
           Text(
             _question!.officialAnswer,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+            style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
           ),
         ],
       ),
@@ -1143,7 +1610,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
+                color: Colors.black.withValues(alpha: 0.7),
                 blurRadius: 20,
                 offset: const Offset(0, -5),
               ),
@@ -1159,7 +1626,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: Colors.white.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1224,7 +1691,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                           Text(
                             _answerSubmitted ? 'Your Answer (Submitted)' : 'Write Your Answer',
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                               fontWeight: FontWeight.w600,
                               fontSize: 16,
                             ),
@@ -1257,10 +1724,10 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                         controller: _studentAnswerController,
                         maxLines: 5,
                         enabled: !_answerSubmitted && !_isCheckingAnswer,
-                        style: const TextStyle(color: Colors.white, fontSize: 15),
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
                         decoration: InputDecoration(
                           hintText: 'Type your answer here...',
-                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                          hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6)),
                           filled: true,
                           fillColor: const Color(0xFF0D1117),
                           border: OutlineInputBorder(
@@ -1294,7 +1761,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
-                                disabledBackgroundColor: Colors.blue.withValues(alpha: 0.3),
+                                disabledBackgroundColor: Colors.blue.withValues(alpha: 0.6),
                               ),
                               child: _isCheckingAnswer
                                   ? const SizedBox(
@@ -1399,8 +1866,8 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isCorrect 
-              ? Colors.green.withValues(alpha: 0.3) 
-              : Colors.orange.withValues(alpha: 0.3),
+              ? Colors.green.withValues(alpha: 0.6) 
+              : Colors.orange.withValues(alpha: 0.6),
         ),
       ),
       child: Column(
@@ -1409,7 +1876,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
           Text(
             _aiFeedback!['feedback'] ?? '',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: AppColors.textPrimary.withValues(alpha: 0.9),
               fontSize: 14,
               height: 1.5,
             ),
@@ -1457,14 +1924,14 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF1A1D24),
+            AppColors.surface,
             const Color(0xFF151820),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: _answerSubmitted 
-              ? (isCorrect ? Colors.green.withValues(alpha: 0.4) : Colors.orange.withValues(alpha: 0.4))
+              ? (isCorrect ? Colors.green.withValues(alpha: 0.7) : Colors.orange.withValues(alpha: 0.7))
               : Colors.white.withValues(alpha: 0.08),
         ),
         boxShadow: [
@@ -1504,7 +1971,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 child: Text(
                   _answerSubmitted ? 'Your Answer' : 'Your Answer',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -1535,10 +2002,10 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
             controller: _studentAnswerController,
             maxLines: 6,
             enabled: !_answerSubmitted && !_isCheckingAnswer,
-            style: const TextStyle(color: Colors.white, fontSize: 15),
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
             decoration: InputDecoration(
               hintText: 'Type your answer here...',
-              hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+              hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6)),
               filled: true,
               fillColor: const Color(0xFF0B0E14),
               border: OutlineInputBorder(
@@ -1595,7 +2062,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                       : (_answerSubmitted ? 'Checked' : 'Check Answer')),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _answerSubmitted 
-                        ? (isCorrect ? Colors.green.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3))
+                        ? (isCorrect ? Colors.green.withValues(alpha: 0.6) : Colors.orange.withValues(alpha: 0.6))
                         : Colors.blue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1614,7 +2081,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                       _aiFeedback = null;
                     });
                   },
-                  icon: const Icon(Icons.refresh, color: Colors.white70),
+                  icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
                   tooltip: 'Try Again',
                 ),
               ],
@@ -1631,7 +2098,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
             Text(
               _aiFeedback!['feedback'] ?? '',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: AppColors.textPrimary.withValues(alpha: 0.9),
                 fontSize: 15,
                 height: 1.5,
               ),
@@ -1704,7 +2171,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 child: Text(
                   item,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: AppColors.textPrimary.withValues(alpha: 0.8),
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -1729,7 +2196,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
         color: const Color(0xFF1A1A2E), // Subtle purple/blue tint
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.indigoAccent.withValues(alpha: 0.3),
+          color: Colors.indigoAccent.withValues(alpha: 0.6),
         ),
       ),
       child: Column(
@@ -1750,7 +2217,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 const Text(
                     'AI Step-by-Step',
                     style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                     ),
@@ -1767,7 +2234,7 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
                 child: SelectableText(
                     part.trim(),
                     style: const TextStyle(
-                        color: Colors.white70,
+                        color: AppColors.textSecondary,
                         fontSize: 16,
                         height: 1.6,
                         fontFamily: 'Roboto',
@@ -1779,3 +2246,4 @@ class _QuestionDetailScreenState extends State<QuestionDetailScreen>
     );
   }
 }
+

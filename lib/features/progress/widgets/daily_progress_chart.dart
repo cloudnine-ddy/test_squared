@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// Widget to display daily question solving progress as a bar chart
 class DailyProgressChart extends StatelessWidget {
@@ -18,7 +19,7 @@ class DailyProgressChart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.1),
@@ -31,7 +32,7 @@ class DailyProgressChart extends StatelessWidget {
             children: [
               Icon(
                 Icons.trending_up,
-                color: AppTheme.primaryBlue,
+                color: AppColors.primary,
                 size: 24,
               ),
               const SizedBox(width: 8),
@@ -212,8 +213,8 @@ class DailyProgressChart extends StatelessWidget {
                 toY: count.toDouble(),
                 gradient: LinearGradient(
                   colors: [
-                    AppTheme.primaryBlue,
-                    AppTheme.primaryBlue.withValues(alpha: 0.7),
+                    AppColors.primary,
+                    AppColors.primary.withValues(alpha: 0.7),
                   ],
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,

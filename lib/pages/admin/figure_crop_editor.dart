@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/theme/app_theme.dart';
+import '../core/theme/app_theme.dart';
+import '../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 
 /// Interactive crop editor for adjusting figure bounding boxes
@@ -151,7 +152,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppTheme.backgroundDeepest,
+      color: AppColors.background,
       child: Column(
         children: [
           // Header
@@ -171,7 +172,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
                 Container(
                   width: 300,
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceDark,
+                    color: AppColors.sidebar,
                     border: Border(
                       left: BorderSide(
                         color: Colors.white.withValues(alpha: 0.1),
@@ -198,7 +199,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         border: Border(
           bottom: BorderSide(
             color: Colors.white.withValues(alpha: 0.1),

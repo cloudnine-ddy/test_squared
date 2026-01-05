@@ -67,23 +67,39 @@ class BookmarkRepository {
 
   /// Get bookmarked questions with full question data
   Future<List<QuestionModel>> getBookmarkedQuestions({String? folder}) async {
-    final userId = _supabase.auth.currentUser?.id;
-    if (userId == null) return [];
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) {
+        print('DEBUG getBookmarkedQuestions: No user logged in');
+        return [];
+      }
 
-    var query = _supabase
-        .from('user_bookmarks')
-        .select('question_id, questions(*, papers(*))')
-        .eq('user_id', userId);
-    
-    if (folder != null) {
-      query = query.eq('folder_name', folder);
+      print('DEBUG getBookmarkedQuestions: userId=$userId, folder=$folder');
+
+      var query = _supabase
+          .from('user_bookmarks')
+          .select('question_id, questions(*, papers(*))')
+          .eq('user_id', userId);
+      
+      if (folder != null) {
+        query = query.eq('folder_name', folder);
+      }
+
+      final data = await query.order('created_at', ascending: false);
+      print('DEBUG getBookmarkedQuestions: Found ${(data as List).length} bookmarks');
+
+      final questions = (data as List)
+          .where((item) => item['questions'] != null)
+          .map((item) => QuestionModel.fromMap(item['questions']))
+          .toList();
+      
+      print('DEBUG getBookmarkedQuestions: Returning ${questions.length} questions');
+      return questions;
+    } catch (e, stackTrace) {
+      print('ERROR in getBookmarkedQuestions: $e');
+      print('STACK TRACE: $stackTrace');
+      return [];
     }
-
-    final data = await query.order('created_at', ascending: false);
-    return (data as List)
-        .where((item) => item['questions'] != null)
-        .map((item) => QuestionModel.fromMap(item['questions']))
-        .toList();
   }
 
   /// Get all folder names for current user

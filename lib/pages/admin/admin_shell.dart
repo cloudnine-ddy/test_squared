@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/services/toast_service.dart';
 import 'upload_paper_view.dart';
@@ -149,7 +150,7 @@ class _AdminShellState extends State<AdminShell> {
           // Divider
           Container(
             width: 1,
-            color: AppTheme.surfaceDark.withValues(alpha: 0.5),
+            color: AppColors.sidebar.withValues(alpha: 0.5),
           ),
           // Main content
           Expanded(
@@ -167,7 +168,7 @@ class _AdminShellState extends State<AdminShell> {
 
   Widget _buildSidebar() {
     return Container(
-      color: const Color(0xFF0F172A), // Deep dark blue
+      color: AppColors.sidebar, // Deep dark blue
       child: Column(
         children: [
           // Header
@@ -423,7 +424,7 @@ class _AdminShellState extends State<AdminShell> {
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         border: Border(
           bottom: BorderSide(
             color: Colors.white.withValues(alpha: 0.05),

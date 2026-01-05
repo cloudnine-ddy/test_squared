@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'data/past_paper_repository.dart';
 import 'models/paper_model.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 
 /// Screen for selecting a specific paper for a given year
 class PaperSelectionScreen extends StatefulWidget {
@@ -54,9 +55,9 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppColors.sidebar,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -130,7 +131,7 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
   Widget _buildPaperTile(PaperModel paper) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: AppTheme.surfaceDark,
+      color: AppColors.sidebar,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),

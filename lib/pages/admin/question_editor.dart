@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 
 /// Full Question Editor - Edit all fields of a question
@@ -168,19 +169,28 @@ class _QuestionEditorState extends State<QuestionEditor> {
         };
       }
       
+      // Prepare update data
+      final updateData = {
+        'content': _contentController.text.trim(),
+        'official_answer': _officialAnswerController.text.trim(),
+        'question_number': _questionNumber,
+        'topic_ids': _selectedTopicIds,
+        'ai_answer': aiAnswer,
+        'options': _isMCQ ? _options : null,
+        'correct_answer': _isMCQ ? _correctAnswer : null,
+      };
+      
+      print('[QuestionEditor] Updating question ${widget.questionId}');
+      print('[QuestionEditor] Update data: $updateData');
+      
       // Update question
-      await _supabase
+      final response = await _supabase
           .from('questions')
-          .update({
-            'content': _contentController.text,
-            'official_answer': _officialAnswerController.text,
-            'question_number': _questionNumber,
-            'topic_ids': _selectedTopicIds,
-            'ai_answer': aiAnswer,
-            'options': _isMCQ ? _options : null,
-            'correct_answer': _isMCQ ? _correctAnswer : null,
-          })
-          .eq('id', widget.questionId);
+          .update(updateData)
+          .eq('id', widget.questionId)
+          .select();
+      
+      print('[QuestionEditor] Update response: $response');
       
       if (!mounted) return;
       ToastService.showSuccess('Question saved!');
@@ -188,7 +198,23 @@ class _QuestionEditorState extends State<QuestionEditor> {
         _hasChanges = false;
         _isSaving = false;
       });
-    } catch (e) {
+    } on PostgrestException catch (e) {
+      // Detailed Postgrest error logging
+      print('[QuestionEditor] PostgrestException:');
+      print('  Code: ${e.code}');
+      print('  Message: ${e.message}');
+      print('  Details: ${e.details}');
+      print('  Hint: ${e.hint}');
+      
+      if (mounted) {
+        ToastService.showError('Database error: ${e.message}\nDetails: ${e.details ?? "None"}');
+        setState(() => _isSaving = false);
+      }
+    } catch (e, stackTrace) {
+      // General error logging
+      print('[QuestionEditor] General error: $e');
+      print('[QuestionEditor] Stack trace: $stackTrace');
+      
       if (mounted) {
         ToastService.showError('Failed to save: $e');
         setState(() => _isSaving = false);
@@ -253,7 +279,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
         : 'Unknown Paper';
 
     return Container(
-      color: AppTheme.backgroundDeepest,
+      color: AppColors.background,
       child: Column(
         children: [
           // Header
@@ -316,7 +342,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                                 decoration: BoxDecoration(
                                   color: _options[i]['label'] == _correctAnswer
                                       ? Colors.green.withValues(alpha: 0.2)
-                                      : const Color(0xFF1E2233),
+                                      : AppColors.surface,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
                                     color: _options[i]['label'] == _correctAnswer
@@ -343,7 +369,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                                             : Text(
                                                 _options[i]['label'] ?? '',
                                                 style: const TextStyle(
-                                                  color: Colors.white,
+                                                  color: AppColors.textPrimary,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 16,
                                                 ),
@@ -355,12 +381,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
                                     Expanded(
                                       child: TextFormField(
                                         initialValue: _options[i]['text'] ?? '',
-                                        style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+                                        style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.9)),
                                         decoration: InputDecoration(
                                           isDense: true,
                                           border: InputBorder.none,
                                           hintText: 'Option ${_options[i]['label']}...',
-                                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                                          hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.3)),
                                         ),
                                         onChanged: (value) {
                                           _options[i]['text'] = value;
@@ -378,7 +404,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
                                 'To change the correct answer, edit the Official Answer field below',
-                                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11, fontStyle: FontStyle.italic),
+                                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.4), fontSize: 11, fontStyle: FontStyle.italic),
                               ),
                             ),
                           ],
@@ -430,10 +456,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppColors.sidebar,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
+            color: AppColors.border,
           ),
         ),
       ),
@@ -442,7 +468,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
           IconButton(
             onPressed: widget.onClose,
             icon: const Icon(Icons.arrow_back),
-            color: Colors.white.withValues(alpha: 0.7),
+            color: AppColors.textPrimary,
           ),
           const SizedBox(width: 12),
           Column(
@@ -451,7 +477,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               Text(
                 'Question $_questionNumber',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                 ),
@@ -459,7 +485,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               Text(
                 paperInfo,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: AppColors.textPrimary.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),
               ),
@@ -518,7 +544,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
         Text(
           title,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.8),
+            color: AppColors.textPrimary.withValues(alpha: 0.8),
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -532,20 +558,20 @@ class _QuestionEditorState extends State<QuestionEditor> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+      hintStyle: TextStyle(color: AppColors.textSecondary),
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.05),
+      fillColor: AppColors.background,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        borderSide: BorderSide(color: AppColors.border, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        borderSide: BorderSide(color: AppColors.border, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
       ),
     );
   }
@@ -574,7 +600,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
           labelStyle: TextStyle(
             color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
           ),
-          backgroundColor: Colors.white.withValues(alpha: 0.05),
+          backgroundColor: AppColors.background,
           side: BorderSide(
             color: isSelected 
                 ? const Color(0xFF6366F1) 
@@ -589,10 +615,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: AppColors.border,
         ),
       ),
       child: Column(
@@ -615,7 +641,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               Text(
                 'Has Figure',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.8),
+                  color: AppColors.textPrimary.withValues(alpha: 0.8),
                 ),
               ),
             ],
@@ -629,7 +655,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               Text(
                 'Current Image:',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: AppColors.textPrimary.withValues(alpha: 0.6),
                   fontSize: 12,
                 ),
               ),
@@ -640,7 +666,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: AppColors.border,
                   ),
                 ),
                 child: ClipRRect(
@@ -756,14 +782,14 @@ class _QuestionEditorState extends State<QuestionEditor> {
             Text(
               label,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
+                color: AppColors.textPrimary.withValues(alpha: 0.5),
                 fontSize: 11,
               ),
             ),
             Text(
               value.toStringAsFixed(0),
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: AppColors.textPrimary.withValues(alpha: 0.7),
                 fontSize: 11,
               ),
             ),
@@ -780,7 +806,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
             max: max,
             onChanged: onChanged,
             activeColor: const Color(0xFF6366F1),
-            inactiveColor: Colors.white.withValues(alpha: 0.1),
+            inactiveColor: AppColors.border,
           ),
         ),
       ],
@@ -861,16 +887,16 @@ class _CropDialogState extends State<_CropDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog.fullscreen(
-      backgroundColor: AppTheme.backgroundDeepest,
+      backgroundColor: AppColors.background,
       child: Column(
         children: [
           // Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceDark,
+              color: AppColors.sidebar,
               border: Border(
-                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                bottom: BorderSide(color: AppColors.border),
               ),
             ),
             child: Row(
@@ -878,13 +904,13 @@ class _CropDialogState extends State<_CropDialog> {
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  color: Colors.white.withValues(alpha: 0.7),
+                  color: AppColors.textPrimary,
                 ),
                 const SizedBox(width: 12),
                 const Text(
                   'Crop Figure',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
@@ -956,9 +982,9 @@ class _CropDialogState extends State<_CropDialog> {
                   width: 280,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceDark,
+                    color: AppColors.sidebar,
                     border: Border(
-                      left: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      left: BorderSide(color: AppColors.border),
                     ),
                   ),
                   child: Column(
@@ -968,7 +994,7 @@ class _CropDialogState extends State<_CropDialog> {
                       Text(
                         'Page',
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: AppColors.textPrimary.withValues(alpha: 0.8),
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -989,13 +1015,13 @@ class _CropDialogState extends State<_CropDialog> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.1),
+                              color: AppColors.border,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               '$_page',
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1108,7 +1134,7 @@ class _CropDialogState extends State<_CropDialog> {
                 child: Center(
                   child: Icon(
                     Icons.open_with,
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -1187,11 +1213,11 @@ class _CropDialogState extends State<_CropDialog> {
             children: [
               Text(
                 label,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 12),
               ),
               Text(
                 '${value.toStringAsFixed(0)}%',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.8), fontSize: 12),
               ),
             ],
           ),
@@ -1201,7 +1227,7 @@ class _CropDialogState extends State<_CropDialog> {
             max: 100,
             onChanged: onChanged,
             activeColor: const Color(0xFF6366F1),
-            inactiveColor: Colors.white.withValues(alpha: 0.1),
+            inactiveColor: AppColors.border,
           ),
         ],
       ),
