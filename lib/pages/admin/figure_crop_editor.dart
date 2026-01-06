@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_theme.dart';
@@ -21,35 +23,36 @@ class FigureCropEditor extends StatefulWidget {
 
 class _FigureCropEditorState extends State<FigureCropEditor> {
   final _supabase = Supabase.instance.client;
-  
+
   bool _isCropping = false;
   bool _isLoadingPage = false;
   String? _pdfUrl;
-  String? _pageImageUrl; // Rendered page image
-  
+  String? _pageImageUrl; // Legacy support
+  Uint8List? _pageImageBytes; // For Base64 images
+
   // Crop box in percentages (0-100)
   double _cropX = 10;
   double _cropY = 30;
   double _cropWidth = 40;
   double _cropHeight = 30;
-  
+
   // Page info
   int _currentPage = 1;
-  
+
   @override
   void initState() {
     super.initState();
     _initializeFromQuestion();
   }
-  
+
   void _initializeFromQuestion() {
     final paper = widget.question['paper'] as Map<String, dynamic>?;
     _pdfUrl = paper?['pdf_url'];
-    
+
     // Get initial crop box from ai_answer
     final aiAnswer = widget.question['ai_answer'] as Map<String, dynamic>?;
     final figureLocation = aiAnswer?['figure_location'] as Map<String, dynamic>?;
-    
+
     if (figureLocation != null) {
       setState(() {
         _currentPage = (figureLocation['page'] as num?)?.toInt() ?? 1;
@@ -59,16 +62,16 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
         _cropHeight = (figureLocation['height_percent'] as num?)?.toDouble() ?? 30;
       });
     }
-    
+
     // Load the PDF page preview
     _loadPagePreview();
   }
-  
+
   Future<void> _loadPagePreview() async {
     if (_pdfUrl == null) return;
-    
+
     setState(() => _isLoadingPage = true);
-    
+
     try {
       final response = await _supabase.functions.invoke(
         'render-page',
@@ -77,8 +80,16 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
           'page': _currentPage,
         },
       );
-      
-      if (response.data?['image_url'] != null) {
+
+
+      if (response.data?['image_base64'] != null) {
+        if (mounted) {
+           setState(() {
+            _pageImageBytes = base64Decode(response.data['image_base64']);
+            _isLoadingPage = false;
+          });
+        }
+      } else if (response.data?['image_url'] != null) {
         if (mounted) {
           setState(() {
             _pageImageUrl = response.data['image_url'];
@@ -98,7 +109,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
 
   Future<void> _saveCrop() async {
     setState(() => _isCropping = true);
-    
+
     try {
       // Update the figure_location in ai_answer
       final updatedAiAnswer = {
@@ -111,13 +122,13 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
           'height_percent': _cropHeight,
         },
       };
-      
+
       // Save to database
       await _supabase
           .from('questions')
           .update({'ai_answer': updatedAiAnswer})
           .eq('id', widget.question['id']);
-      
+
       // Call crop-figure function to re-crop
       final response = await _supabase.functions.invoke(
         'crop-figure',
@@ -133,11 +144,11 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
           },
         },
       );
-      
+
       if (response.status != 200 && response.data?['error'] != null) {
         throw Exception(response.data?['error']);
       }
-      
+
       ToastService.showSuccess('Figure cropped and saved!');
       widget.onClose();
     } catch (e) {
@@ -157,7 +168,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
         children: [
           // Header
           _buildHeader(),
-          
+
           // Main content
           Expanded(
             child: Row(
@@ -167,7 +178,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
                   flex: 2,
                   child: _buildPreviewArea(),
                 ),
-                
+
                 // Controls panel
                 Container(
                   width: 300,
@@ -194,7 +205,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
     final paperInfo = paper != null
         ? '${paper['year']} ${paper['season']} V${paper['variant']}'
         : 'Unknown Paper';
-    
+
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -216,7 +227,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
             tooltip: 'Back to list',
           ),
           const SizedBox(width: 16),
-          
+
           // Title
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -239,9 +250,9 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
               ),
             ],
           ),
-          
+
           const Spacer(),
-          
+
           // Save button
           ElevatedButton.icon(
             onPressed: _isCropping ? null : _saveCrop,
@@ -280,13 +291,13 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
           const aspectRatio = 210 / 297;
           double width = constraints.maxWidth;
           double height = constraints.maxHeight;
-          
+
           if (width / height > aspectRatio) {
             width = height * aspectRatio;
           } else {
             height = width / aspectRatio;
           }
-          
+
           return Center(
             child: SizedBox(
               width: width,
@@ -313,6 +324,26 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
                               ],
                             ),
                           )
+                        : _pageImageBytes != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.memory(
+                                  _pageImageBytes!,
+                                  fit: BoxFit.contain,
+                                  width: width,
+                                  height: height,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.error, color: Colors.red[300], size: 48),
+                                        const SizedBox(height: 8),
+                                        const Text('Failed to load page image'),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
                         : _pageImageUrl != null
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
@@ -362,7 +393,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
                                 ),
                               ),
                   ),
-                  
+
                   // Crop overlay
                   _buildCropOverlay(width, height),
                 ],
@@ -379,7 +410,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
     final top = (_cropY / 100) * containerHeight;
     final width = (_cropWidth / 100) * containerWidth;
     final height = (_cropHeight / 100) * containerHeight;
-    
+
     return Stack(
       children: [
         // Darkened areas outside crop
@@ -415,7 +446,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
           height: height,
           child: Container(color: Colors.black.withValues(alpha: 0.5)),
         ),
-        
+
         // Crop box border
         Positioned(
           left: left,
@@ -427,7 +458,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
               setState(() {
                 _cropX += (details.delta.dx / containerWidth) * 100;
                 _cropY += (details.delta.dy / containerHeight) * 100;
-                
+
                 // Clamp values
                 _cropX = _cropX.clamp(0, 100 - _cropWidth);
                 _cropY = _cropY.clamp(0, 100 - _cropHeight);
@@ -449,7 +480,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
             ),
           ),
         ),
-        
+
         // Corner handles
         _buildCornerHandle(left, top, containerWidth, containerHeight, 'topLeft'),
         _buildCornerHandle(left + width - 12, top, containerWidth, containerHeight, 'topRight'),
@@ -474,7 +505,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
           setState(() {
             final dx = (details.delta.dx / containerWidth) * 100;
             final dy = (details.delta.dy / containerHeight) * 100;
-            
+
             switch (corner) {
               case 'topLeft':
                 _cropX += dx;
@@ -497,7 +528,7 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
                 _cropHeight += dy;
                 break;
             }
-            
+
             // Clamp values
             _cropX = _cropX.clamp(0, 95);
             _cropY = _cropY.clamp(0, 95);
@@ -579,9 +610,9 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
                     ),
                   ),
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Page selector
           Text(
             'Page',
@@ -629,17 +660,17 @@ class _FigureCropEditorState extends State<FigureCropEditor> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Position sliders
           _buildSlider('X Position', _cropX, (v) => setState(() => _cropX = v)),
           _buildSlider('Y Position', _cropY, (v) => setState(() => _cropY = v)),
           _buildSlider('Width', _cropWidth, (v) => setState(() => _cropWidth = v)),
           _buildSlider('Height', _cropHeight, (v) => setState(() => _cropHeight = v)),
-          
+
           const SizedBox(height: 24),
-          
+
           // Reset button
           SizedBox(
             width: double.infinity,

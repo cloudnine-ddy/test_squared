@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 /**
  * render-page Edge Function
- * 
+ *
  * Renders a PDF page as an image using pdf.co API.
  * Uses default 72 DPI rendering to match crop-figure coordinates.
  */
@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     }
 
     const pdfCoApiKey = Deno.env.get('PDF_CO_API_KEY')
-    
+
     if (!pdfCoApiKey) {
       return new Response(
         JSON.stringify({ error: 'PDF_CO_API_KEY not configured' }),
@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
     const pdfCoPayload = {
       url: pdfUrl,
       pages: String(page - 1),
-      async: false
+      async: false,
+      inline: true // Return Base64
       // NO width parameter - use default 72 DPI
     }
 
@@ -79,22 +80,21 @@ Deno.serve(async (req) => {
       )
     }
 
-    const imageUrls = pdfCoJson.urls || [pdfCoJson.url]
-    
-    if (!imageUrls || imageUrls.length === 0) {
+    const pageBody = pdfCoJson.body; // Base64 content
+
+    if (!pageBody) {
       return new Response(
-        JSON.stringify({ error: 'No image generated' }),
+        JSON.stringify({ error: 'No image body returned' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const pageImageUrl = imageUrls[0]
-    console.log(`Page rendered: ${pageImageUrl}`)
+    console.log(`Page rendered (Base64) length: ${pageBody.length}`)
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        image_url: pageImageUrl 
+      JSON.stringify({
+        success: true,
+        image_base64: pageBody
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

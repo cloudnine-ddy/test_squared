@@ -260,9 +260,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           style: TextStyle(
                                             color: isSelected
                                                 ? Theme.of(context).primaryColor
-                                                : Theme.of(context).colorScheme.onSurface,
+                                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9), // Higher contrast for unselected
                                             fontWeight: isSelected
-                                                ? FontWeight.w600
+                                                ? FontWeight.w700 // Bolder
                                                 : FontWeight.normal,
                                           ),
                                         ),
@@ -785,12 +785,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Theme.of(context).brightness == Brightness.dark
-              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2)
-              : AppColors.accent.withValues(alpha: 0.2),
+              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.15) // Slightly more visible
+              : AppColors.accent.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)
+                ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.5) // Brighter border
                 : AppColors.accent.withValues(alpha: 0.3),
           ),
         ),
@@ -799,25 +799,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             Icon(
               icon,
               color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).colorScheme.onSurface
-                  : AppColors.primary,
-              size: 20
+                  ? Theme.of(context).colorScheme.secondary // Neon accent
+                  : AppColors.accent,
+              size: 20,
             ),
             const SizedBox(width: 12),
             Text(
               label,
               style: TextStyle(
                 color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface
+                    ? Colors.white // High contrast white text
                     : AppColors.textPrimary,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
       ),
     );
+
   }
 }
 

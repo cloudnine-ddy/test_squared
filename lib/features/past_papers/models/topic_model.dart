@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class TopicModel {
   final String id;
   final String name;
+  final String subjectId;
   final String description;
   final int questionCount;
   final Color color;
@@ -10,6 +11,7 @@ class TopicModel {
   const TopicModel({
     required this.id,
     required this.name,
+    required this.subjectId,
     required this.description,
     required this.questionCount,
     required this.color,
@@ -33,6 +35,7 @@ class TopicModel {
     return TopicModel(
       id: map['id'] as String,
       name: map['name'] as String,
+      subjectId: map['subject_id'] as String? ?? '',
       description: map['description'] as String? ?? '',
       questionCount: map['question_count'] as int? ?? map['questionCount'] as int? ?? 0,
       color: colorValue,
@@ -44,6 +47,7 @@ class TopicModel {
     return {
       'id': id,
       'name': name,
+      'subject_id': subjectId,
       'description': description,
       'question_count': questionCount,
       'color': color.value,

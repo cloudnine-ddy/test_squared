@@ -29,34 +29,64 @@ Deno.serve(async (req) => {
     if (!questionId || !paperId) throw new Error('Missing ID or Paper ID')
 
     // Check for either figure or table
-    if (!aiAnswer || (!aiAnswer.has_figure && !aiAnswer.has_table)) {
+    // Support new 'figures' array or legacy fields
+    const hasFigures = aiAnswer.figures && aiAnswer.figures.length > 0;
+    const hasLegacyFigure = aiAnswer.has_figure;
+    const hasLegacyTable = aiAnswer.has_table;
+
+    if (!hasFigures && !hasLegacyFigure && !hasLegacyTable) {
       console.log(`[Skip] Question ${questionId} has no figure or table.`)
       return new Response(JSON.stringify({ message: 'Skipped - No Figure/Table' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const isTable = !!aiAnswer.has_table;
-    const locationData = isTable ? aiAnswer.table_location : aiAnswer.figure_location;
+    let locationData;
+
+    if (hasFigures) {
+        // Use the first figure for the main image_url
+        // TODO: Support multiple images in future
+        locationData = aiAnswer.figures[0].boundingBox;
+    } else {
+        const isTable = !!aiAnswer.has_table;
+        locationData = isTable ? aiAnswer.table_location : aiAnswer.figure_location;
+    }
 
     if (!locationData) {
        console.log(`[Skip] Question ${questionId} marked as having figure/table but missing location data.`)
        return new Response(JSON.stringify({ message: 'Skipped - Missing Location Data' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const {
-      page,
-      x_percent,
-      y_percent,
-      width_percent,
-      height_percent,
-      source_page_width,
-      source_page_height
-    } = locationData
+    // Map new schema (x,y,width,height) or legacy (x_percent...)
+    // locationData from analyze-paper (new) is { x, y, width, height, page, page_width, page_height } (PDF Points)
+    // legacy is { x_percent, y_percent ... }
+
+    let page, pX, pY, pW, pH, sourceW, sourceH;
+
+    if (locationData.x !== undefined) {
+        // New Schema (Points)
+        page = locationData.page;
+        pX = locationData.x;
+        pY = locationData.y;
+        pW = locationData.width;
+        pH = locationData.height;
+        sourceW = locationData.page_width;
+        sourceH = locationData.page_height;
+    } else {
+        // Legacy Schema (Percent)
+        page = locationData.page;
+        sourceW = locationData.source_page_width || 595; // Fallback
+        sourceH = locationData.source_page_height || 842;
+
+        pX = (locationData.x_percent / 100) * sourceW;
+        pY = (locationData.y_percent / 100) * sourceH;
+        pW = (locationData.width_percent / 100) * sourceW;
+        pH = (locationData.height_percent / 100) * sourceH;
+    }
 
     console.log(`[Start] Processing Q${questionId} (Page ${page})`)
-    console.log(`[Dims] Page: ${source_page_width}x${source_page_height}`)
-    console.log(`[BBox] x=${x_percent}%, y=${y_percent}%, w=${width_percent}%, h=${height_percent}%`)
+    console.log(`[Dims] Page: ${sourceW}x${sourceH}`)
+    // console.log(`[BBox] x=${x_percent}%, y=${y_percent}%, w=${width_percent}%, h=${height_percent}%`) - Removed old log
 
-    if (!source_page_width || !source_page_height) {
+    if (!sourceW || !sourceH) {
        throw new Error('Missing source page dimensions in metadata')
     }
 
@@ -89,23 +119,18 @@ Deno.serve(async (req) => {
     // User instruction: "Remove Hardcoded Dimensions ... stop using 595 and 842. Instead ... accept pageWidth and pageHeight"
     // User instruction: "Refine Math: Use the actual dimensions to calculate the rectString for PDF.co"
 
-    const pX = Math.max(0, (x_percent / 100) * source_page_width)
-    const pY = Math.max(0, (y_percent / 100) * source_page_height)
-    const pW = (width_percent / 100) * source_page_width
-    const pH = (height_percent / 100) * source_page_height
+    // Dimensions are already in points (pX, pY...), no need to convert from % if using new schema.
+    // Logic above unified pX/pY calculation.
 
-    // Add small buffer?
-    // The previous logic had 20px padding on the *image*.
-    // Let's add 10 points padding here to be safe, clamping to page limits.
+    // Safety Padding (10pt)
     const PADDING = 10
     const finalX = Math.max(0, pX - PADDING)
     const finalY = Math.max(0, pY - PADDING)
-    const finalW = Math.min(source_page_width - finalX, pW + (PADDING * 2))
-    const finalH = Math.min(source_page_height - finalY, pH + (PADDING * 2))
+    const finalW = Math.min(sourceW - finalX, pW + (PADDING * 2))
+    const finalH = Math.min(sourceH - finalY, pH + (PADDING * 2))
 
     const rectString = `${finalX},${finalY},${finalW},${finalH}`
     console.log(`[Math] Rect Calculation:`)
-    console.log(`       Input %: ${x_percent}, ${y_percent}, ${width_percent}, ${height_percent}`)
     console.log(`       Raw Points: ${pX}, ${pY}, ${pW}, ${pH}`)
     console.log(`       Final Rect: ${rectString}`)
 

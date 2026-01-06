@@ -13,10 +13,11 @@ interface Topic {
 }
 
 interface RawFigure {
-  ymin: number // 0-1000 (Top-Left Origin)
+  ymin: number // 0-1000
   xmin: number // 0-1000
   ymax: number // 0-1000
   xmax: number // 0-1000
+  description?: string
 }
 
 interface RawQuestion {
@@ -25,9 +26,10 @@ interface RawQuestion {
   topic_ids?: string[]
   type: 'structured' | 'mcq'
   marks?: number
+  statements?: string[] // I, II, III statements
   options?: { label: string; text: string }[]
   correct_answer?: string
-  figure?: RawFigure
+  figures?: RawFigure[] // Multiple figures support
   is_continuation?: boolean
   explanation?: string
 }
@@ -187,40 +189,51 @@ Deno.serve(async (req) => {
       let explanationData = null;
 
       // Handle Figure & Coordinates
-      if (q.figure) {
+      // Process Figures
+      // Convert 'figures' array to ai_answer format
+      // If legacy 'figure' field exists, add it too (backward compat if needed, but schema changed)
+      // Actually we just use the new 'figures' array.
+
+      const figuresData = [];
+      const sources = q.figures || ( (q as any).figure ? [(q as any).figure] : [] );
+
+      if (sources.length > 0) {
         // Dimensions are now attached to the question object from the loop
         const dims = (q as any)._page_dims || { width: 595, height: 842 }
 
-        // Gemini 0-1000 (Top-Left Origin) -> PDF Points (Bottom-Left Origin)
-        const xMinRel = q.figure.xmin / 1000;
-        const xMaxRel = q.figure.xmax / 1000;
-        const yMinRel = q.figure.ymin / 1000; // Top
-        const yMaxRel = q.figure.ymax / 1000; // Bottom
+        for (const fig of sources) {
+            // Gemini 0-1000 (Top-Left Origin) -> PDF Points (Bottom-Left Origin)
+            const xMinRel = fig.xmin / 1000;
+            const xMaxRel = fig.xmax / 1000;
+            const yMinRel = fig.ymin / 1000; // Top
+            const yMaxRel = fig.ymax / 1000; // Bottom
 
-        const x = xMinRel * dims.width;
+            const x = xMinRel * dims.width;
+            const pdfYTop = (1 - yMinRel) * dims.height;
+            const pdfYBottom = (1 - yMaxRel) * dims.height;
+            const width = (xMaxRel - xMinRel) * dims.width;
+            const height = pdfYTop - pdfYBottom;
 
-        // In PDF (Bottom-Left 0,0):
-        // Top of box (visual) = Higher Y value = (1 - yMin) * height
-        // Bottom of box (visual) = Lower Y value = (1 - yMax) * height
-
-        const pdfYTop = (1 - yMinRel) * dims.height;
-        const pdfYBottom = (1 - yMaxRel) * dims.height;
-
-        const width = (xMaxRel - xMinRel) * dims.width;
-        const height = pdfYTop - pdfYBottom;
-
-        aiAnswer = {
-          boundingBox: {
-            x: Number(x.toFixed(2)),
-            y: Number(pdfYBottom.toFixed(2)),
-            width: Number(width.toFixed(2)),
-            height: Number(height.toFixed(2)),
-            page: (q as any)._source_page,
-            page_width: dims.width,
-            page_height: dims.height
-          },
-          raw_gemini: q.figure
+            figuresData.push({
+                description: fig.description || 'Figure',
+                boundingBox: {
+                    x: Number(x.toFixed(2)),
+                    y: Number(pdfYBottom.toFixed(2)),
+                    width: Number(width.toFixed(2)),
+                    height: Number(height.toFixed(2)),
+                    page: (q as any)._source_page,
+                    page_width: dims.width,
+                    page_height: dims.height
+                },
+                raw_gemini: fig
+            });
         }
+      }
+
+      aiAnswer = {
+          has_figure: figuresData.length > 0,
+          figures: figuresData,
+          statements: q.statements || []
       }
 
       // Handle Explanation
@@ -350,26 +363,27 @@ async function analyzePageImage(
   mimeType: string = "image/png"
 ): Promise<{ page_number: number, questions: RawQuestion[] } | null> {
 
-  const prompt = `Analyze this Biology exam page.
+  const prompt = `Analyze this Biology exam page using Multimodal Vision Parsing.
 
-TASK 1: TEXT EXTRACTION (ENGLISH ONLY)
-- CRITICAL: This is a bilingual paper. Extract ONLY the English text. Ignore Malay.
-- Do NOT include both languages.
-- If text is "Cell / Sel", extract "Cell".
+TASK 1: TEXT EXTRACTION & COMBINATION QUESTIONS
+- Extract English text only.
+- COMBINATION QUESTIONS (Roman Numerals I, II, III + Options A, B, C, D):
+    - IF a question has statements listed as I, II, III, etc.:
+    - Store these statements in the 'statements' array (e.g. ["I. Cell wall is present", "II. Nucleus is absent"]).
+    - The 'options' should ONLY be the final choices (e.g. A. I and II, B. II and III).
+    - Do NOT mix them.
 
-TASK 2: FIGURE & TABLE DETECTION (AGGRESSIVE)
-- Does the question refer to "Diagram", "Figure", "Table", "Graph", "Chart"?
-- OR is there a visual drawing, photo, or illustration?
-- IF YES: You MUST provide the 'figure' (for diagrams/images) or 'table' (for data tables) object.
-- Return the bounding box (ymin, xmin, ymax, xmax) on 0-1000 scale.
-- The box must cover the ENTIRE visual element.
-- Do NOT ignore drawings.
+TASK 2: FIGURE MULTIMODAL ANALYSIS
+- Look for "Diagram", "Figure", "Table", "Graph", "Chart", "Rajah".
+- VISUAL ANALYSIS: "See" the image. If there is a diagram:
+    - Create an entry in the 'figures' array.
+    - 'description': Describe the diagram in detail (e.g. "A cross-section of a leaf showing xylem and phloem").
+    - 'ymin/xmin/ymax/xmax': Bounding box (0-1000) covering the ENTIRE visual element + labels.
 
-TASK 3: SOLVE THE QUESTION
-- You MUST determine the correct answer based on your biological knowledge.
-- For MCQ: Set 'correct_answer' to the correct option letter (e.g. "A").
-- For Structured: Set 'correct_answer' to the key points required for marks.
-- Provide a short 'explanation' (1-2 sentences).
+TASK 3: SOLVE
+- MCQ: Extract ALL 4 options (A-D). Set 'correct_answer' to the letter.
+- Structured: Key points for 'correct_answer'.
+- Explanation: 1-2 sentences.
 
 TOPICS: ${topicsJson}
 `
@@ -388,6 +402,7 @@ TOPICS: ${topicsJson}
             topic_ids: { type: "ARRAY", items: { type: "STRING" } },
             type: { type: "STRING", enum: ["mcq", "structured"] },
             marks: { type: "INTEGER", minimum: 1, maximum: 50 },
+            statements: { type: "ARRAY", items: { type: "STRING" } },
             options: {
               type: "ARRAY",
               items: {
@@ -400,13 +415,17 @@ TOPICS: ${topicsJson}
             },
             correct_answer: { type: "STRING" },
             explanation: { type: "STRING", maxLength: 1000 },
-            figure: {
-              type: "OBJECT",
-              properties: {
-                ymin: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                xmin: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                ymax: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                xmax: { type: "INTEGER", minimum: 0, maximum: 1000 }
+            figures: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  description: { type: "STRING" },
+                  ymin: { type: "INTEGER", minimum: 0, maximum: 1000 },
+                  xmin: { type: "INTEGER", minimum: 0, maximum: 1000 },
+                  ymax: { type: "INTEGER", minimum: 0, maximum: 1000 },
+                  xmax: { type: "INTEGER", minimum: 0, maximum: 1000 }
+                }
               }
             },
             table: {
@@ -518,16 +537,12 @@ function mergeQuestions(fragments: (RawQuestion & { _source_page: number, _page_
 
       if (frag.marks && !existing.marks) existing.marks = frag.marks
 
-      if (!existing.figure && frag.figure) {
-         existing.figure = frag.figure;
-         (existing as any)._source_page = frag._source_page;
-         (existing as any)._page_dims = frag._page_dims;
+      if (frag.figures && frag.figures.length > 0) {
+         existing.figures = [ ...(existing.figures || []), ...frag.figures ];
       }
 
-      if (!(existing as any).table && (frag as any).table) {
-         (existing as any).table = (frag as any).table;
-         (existing as any)._source_page = frag._source_page;
-         (existing as any)._page_dims = frag._page_dims;
+      if (frag.statements && frag.statements.length > 0) {
+         existing.statements = [ ...(existing.statements || []), ...frag.statements ];
       }
 
       if (!existing.explanation && frag.explanation) {

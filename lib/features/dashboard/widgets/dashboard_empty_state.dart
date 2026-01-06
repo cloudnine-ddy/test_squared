@@ -13,6 +13,9 @@ class DashboardEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Determine if we are in dark mode to apply high-contrast fixes
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(40),
@@ -55,7 +58,8 @@ class DashboardEmptyState extends StatelessWidget {
                   Icon(
                     Icons.school_outlined,
                     size: 80,
-                    color: Theme.of(context).primaryColor,
+                    // Use Neon Accent in dark mode for pop
+                    color: isDark ? Colors.lightBlueAccent : Theme.of(context).primaryColor,
                   ),
                 ],
               ),
@@ -69,7 +73,8 @@ class DashboardEmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface,
+                // Pure white in dark mode for max contrast
+                color: isDark ? Colors.white : Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -81,7 +86,8 @@ class DashboardEmptyState extends StatelessWidget {
               'Select a subject from the sidebar to start practicing,\nor explore our subjects to begin your learning journey.',
               style: TextStyle(
                 fontSize: 16,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                // Lighter grey (#B0B0B0 approx) for dark mode
+                color: isDark ? Colors.grey[400] : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                 height:1.6,
               ),
               textAlign: TextAlign.center,
@@ -100,7 +106,8 @@ class DashboardEmptyState extends StatelessWidget {
                   icon: Icons.library_books_outlined,
                   title: 'Browse Subjects',
                   description: 'Explore all available subjects',
-                  color: Theme.of(context).primaryColor,
+                  // Bright Blue / Cyan for Neon Pop
+                  color: isDark ? Colors.lightBlueAccent : Theme.of(context).primaryColor,
                   onTap: onExploreSubjects,
                 ),
                 _buildQuickActionCard(
@@ -108,7 +115,8 @@ class DashboardEmptyState extends StatelessWidget {
                   icon: Icons.bar_chart_outlined,
                   title: 'View Progress',
                   description: 'Track your learning journey',
-                  color: Colors.green,
+                  // Neon Green
+                  color: isDark ? Colors.greenAccent : Colors.green,
                   onTap: () => context.push('/progress'),
                 ),
                 _buildQuickActionCard(
@@ -116,7 +124,8 @@ class DashboardEmptyState extends StatelessWidget {
                   icon: Icons.bookmark_outline,
                   title: 'Saved Questions',
                   description: 'Review bookmarked questions',
-                  color: Colors.orange,
+                  // Neon Orange
+                  color: isDark ? Colors.orangeAccent : Colors.orange,
                   onTap: () => context.push('/bookmarks'),
                 ),
               ],
@@ -149,7 +158,7 @@ class DashboardEmptyState extends StatelessWidget {
                       '"Success is the sum of small efforts repeated day in and day out."',
                       style: TextStyle(
                         fontSize: 15,
-                        color: Theme.of(context).colorScheme.onSurface,
+                        color: isDark ? Colors.white : Theme.of(context).colorScheme.onSurface,
                         fontStyle: FontStyle.italic,
                         height: 1.5,
                       ),
@@ -173,6 +182,8 @@ class DashboardEmptyState extends StatelessWidget {
     required Color color,
     VoidCallback? onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -196,12 +207,15 @@ class DashboardEmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                // Semi-transparent white background for high contrast in dark mode
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.1)
+                    : color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: color,
+                color: color, // Neon accent
                 size: 32,
               ),
             ),
@@ -211,7 +225,7 @@ class DashboardEmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
+                color: isDark ? Colors.white : Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -220,7 +234,10 @@ class DashboardEmptyState extends StatelessWidget {
               description,
               style: TextStyle(
                 fontSize: 13,
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
+                // Lighter grey text for dark mode
+                color: isDark
+                    ? Colors.grey[400]
+                    : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
               ),
               textAlign: TextAlign.center,
             ),

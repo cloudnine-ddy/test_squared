@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
@@ -7,6 +8,7 @@ import '../data/progress_repository.dart';
 import '../models/topic_stats_model.dart';
 import '../../past_papers/data/past_paper_repository.dart';
 import '../../past_papers/models/topic_model.dart';
+import '../../past_papers/models/subject_model.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/mastery_badge.dart';
 import '../widgets/streak_indicator.dart';
@@ -22,12 +24,17 @@ class ProgressDashboardScreen extends StatefulWidget {
 class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
   final _progressRepo = ProgressRepository();
   final _paperRepo = PastPaperRepository();
-  
+
   bool _isLoading = true;
   Map<String, dynamic> _overallStats = {};
   List<TopicStatsModel> _topicStats = [];
   List<Map<String, dynamic>> _weakAreas = [];
   Map<String, TopicModel> _topicsMap = {};
+  Map<String, SubjectModel> _subjectsMap = {};
+  List<Map<String, dynamic>> _dailyStats = [];
+
+  int _calculatedCurrentStreak = 0;
+  int _calculatedLongestStreak = 0;
 
   @override
   void initState() {
@@ -48,26 +55,116 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
         _progressRepo.getUserTopicStats(userId),
         _progressRepo.getWeakAreas(userId),
         _loadAllTopics(),
+        _paperRepo.getSubjects(), // Fetch all subjects
+        _progressRepo.getDailyQuestionStats(userId: userId, days: 365), // Fetch year data for streak calc
       ]);
 
-      // Create topics map for quick lookup
+      // Create maps for quick lookup
       final topics = results[3] as List<TopicModel>;
       _topicsMap = {for (var topic in topics) topic.id: topic};
+
+      final subjects = results[4] as List<SubjectModel>;
+      _subjectsMap = {for (var subject in subjects) subject.id: subject};
+
+      final dailyStats = results[5] as List<Map<String, dynamic>>;
+      _calculateStreaks(dailyStats);
 
       if (mounted) {
         setState(() {
           _overallStats = results[0] as Map<String, dynamic>;
           _topicStats = results[1] as List<TopicStatsModel>;
           _weakAreas = results[2] as List<Map<String, dynamic>>;
+          _dailyStats = dailyStats;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ToastService.showError('Failed to load progress data');
+        // ToastService.showError('Failed to load progress data');
+        print('Error loading progress data: $e');
       }
     }
+  }
+
+  void _calculateStreaks(List<Map<String, dynamic>> stats) {
+    if (stats.isEmpty) {
+      _calculatedCurrentStreak = 0;
+      _calculatedLongestStreak = 0;
+      return;
+    }
+
+    // Sort by date ascending
+    stats.sort((a, b) => DateTime.parse(a['date']).compareTo(DateTime.parse(b['date'])));
+
+    // Create a set of dates where user was active
+    final activeDates = <String>{};
+    for (var stat in stats) {
+      if ((stat['questions_solved'] as int) > 0) {
+        activeDates.add(stat['date'].toString().split('T')[0]); // YYYY-MM-DD
+      }
+    }
+
+    if (activeDates.isEmpty) {
+      _calculatedCurrentStreak = 0;
+      _calculatedLongestStreak = 0;
+      return;
+    }
+
+    final today = DateTime.now();
+    final todayStr = today.toIso8601String().split('T')[0];
+    final yesterdayStr = today.subtract(const Duration(days: 1)).toIso8601String().split('T')[0];
+
+    // Calculate Current Streak
+    int current = 0;
+    // If active today, start checking from today. If not active today but active yesterday, start from yesterday.
+    DateTime checkDate = activeDates.contains(todayStr) ? today : today.subtract(const Duration(days: 1));
+
+    // Edge case: if not active today AND not active yesterday, streak is 0
+    if (!activeDates.contains(todayStr) && !activeDates.contains(yesterdayStr)) {
+      current = 0;
+    } else {
+      while (true) {
+        final dateStr = checkDate.toIso8601String().split('T')[0];
+        if (activeDates.contains(dateStr)) {
+          current++;
+          checkDate = checkDate.subtract(const Duration(days: 1));
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Calculate Longest Streak
+    int longest = 0;
+    int temp = 0;
+
+    // Need to iterate through all days in range to check for gaps
+    // Just iterating activeDates isn't enough because we need to know consecutive days
+    // But since activeDates are sorted if we parse them... better approach:
+    // Convert activeDates to List<DateTime> sorted
+    final sortedDates = activeDates.map((e) => DateTime.parse(e)).toList()
+      ..sort((a, b) => a.compareTo(b));
+
+    if (sortedDates.isNotEmpty) {
+      temp = 1;
+      longest = 1;
+      for (int i = 0; i < sortedDates.length - 1; i++) {
+        final d1 = sortedDates[i];
+        final d2 = sortedDates[i+1];
+        final diff = d2.difference(d1).inDays;
+
+        if (diff == 1) {
+          temp++;
+        } else {
+          temp = 1;
+        }
+        if (temp > longest) longest = temp;
+      }
+    }
+
+    _calculatedCurrentStreak = current;
+    _calculatedLongestStreak = longest;
   }
 
   Future<List<TopicModel>> _loadAllTopics() async {
@@ -75,71 +172,79 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
     final data = await Supabase.instance.client
         .from('topics')
         .select();
-    
+
     return (data as List).map((json) => TopicModel.fromMap(json)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('My Progress'),
-        backgroundColor: AppColors.sidebar,
+    // Force a light theme look specifically for this page
+    return Theme(
+      data: AppTheme.lightTheme.copyWith(
+        scaffoldBackgroundColor: const Color(0xFFFDFBF7), // Creamy/Beige background
+        appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFFFDFBF7),
+            elevation: 0,
+            iconTheme: IconThemeData(color: Colors.black87),
+            titleTextStyle: TextStyle(
+                color: Colors.black87,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+            ),
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Daily Progress Chart
-                    FutureBuilder<List<Map<String, dynamic>>>(
-                      future: _progressRepo.getDailyQuestionStats(
-                        userId: Supabase.instance.client.auth.currentUser!.id,
-                        days: 7,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFDFBF7),
+        appBar: AppBar(
+          title: const Text('My Progress'),
+          centerTitle: false,
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Daily Progress Chart
+                      // Use cached daily stats or fetch recently
+                      DailyProgressChart(
+                        dailyStats: _dailyStats, // Use stats fetched for streak
+                        daysToShow: 7,
                       ),
-                      builder: (context, snapshot) {
-                        final dailyStats = snapshot.data ?? [];
-                        return DailyProgressChart(
-                          dailyStats: dailyStats,
-                          daysToShow: 7,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Overall Stats Cards
-                    _buildOverallStats(),
-                    const SizedBox(height: 24),
-
-                    // Streak Indicator
-                    StreakIndicator(
-                      currentStreak: _overallStats['current_streak'] ?? 0,
-                      longestStreak: _overallStats['longest_streak'] ?? 0,
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Weak Areas Section
-                    if (_weakAreas.isNotEmpty) ...[
-                      _buildSectionHeader('Areas to Improve'),
-                      const SizedBox(height: 12),
-                      _buildWeakAreas(),
                       const SizedBox(height: 24),
-                    ],
 
-                    // Topic Mastery Grid
-                    _buildSectionHeader('Topic Mastery'),
-                    const SizedBox(height: 12),
-                    _buildTopicMasteryGrid(),
-                  ],
+                      // Overall Stats Cards
+                      _buildOverallStats(),
+                      const SizedBox(height: 24),
+
+                      // Streak Indicator
+                      StreakIndicator(
+                        currentStreak: _calculatedCurrentStreak,
+                        longestStreak: _calculatedLongestStreak,
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Weak Areas Section
+                      if (_weakAreas.isNotEmpty) ...[
+                        _buildSectionHeader('Areas to Improve'),
+                        const SizedBox(height: 16),
+                        _buildWeakAreas(),
+                        const SizedBox(height: 32),
+                      ],
+
+                      // Topic Mastery Grid
+                      _buildSectionHeader('Topic Mastery'),
+                      const SizedBox(height: 16),
+                      _buildTopicMasteryGrid(),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -160,7 +265,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
             subtitle: '$totalAttempts attempts',
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
           child: StatCard(
             icon: Icons.check_circle_outline,
@@ -170,7 +275,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
             subtitle: 'Overall',
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         Expanded(
           child: StatCard(
             icon: Icons.star_outline,
@@ -188,7 +293,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
     return Text(
       title,
       style: const TextStyle(
-        color: Colors.white,
+        color: Colors.black87,
         fontSize: 20,
         fontWeight: FontWeight.bold,
       ),
@@ -202,40 +307,76 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
         final accuracy = (area['accuracy'] as num?)?.toDouble() ?? 0.0;
         final attempts = area['total_attempts'] ?? 0;
 
+        // Find subject name
+        // Iterate topics map to find topic with this name ?? unsafe
+        // Better: weakAreas from RPC should ideally have topic_id.
+        // Let's check `getWeakAreas` implementation in Repo again.
+        // It casts result to Map<String, dynamic>. The RPC likely returns topic_id.
+        // I will assume topic_id is present.
+
+        String? subjectName;
+        String? topicId = area['topic_id']; // Try to get ID
+
+        if (topicId != null) {
+          final topic = _topicsMap[topicId];
+          if (topic != null) {
+            subjectName = _subjectsMap[topic.subjectId]?.name;
+          }
+        }
+
         return Container(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.sidebar,
+            color: const Color(0xFFEAE4D9).withValues(alpha: 0.3), // Light beige
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Colors.orange.withValues(alpha: 0.3),
+              color: Colors.black.withValues(alpha: 0.05),
             ),
           ),
           child: Row(
             children: [
-              Icon(
-                Icons.trending_down,
-                color: Colors.orange,
-                size: 24,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                    Icons.trending_down,
+                    color: Colors.orange,
+                    size: 20,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (subjectName != null)
+                      Text(
+                        subjectName.toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.black.withValues(alpha: 0.4),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     Text(
                       topicName,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: Colors.black87,
                         fontWeight: FontWeight.w600,
+                        fontSize: 16,
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       '$attempts attempts • ${accuracy.toStringAsFixed(1)}% accuracy',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 12,
+                        color: Colors.black.withValues(alpha: 0.6),
+                        fontSize: 13,
                       ),
                     ),
                   ],
@@ -243,9 +384,21 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // TODO: Navigate to practice mode for this topic
-                  ToastService.showInfo('Practice mode coming soon!');
+                  if (topicId != null) {
+                     context.push('/topic/$topicId');
+                  } else {
+                     ToastService.showInfo('Topic details unavailable');
+                  }
                 },
+                style: TextButton.styleFrom(
+                    foregroundColor: Colors.black87,
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
+                    ),
+                ),
                 child: const Text('Practice'),
               ),
             ],
@@ -257,10 +410,11 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
 
   Widget _buildTopicMasteryGrid() {
     if (_topicStats.isEmpty) {
-      return Container(
+      // ... Empty state code
+       return Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: AppColors.sidebar,
+          color: const Color(0xFFEAE4D9).withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Center(
@@ -269,13 +423,13 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
               Icon(
                 Icons.school_outlined,
                 size: 48,
-                color: Colors.white.withValues(alpha: 0.3),
+                color: Colors.black.withValues(alpha: 0.2),
               ),
               const SizedBox(height: 12),
               Text(
                 'Start practicing to see your progress!',
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: Colors.black.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -289,9 +443,9 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.1, // Adjusted for extra specific height
       ),
       itemCount: _topicStats.length,
       itemBuilder: (context, index) {
@@ -304,25 +458,53 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
   }
 
   Widget _buildTopicMasteryCard(TopicStatsModel stats, TopicModel? topic) {
+    SubjectModel? subject;
+    if (topic != null) {
+       subject = _subjectsMap[topic.subjectId];
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+             BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+            ),
+        ],
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: Colors.black.withValues(alpha: 0.05),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (subject != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                subject.name.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Text(
                   topic?.name ?? 'Unknown Topic',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black87,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -337,7 +519,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
           Text(
             '${stats.accuracyDisplay} accuracy',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.black.withValues(alpha: 0.7),
               fontSize: 12,
             ),
           ),
@@ -345,7 +527,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
           Text(
             '${stats.totalAttempts} attempts',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
+              color: Colors.black.withValues(alpha: 0.4),
               fontSize: 11,
             ),
           ),

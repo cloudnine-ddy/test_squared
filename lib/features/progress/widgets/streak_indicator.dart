@@ -16,33 +16,37 @@ class StreakIndicator extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [
-            Colors.orange.withValues(alpha: 0.2),
-            Colors.deepOrange.withValues(alpha: 0.1),
+            const Color(0xFFFFECD2), // Peach
+            const Color(0xFFFCB69F), // Orange
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
-        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.local_fire_department,
-              color: Colors.orange,
-              size: 32,
+              Icons.local_fire_department_rounded,
+              color: Colors.deepOrange,
+              size: 36,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,8 +54,9 @@ class StreakIndicator extends StatelessWidget {
                 Text(
                   'Study Streak',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
+                    color: Colors.black.withValues(alpha: 0.6),
                     fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -60,7 +65,7 @@ class StreakIndicator extends StatelessWidget {
                     Text(
                       '$currentStreak',
                       style: const TextStyle(
-                        color: Colors.orange,
+                        color: Color(0xFFE65100), // Deep Orange
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                       ),
@@ -69,8 +74,9 @@ class StreakIndicator extends StatelessWidget {
                     Text(
                       'day${currentStreak != 1 ? 's' : ''}',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 16,
+                        color: Colors.black.withValues(alpha: 0.7),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -80,44 +86,14 @@ class StreakIndicator extends StatelessWidget {
                   Text(
                     'Best: $longestStreak day${longestStreak != 1 ? 's' : ''}',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 12,
+                      color: Colors.black.withValues(alpha: 0.5),
+                      fontSize: 13,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          if (currentStreak > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.green.withValues(alpha: 0.4),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  const Text(
-                    'Active',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
