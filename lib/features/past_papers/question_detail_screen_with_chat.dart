@@ -8,10 +8,12 @@ import 'question_detail_screen.dart';
 /// Wrapper that adds split-screen layout with AI chat to question detail
 class QuestionDetailScreenWithChat extends ConsumerStatefulWidget {
   final String questionId;
+  final String? topicId;
 
   const QuestionDetailScreenWithChat({
     super.key,
     required this.questionId,
+    this.topicId,
   });
 
   @override
@@ -35,20 +37,26 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
         builder: (context, constraints) {
           // On narrow screens (mobile), don't show split
           final isNarrow = constraints.maxWidth < 900;
-          
+
           if (isNarrow) {
-            return QuestionDetailScreen(questionId: widget.questionId);
+            return QuestionDetailScreen(
+              questionId: widget.questionId,
+              topicId: widget.topicId,
+            );
           }
-          
+
           // Desktop: Split screen
           return Row(
             children: [
               // Left: Original question screen (60%)
               Expanded(
                 flex: _showChat ? 6 : 10,
-                child: QuestionDetailScreen(questionId: widget.questionId),
+                child: QuestionDetailScreen(
+                  questionId: widget.questionId,
+                  topicId: widget.topicId,
+                ),
               ),
-              
+
               // Right: AI Chat (40%)
               if (_showChat)
                 Expanded(

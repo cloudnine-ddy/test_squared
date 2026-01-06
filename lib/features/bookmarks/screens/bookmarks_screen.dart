@@ -85,10 +85,21 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : AppColors.background,
       appBar: AppBar(
-        title: const Text('Bookmarks'),
-        backgroundColor: AppColors.sidebar,
+        title: Text(
+          'Bookmarks',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : Colors.white,
+          ),
+        ),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.sidebar,
       ),
       body: Row(
         children: [
@@ -135,7 +146,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             Text(
               'No bookmarks in this folder',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.6),
                 fontSize: 16,
               ),
             ),
@@ -169,9 +182,19 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   Widget _buildQuestionCard(QuestionModel question, bool hasNote) {
     final isAI = question.type == 'ai_generated';
-    final cardColor = isAI ? const Color(0xFFF5F0E1) : AppColors.sidebar;
-    final textColor = isAI ? const Color(0xFF2D2D2D) : Colors.white;
-    final borderColor = isAI ? const Color(0xFFE8DCC8) : Colors.white.withValues(alpha: 0.1);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final cardColor = isAI
+        ? (isDark ? const Color(0xFFF5F0E1).withValues(alpha: 0.1) : const Color(0xFFF5F0E1))
+        : (isDark ? Theme.of(context).cardTheme.color : AppColors.sidebar);
+
+    final textColor = isAI
+        ? (isDark ? Colors.white : const Color(0xFF2D2D2D))
+        : (isDark ? Theme.of(context).colorScheme.onSurface : Colors.white);
+
+    final borderColor = isAI
+        ? (isDark ? Colors.transparent : const Color(0xFFE8DCC8))
+        : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.1));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -249,7 +272,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                       Icons.more_vert,
                       color: textColor.withValues(alpha: 0.6),
                     ),
-                    color: AppColors.sidebar,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).cardTheme.color
+                        : AppColors.sidebar,
                     itemBuilder: (context) => [
                       PopupMenuItem(
                         value: 'move',
@@ -327,13 +352,29 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     final newFolder = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.sidebar,
-        title: const Text('Move to folder', style: TextStyle(color: Colors.white)),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.sidebar,
+        title: Text(
+          'Move to folder',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : Colors.white,
+          )
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: _folders.map((folder) {
             return ListTile(
-              title: Text(folder, style: const TextStyle(color: Colors.white)),
+              title: Text(
+                folder,
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Colors.white,
+                )
+              ),
               onTap: () => Navigator.pop(context, folder),
             );
           }).toList(),
@@ -358,15 +399,32 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.sidebar,
-        title: const Text('New Folder', style: TextStyle(color: Colors.white)),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.sidebar,
+        title: Text(
+          'New Folder',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : Colors.white,
+          )
+        ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Folder name',
-            hintStyle: TextStyle(color: Colors.white54),
+            hintStyle: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                  : Colors.white54,
+            ),
           ),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : Colors.white,
+          ),
           autofocus: true,
         ),
         actions: [

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
@@ -12,21 +13,21 @@ import '../auth/services/auth_service.dart';
 import 'subject_detail_view.dart';
 import 'widgets/dashboard_empty_state.dart';
 
-class DashboardScreen extends StatefulWidget {
+class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
 
   @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
+  ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _selectedCurriculum = 'SPM';
   int? _selectedSubjectIndex;
   String? _selectedSubjectName; // Nullable, initialized to null
   String? _selectedSubjectId; // Store subject ID for filtering
   List<SubjectModel> _pinnedSubjects = [];
   bool _isLoadingPinnedSubjects = false;
-  
+
   final List<String> _curriculums = [
     'SPM',
     'IGCSE (Coming Soon)',
@@ -61,18 +62,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Test² Dashboard'),
-      ),
       body: Row(
         children: [
           // Custom Sidebar
           Container(
             width: 260,
             decoration: BoxDecoration(
-              color: AppColors.sidebar,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).navigationRailTheme.backgroundColor
+                  : AppColors.sidebar,
               border: Border(
-                right: BorderSide(color: AppColors.border, width: 1),
+                right: BorderSide(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).dividerColor
+                      : AppColors.border,
+                  width: 1,
+                ),
               ),
             ),
             child: Column(
@@ -89,7 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                          color: Theme.of(context).primaryColor,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -99,20 +104,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        color: AppColors.surface,
+                        color: Theme.of(context).cardTheme.color,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               _selectedCurriculum,
                               style: TextStyle(
-                                color: AppColors.textPrimary,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 14,
                               ),
                             ),
                             Icon(
                               Icons.keyboard_arrow_down,
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               size: 20,
                             ),
                           ],
@@ -124,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Text(
                                 curriculum,
                                 style: TextStyle(
-                                  color: AppColors.textPrimary,
+                                  color: Theme.of(context).colorScheme.onSurface,
                                   fontSize: 14,
                                 ),
                               ),
@@ -170,7 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
                 // Divider
                 Divider(
-                  color: AppColors.divider,
+                  color: Theme.of(context).dividerColor,
                   thickness: 1,
                   height: 1,
                 ),
@@ -185,7 +190,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                            : AppColors.textPrimary.withValues(alpha: 0.6),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -238,12 +245,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: isSelected
-                                              ? AppColors.primary.withValues(alpha: 0.1)
+                                              ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
                                               : Colors.transparent,
                                           borderRadius: BorderRadius.circular(8),
                                           border: Border.all(
                                             color: isSelected
-                                                ? AppColors.primary
+                                                ? Theme.of(context).primaryColor
                                                 : Colors.transparent,
                                             width: 1,
                                           ),
@@ -252,8 +259,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           subject.name,
                                           style: TextStyle(
                                             color: isSelected
-                                                ? AppColors.primary
-                                                : AppColors.textPrimary,
+                                                ? Theme.of(context).primaryColor
+                                                : Theme.of(context).colorScheme.onSurface,
                                             fontWeight: isSelected
                                                 ? FontWeight.w600
                                                 : FontWeight.normal,
@@ -304,8 +311,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              AppColors.primary,
-                              AppColors.accent,
+                              Theme.of(context).primaryColor,
+                              Theme.of(context).colorScheme.secondary,
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -350,7 +357,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
                       Divider(
-                        color: AppColors.divider,
+                        color: Theme.of(context).dividerColor,
                         thickness: 1,
                         height: 1,
                       ),
@@ -362,12 +369,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           final userName = user?.userMetadata?['full_name'] as String? ?? 'Student';
                           final userEmail = user?.email ?? 'No email';
                           final avatarText = userName.isNotEmpty ? userName[0].toUpperCase() : 'S';
-                          
+
                           return Row(
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundColor: AppColors.primary,
+                                backgroundColor: Theme.of(context).primaryColor,
                                 child: Text(
                                   avatarText,
                                   style: const TextStyle(
@@ -386,7 +393,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     Text(
                                       userName,
                                       style: TextStyle(
-                                        color: AppColors.textPrimary,
+                                        color: Theme.of(context).brightness == Brightness.dark
+                                            ? Theme.of(context).colorScheme.onSurface
+                                            : AppColors.textPrimary,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -395,7 +404,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     Text(
                                       userEmail,
                                       style: TextStyle(
-                                        color: AppColors.textSecondary,
+                                        color: Theme.of(context).brightness == Brightness.dark
+                                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                                            : AppColors.textPrimary.withValues(alpha: 0.6),
                                         fontSize: 12,
                                       ),
                                       overflow: TextOverflow.ellipsis,
@@ -406,81 +417,79 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           PopupMenuButton<String>(
                             icon: Icon(
                               Icons.settings,
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               size: 20,
                             ),
-                            color: AppColors.surface,
+                            color: Theme.of(context).cardTheme.color,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'theme',
-                                child: Consumer<ThemeProvider>(
-                                  builder: (context, themeProvider, _) => Row(
+                                PopupMenuItem(
+                                  value: 'theme',
+                                  child: Row(
                                     children: [
                                       Icon(
-                                        themeProvider.isDarkMode 
-                                            ? Icons.light_mode 
+                                        ref.watch(themeModeProvider) == ThemeMode.dark
+                                            ? Icons.light_mode
                                             : Icons.dark_mode,
-                                        color: AppColors.textPrimary,
+                                        color: Theme.of(context).colorScheme.onSurface,
                                         size: 20,
                                       ),
                                       const SizedBox(width: 12),
                                       Text(
-                                        themeProvider.isDarkMode 
-                                            ? 'Light Mode' 
+                                        ref.watch(themeModeProvider) == ThemeMode.dark
+                                            ? 'Light Mode'
                                             : 'Dark Mode',
                                         style: TextStyle(
-                                          color: AppColors.textPrimary,
+                                          color: Theme.of(context).colorScheme.onSurface,
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'accessibility',
                                 child: Row(
                                   children: [
-                                    Icon(
-                                      Icons.accessibility_new,
-                                      color: AppColors.textPrimary,
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 12),
-                                    Text(
-                                      'Accessibility',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
+                                      Icon(
+                                        Icons.accessibility_new,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                        size: 20,
                                       ),
-                                    ),
+                                    const SizedBox(width: 12),
+                                      Text(
+                                        'Accessibility',
+                                        style: TextStyle(
+                                          color: Theme.of(context).colorScheme.onSurface,
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'logout',
                                 child: Row(
                                   children: [
-                                    Icon(
-                                      Icons.logout,
-                                      color: AppColors.textPrimary,
-                                      size: 20,
-                                    ),
-                                    SizedBox(width: 12),
-                                    Text(
-                                      'Logout',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary,
+                                      Icon(
+                                        Icons.logout,
+                                        color: Theme.of(context).colorScheme.onSurface,
+                                        size: 20,
                                       ),
-                                    ),
+                                    const SizedBox(width: 12),
+                                      Text(
+                                        'Logout',
+                                        style: TextStyle(
+                                          color: Theme.of(context).colorScheme.onSurface,
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
                             ],
                             onSelected: (value) async {
                               if (value == 'theme') {
-                                Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+                                ref.read(themeModeProvider.notifier).toggleTheme();
                               } else if (value == 'accessibility') {
                                 context.push('/settings/accessibility');
                               } else if (value == 'logout') {
@@ -501,21 +510,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
-          // Vertical Divider
-          Container(
-            width: 1,
-            color: AppColors.divider,
-          ),
+
           // Main Content Area
           Expanded(
-            child: _selectedSubjectName != null && _selectedSubjectId != null
-                ? SubjectDetailView(
-                    subjectName: _selectedSubjectName!,
-                    subjectId: _selectedSubjectId!,
-                    isPinned: _pinnedSubjects.any((s) => s.id == _selectedSubjectId),
-                    onPinChanged: () => _loadPinnedSubjects(),
-                  )
-                : _buildEmptyState(),
+            child: Column(
+              children: [
+                // Custom Header
+                Container(
+                  height: 60,
+                  alignment: Alignment.center,
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  child: Text(
+                    'Test² Dashboard',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+                // Content
+                Expanded(
+                  child: _selectedSubjectName != null && _selectedSubjectId != null
+                      ? SubjectDetailView(
+                          subjectName: _selectedSubjectName!,
+                          subjectId: _selectedSubjectId!,
+                          isPinned: _pinnedSubjects.any((s) => s.id == _selectedSubjectId),
+                          onPinChanged: () => _loadPinnedSubjects(),
+                        )
+                      : _buildEmptyState(),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -538,7 +566,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              backgroundColor: AppColors.surface,
+              backgroundColor: Theme.of(context).cardTheme.color,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -565,19 +593,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       controller: searchController,
                       decoration: InputDecoration(
                         hintText: 'Search for Biology, History...',
-                        hintStyle: TextStyle(color: AppColors.textSecondary),
+                        hintStyle: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                              : AppColors.textSecondary,
+                        ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
+                              : AppColors.textSecondary,
                         ),
                         filled: true,
-                        fillColor: AppColors.background,
+                        fillColor: Theme.of(context).brightness == Brightness.dark
+                             ? Theme.of(context).scaffoldBackgroundColor
+                             : AppColors.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
+                          borderSide: Theme.of(context).brightness == Brightness.dark
+                              ? BorderSide.none
+                              : const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: Theme.of(context).brightness == Brightness.dark
+                              ? BorderSide.none
+                              : const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: Theme.of(context).brightness == Brightness.dark
+                              ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+                              : const BorderSide(color: AppColors.primary, width: 2),
                         ),
                       ),
-                      style: TextStyle(color: AppColors.textPrimary),
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface
+                            : AppColors.textPrimary,
+                      ),
                       onChanged: (value) {
                         setDialogState(() {
                           searchQuery = value;
@@ -609,13 +663,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           // Error State
                           if (snapshot.hasError) {
-                            return const Center(
+                            return Center(
                               child: Padding(
                                 padding: EdgeInsets.all(32.0),
                                 child: Text(
                                   'Failed to load subjects',
                                   style: TextStyle(
-                                    color: AppColors.textPrimary,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -624,13 +678,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                           // Empty State
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                            return const Center(
+                            return Center(
                               child: Padding(
                                 padding: EdgeInsets.all(32.0),
                                 child: Text(
                                   'No subjects found',
                                   style: TextStyle(
-                                    color: AppColors.textPrimary,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -647,13 +701,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       .contains(searchQuery.toLowerCase())).toList();
 
                           if (filteredSubjects.isEmpty) {
-                            return const Center(
+                            return Center(
                               child: Padding(
                                 padding: EdgeInsets.all(32.0),
                                 child: Text(
                                   'No subjects match your search',
                                   style: TextStyle(
-                                    color: AppColors.textPrimary,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                               ),
@@ -669,7 +723,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 title: Text(
                                   subject.name,
                                   style: TextStyle(
-                                    color: AppColors.textPrimary,
+                                    color: Theme.of(context).colorScheme.onSurface,
                                   ),
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -689,9 +743,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 _selectedSubjectIndex = null;
                               }
                             });
-                            
+
                             Navigator.of(context).pop();
-                            
+
                             // Check if subject has topics and show warning if empty
                             try {
                               final topics = await PastPaperRepository().getTopics(subjectId: subject.id);
@@ -730,20 +784,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.2),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.2)
+              : AppColors.accent.withValues(alpha: 0.2),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: AppColors.accent.withValues(alpha: 0.3),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3)
+                : AppColors.accent.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.primary, size: 20),
+            Icon(
+              icon,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onSurface
+                  : AppColors.primary,
+              size: 20
+            ),
             const SizedBox(width: 12),
             Text(
               label,
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),

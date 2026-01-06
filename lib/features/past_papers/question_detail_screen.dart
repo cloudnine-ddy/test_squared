@@ -24,10 +24,12 @@ import '../../core/services/access_control_service.dart';
 /// Full-page question detail view with figure and answer reveals
 class QuestionDetailScreen extends ConsumerStatefulWidget {
   final String questionId;
+  final String? topicId; // Context for navigation
 
   const QuestionDetailScreen({
     super.key,
     required this.questionId,
+    this.topicId,
   });
 
   @override
@@ -44,6 +46,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   bool _isCheckingAnswer = false;
   late TabController _tabController;
   String? _selectedMcqAnswer; // For MCQ questions: 'A', 'B', 'C', or 'D'
+
+  // Navigation
+  String? _prevQuestionId;
+  String? _nextQuestionId;
 
   // Draggable Note State
   bool _isNoteOpen = false;
@@ -101,9 +107,37 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
   Future<void> _loadQuestion() async {
     final question = await PastPaperRepository().getQuestionById(widget.questionId);
+
+    // Fetch adjacent questions with context priority
+    String? prevId;
+    String? nextId;
+
+    if (question != null) {
+      if (widget.topicId != null) {
+        // Topic Context - Respect Question Type
+        final adjacent = await PastPaperRepository().getAdjacentIdsForTopic(
+          widget.topicId!,
+          widget.questionId,
+          type: question.type, // Maintain type consistency (mcq vs structured)
+        );
+        prevId = adjacent['prev'];
+        nextId = adjacent['next'];
+      } else if (question.paperId != null) {
+        // Paper Context (Default)
+        final adjacent = await PastPaperRepository().getAdjacentQuestionIds(
+          question.paperId!,
+          question.questionNumber
+        );
+        prevId = adjacent['prev'];
+        nextId = adjacent['next'];
+      }
+    }
+
     if (mounted) {
       setState(() {
         _question = question;
+        _prevQuestionId = prevId;
+        _nextQuestionId = nextId;
         _isLoading = false;
       });
     }
@@ -316,6 +350,32 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     }
   }
 
+  Future<void> _checkMcqAnswer() async {
+    if (_question == null || _selectedMcqAnswer == null) return;
+
+    final isCorrect = _selectedMcqAnswer == _question!.effectiveCorrectAnswer;
+
+    setState(() {
+      _aiFeedback = {
+        'isCorrect': isCorrect,
+        'is_correct': isCorrect, // For repository compatibility
+        'score': isCorrect ? 100 : 0,
+        'feedback': isCorrect
+            ? 'Correct! Well done.'
+            : 'Incorrect. The correct answer is ${_question!.effectiveCorrectAnswer}.',
+        'strengths': isCorrect ? ['Selected the correct option'] : [],
+        'hints': [],
+        'improvements': [],
+      };
+      _answerSubmitted = true;
+    });
+
+    await _recordAttempt();
+
+    // Refresh topic screen when returning
+    // (Optional: trigger any listeners if needed)
+  }
+
   void _showAnswerSheet() {
     if (_question == null) return;
 
@@ -468,7 +528,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.background,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -500,7 +562,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
     if (_question == null) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.background,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -515,7 +579,107 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : AppColors.background,
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).cardTheme.color
+              : AppColors.surface, // Ensure it matches the dark theme surface
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).dividerColor
+                  : AppColors.border.withValues(alpha: 0.5),
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Row(
+            children: [
+              // Previous Button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _prevQuestionId == null ? null : () {
+                     final uri = Uri(
+                       path: '/question/$_prevQuestionId',
+                       queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
+                     );
+                     context.pushReplacement(uri.toString());
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  label: const Text('Previous'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).cardTheme.color
+                        : AppColors.surface,
+                    foregroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.onSurface
+                        : AppColors.textPrimary,
+                    disabledBackgroundColor: Theme.of(context).brightness == Brightness.dark
+                        ? (Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface).withValues(alpha: 0.5)
+                        : AppColors.surface.withValues(alpha: 0.5),
+                    disabledForegroundColor: AppColors.textSecondary.withValues(alpha: 0.3),
+                    elevation: 0,
+                    side: BorderSide(color: _prevQuestionId == null ? Colors.transparent : AppColors.border),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Next Button
+              Expanded(
+                child: Directionality(
+                  textDirection: TextDirection.rtl, // To put icon on right
+                  child: ElevatedButton.icon(
+                    onPressed: _nextQuestionId == null
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('You have reached the end of this topic.'),
+                                duration: Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        : () {
+                           final uri = Uri(
+                             path: '/question/$_nextQuestionId',
+                             queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
+                           );
+                           context.pushReplacement(uri.toString());
+                        },
+                    icon: Icon(
+                      _nextQuestionId == null ? Icons.check_circle_outline : Icons.arrow_back_rounded,
+                      size: 18
+                    ),
+                    label: Text(_nextQuestionId == null ? 'Completed' : 'Next'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _nextQuestionId == null ? AppColors.surface : AppColors.primary,
+                      foregroundColor: _nextQuestionId == null ? AppColors.textSecondary : Colors.white,
+                      elevation: 0,
+                      side: _nextQuestionId == null ? const BorderSide(color: AppColors.border) : BorderSide.none,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ),
+
+            ],
+          ),
+        ),
+      ),
       body: Stack(
         children: [
           // Background gradient
@@ -559,7 +723,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             slivers: [
               // Simple App Bar (no figure)
               SliverAppBar(
-                backgroundColor: AppColors.background,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).scaffoldBackgroundColor
+                    : AppColors.background,
                 floating: false,
                 pinned: true,
                 elevation: 0,
@@ -575,11 +741,23 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     },
                     child: Container(
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).cardTheme.color
+                            : AppColors.surface,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).dividerColor
+                              : Colors.white.withValues(alpha: 0.1),
+                        ),
                       ),
-                      child: const Icon(Icons.arrow_back_ios_new, color: AppColors.textSecondary, size: 18),
+                      child: Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface
+                            : AppColors.textSecondary,
+                        size: 18
+                      ),
                     ),
                   ),
                 ),
@@ -716,9 +894,16 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   child: Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: AppColors.surface,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).cardTheme.color
+                          : AppColors.surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border, width: 1),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).dividerColor
+                            : AppColors.border,
+                        width: 1
+                      ),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.shadow.withValues(alpha: 0.1),
@@ -771,6 +956,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         FormattedQuestionText(
                           content: _question!.content,
                           fontSize: 16,
+                          textColor: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface
+                              : AppColors.textPrimary,
                         ),
                       ],
                     ),
@@ -822,7 +1010,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                   Text(
                                     'Figure',
                                     style: TextStyle(
-                                      color: AppColors.textPrimary.withValues(alpha: 0.7),
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                                          : AppColors.textPrimary.withValues(alpha: 0.7),
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -910,9 +1100,16 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   Widget _buildTabbedCard() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border, width: 1),
+        border: Border.all(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).dividerColor
+              : AppColors.border,
+          width: 1
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.shadow.withValues(alpha: 0.1),
@@ -933,8 +1130,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               controller: _tabController,
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
-              labelColor: AppColors.textPrimary,
-              unselectedLabelColor: AppColors.textSecondary,
+              labelColor: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onSurface
+                  : AppColors.textPrimary,
+              unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                  : AppColors.textSecondary,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
               dividerColor: Colors.transparent,
@@ -1053,19 +1254,23 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                           : isWrong
                               ? Colors.red.withValues(alpha: 0.2)
                               : isSelected
-                                  ? AppColors.primary.withValues(alpha: 0.15)
-                                  : AppColors.background,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isCorrect
-                            ? Colors.green
-                            : isWrong
-                                ? Colors.red
-                                : isSelected
-                                    ? Colors.blue
-                                    : Colors.white.withValues(alpha: 0.1),
-                        width: isSelected || isCorrect || isWrong ? 2 : 1,
-                      ),
+                                    ? AppColors.primary.withValues(alpha: 0.15)
+                                    : Theme.of(context).brightness == Brightness.dark
+                                        ? Colors.white.withValues(alpha: 0.05) // Distinct surface for options
+                                        : AppColors.background,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isCorrect
+                              ? Colors.green
+                              : isWrong
+                                  ? Colors.red
+                                  : isSelected
+                                      ? Colors.blue
+                                      : Theme.of(context).brightness == Brightness.dark
+                                          ? Colors.white.withValues(alpha: 0.1) // Subtle border
+                                          : Colors.white.withValues(alpha: 0.1),
+                          width: isSelected || isCorrect || isWrong ? 2 : 1,
+                        ),
                     ),
                     child: Row(
                       children: [
@@ -1078,7 +1283,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                 : isWrong
                                     ? Colors.red
                                     : isSelected
-                                        ? Colors.blue
+                                    ? Colors.blue
+                                    : Theme.of(context).brightness == Brightness.dark
+                                        ? Colors.white.withValues(alpha: 0.1)
                                         : Colors.white.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(18),
                           ),
@@ -1090,7 +1297,11 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                     : Text(
                                         option['label'] ?? '',
                                         style: TextStyle(
-                                          color: isSelected ? Colors.white : AppColors.textSecondary,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : (Theme.of(context).brightness == Brightness.dark
+                                                  ? Colors.white.withValues(alpha: 0.9)
+                                                  : AppColors.textSecondary),
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
                                         ),
@@ -1102,7 +1313,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                           child: Text(
                             option['text'] ?? '',
                             style: TextStyle(
-                              color: AppColors.textPrimary.withValues(alpha: 0.9),
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9)
+                                  : AppColors.textPrimary.withValues(alpha: 0.9),
                               fontSize: 15,
                             ),
                           ),
@@ -1122,9 +1335,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     onPressed: (_answerSubmitted || _selectedMcqAnswer == null)
                         ? null
                         : () {
-                            setState(() {
-                              _answerSubmitted = true;
-                            });
+                            _checkMcqAnswer();
                           },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
@@ -1168,19 +1379,40 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               controller: _studentAnswerController,
               maxLines: 5,
               enabled: !_answerSubmitted && !_isCheckingAnswer,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 15),
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textPrimary,
+                fontSize: 15
+              ),
               decoration: InputDecoration(
                 hintText: 'Type your answer here...',
-                hintStyle: TextStyle(color: AppColors.textSecondary),
+                hintStyle: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                      : AppColors.textSecondary
+                ),
                 filled: true,
-                fillColor: AppColors.background,
+                fillColor: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).scaffoldBackgroundColor
+                    : AppColors.background,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.border, width: 1.5),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).dividerColor
+                        : AppColors.border,
+                    width: 1.5
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.border, width: 1.5),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).dividerColor
+                        : AppColors.border,
+                    width: 1.5
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),

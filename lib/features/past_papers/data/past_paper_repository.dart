@@ -10,7 +10,7 @@ class PastPaperRepository {
   Future<List<TopicModel>> getTopics({required String subjectId}) async {
     try {
       print('DEBUG getTopics: Starting for subjectId=$subjectId');
-      
+
       // Fetch topics for this subject
       final topicsResponse = await _supabase
           .from('topics')
@@ -130,6 +130,20 @@ class PastPaperRepository {
         }
       }
 
+      // Sort by Year (Desc), Season (Asc), Number (Asc)
+      questions.sort((a, b) {
+        // Year Descending
+        int yearCompare = (b.paperYear ?? 0).compareTo(a.paperYear ?? 0);
+        if (yearCompare != 0) return yearCompare;
+
+        // Season Ascending (e.g. 's' < 'w')
+        int seasonCompare = (a.paperSeason ?? '').compareTo(b.paperSeason ?? '');
+        if (seasonCompare != 0) return seasonCompare;
+
+        // Number Ascending
+        return a.questionNumber.compareTo(b.questionNumber);
+      });
+
       return questions;
     } catch (e, stackTrace) {
       print('ERROR in getQuestionsByTopic: $e');
@@ -138,10 +152,115 @@ class PastPaperRepository {
     }
   }
 
+  /// Get IDs of the previous and next questions in the same paper
+  Future<Map<String, String?>> getAdjacentQuestionIds(String paperId, int currentNumber) async {
+    try {
+      String? prevId;
+      String? nextId;
+
+      // Get Previous
+      final prevResponse = await _supabase
+          .from('questions')
+          .select('id')
+          .eq('paper_id', paperId)
+          .lt('question_number', currentNumber)
+          .order('question_number', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (prevResponse != null) {
+        prevId = prevResponse['id']?.toString();
+      }
+
+      // Get Next
+      final nextResponse = await _supabase
+          .from('questions')
+          .select('id')
+          .eq('paper_id', paperId)
+          .gt('question_number', currentNumber)
+          .order('question_number', ascending: true)
+          .limit(1)
+          .maybeSingle();
+
+      if (nextResponse != null) {
+        nextId = nextResponse['id']?.toString();
+      }
+
+      return {'prev': prevId, 'next': nextId};
+    } catch (e) {
+      print('ERROR in getAdjacentQuestionIds: $e');
+      return {'prev': null, 'next': null};
+    }
+  }
+
+  /// Get IDs (prev/next) within the context of a Topic
+  /// Fetches all IDs for the topic to determine order.
+  Future<Map<String, String?>> getAdjacentIdsForTopic(String topicId, String currentQuestionId, {String? type}) async {
+    try {
+      // Fetch all IDs for this topic + sort info
+      var query = _supabase
+          .from('questions')
+          .select('id, question_number, papers(year, season)')
+          .contains('topic_ids', [topicId]);
+
+      if (type != null) {
+        query = query.eq('type', type);
+      }
+
+      final response = await query;
+
+      final List<dynamic> data = response as List<dynamic>;
+
+      // Sort in Dart to match getQuestionsByTopic (Year Desc, Season Asc, Number Asc)
+      data.sort((a, b) {
+        final mapA = a as Map<String, dynamic>;
+        final mapB = b as Map<String, dynamic>;
+
+        final paperA = mapA['papers'] as Map<String, dynamic>?;
+        final paperB = mapB['papers'] as Map<String, dynamic>?;
+
+        final yearA = paperA?['year'] as int? ?? 0;
+        final yearB = paperB?['year'] as int? ?? 0;
+
+        // Year Descending
+        int yearCompare = yearB.compareTo(yearA);
+        if (yearCompare != 0) return yearCompare;
+
+        final seasonA = paperA?['season']?.toString() ?? '';
+        final seasonB = paperB?['season']?.toString() ?? '';
+
+        // Season Ascending
+        int seasonCompare = seasonA.compareTo(seasonB);
+        if (seasonCompare != 0) return seasonCompare;
+
+        final numA = mapA['question_number'] as int? ?? 0;
+        final numB = mapB['question_number'] as int? ?? 0;
+
+        // Number Ascending
+        return numA.compareTo(numB);
+      });
+
+      final ids = data.map((e) => e['id'].toString()).toList();
+
+      final currentIndex = ids.indexOf(currentQuestionId);
+      if (currentIndex == -1) {
+        return {'prev': null, 'next': null};
+      }
+
+      final prevId = currentIndex > 0 ? ids[currentIndex - 1] : null;
+      final nextId = currentIndex < ids.length - 1 ? ids[currentIndex + 1] : null;
+
+      return {'prev': prevId, 'next': nextId};
+    } catch (e) {
+      print('ERROR in getAdjacentIdsForTopic: $e');
+      return {'prev': null, 'next': null};
+    }
+  }
+
   Future<List<SubjectModel>> getSubjects({String? curriculum}) async {
     try {
       dynamic response;
-      
+
       if (curriculum != null) {
         response = await _supabase
             .from('subjects')
@@ -211,7 +330,7 @@ class PastPaperRepository {
           .single();
 
       final List<dynamic> pinnedIds = profileResponse['pinned_subject_ids'] ?? [];
-      
+
       if (pinnedIds.isEmpty) {
         return [];
       }
@@ -223,7 +342,7 @@ class PastPaperRepository {
           .inFilter('id', pinnedIds.map((e) => e.toString()).toList());
 
       final List<dynamic> data = subjectsResponse as List<dynamic>;
-      
+
       final subjects = <SubjectModel>[];
       for (var item in data) {
         try {
@@ -263,7 +382,7 @@ class PastPaperRepository {
       // Add if not already pinned
       if (!pinnedIds.contains(subjectId)) {
         pinnedIds.add(subjectId);
-        
+
         await _supabase
             .from('profiles')
             .update({'pinned_subject_ids': pinnedIds})
@@ -295,7 +414,7 @@ class PastPaperRepository {
 
       // Remove the subject ID
       pinnedIds.remove(subjectId);
-      
+
       await _supabase
           .from('profiles')
           .update({'pinned_subject_ids': pinnedIds})

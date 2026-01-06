@@ -248,6 +248,8 @@ class _AdminShellState extends State<AdminShell> {
                 Divider(color: Colors.white.withValues(alpha: 0.1)),
                 const SizedBox(height: 8),
                 // Theme toggle button
+                /*
+                // Theme toggle disabled during refactor
                 Consumer<ThemeProvider>(
                   builder: (context, themeProvider, _) => _buildFooterButton(
                     icon: themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
@@ -255,6 +257,7 @@ class _AdminShellState extends State<AdminShell> {
                     onTap: () => themeProvider.toggleTheme(),
                   ),
                 ),
+                */
                 const SizedBox(height: 4),
                 _buildLogoutButton(),
               ],

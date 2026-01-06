@@ -51,7 +51,9 @@ class ChatMessage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: isAI
-                    ? const Color(0xFFE8DCC8) // Light tan for AI
+                    ? (Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).cardTheme.color
+                        : const Color(0xFFE8DCC8))
                     : AppColors.primary, // Navy for user
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(isAI ? 4 : 16),
@@ -66,6 +68,9 @@ class ChatMessage extends StatelessWidget {
                     offset: const Offset(0, 2),
                   ),
                 ],
+                border: Theme.of(context).brightness == Brightness.dark
+                    ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
+                    : null,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,12 +79,16 @@ class ChatMessage extends StatelessWidget {
                     data: message,
                     styleSheet: MarkdownStyleSheet(
                       p: TextStyle(
-                        color: isAI ? AppColors.textPrimary : Colors.white,
+                        color: isAI
+                            ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary)
+                            : Colors.white,
                         fontSize: 14,
                         height: 1.5,
                       ),
                       strong: TextStyle(
-                        color: isAI ? AppColors.textPrimary : Colors.white,
+                        color: isAI
+                            ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary)
+                            : Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -93,7 +102,9 @@ class ChatMessage extends StatelessWidget {
                     _formatTime(timestamp),
                     style: TextStyle(
                       color: isAI
-                          ? AppColors.textSecondary.withValues(alpha: 0.6)
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.5)
+                              : AppColors.textSecondary.withValues(alpha: 0.6))
                           : Colors.white.withValues(alpha: 0.7),
                       fontSize: 11,
                     ),
@@ -184,13 +195,18 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8DCC8),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).cardTheme.color
+                  : const Color(0xFFE8DCC8),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(4),
                 topRight: Radius.circular(16),
                 bottomLeft: Radius.circular(16),
                 bottomRight: Radius.circular(16),
               ),
+              border: Theme.of(context).brightness == Brightness.dark
+                  ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
+                  : null,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -210,7 +226,9 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: AppColors.textSecondary,
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : AppColors.textSecondary,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),

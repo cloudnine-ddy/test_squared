@@ -138,9 +138,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.sidebar,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).appBarTheme.backgroundColor
+            : AppColors.sidebar,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
@@ -151,9 +155,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
             }
           },
         ),
-        title: const Text(
+        title: Text(
           'Questions',
-          style: TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : AppColors.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.bold
+          ),
         ),
         centerTitle: false,
       ),
@@ -174,9 +184,15 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
   Widget _buildModernFilterBar() {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.sidebar,
         border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+          bottom: BorderSide(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).dividerColor
+                : Colors.white.withValues(alpha: 0.1),
+          ),
         ),
       ),
       child: Column(
@@ -191,11 +207,25 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
                   flex: 2,
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(color: AppColors.textPrimary),
+                    style: TextStyle(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : AppColors.textPrimary,
+                    ),
                     decoration: InputDecoration(
                       hintText: 'Search questions...',
-                      hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.5)),
-                      prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.7), size: 20),
+                      hintStyle: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                            : AppColors.textPrimary.withValues(alpha: 0.5),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                            : Colors.white.withValues(alpha: 0.7),
+                        size: 20
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, color: Colors.white54, size: 20),
@@ -208,14 +238,24 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
                             )
                           : null,
                       filled: true,
-                      fillColor: AppColors.surface,
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).scaffoldBackgroundColor
+                          : AppColors.surface,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.border),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).dividerColor
+                              : AppColors.border,
+                        ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.border),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).dividerColor
+                              : AppColors.border,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -236,16 +276,35 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).cardTheme.color
+                        : AppColors.surface,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).dividerColor
+                          : AppColors.border,
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _marksFilter,
-                      icon: Icon(Icons.arrow_drop_down, color: AppColors.textPrimary, size: 20),
-                      style: TextStyle(color: AppColors.textPrimary, fontSize: 14),
-                      dropdownColor: AppColors.surface,
+                      icon: Icon(
+                        Icons.arrow_drop_down,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface
+                            : AppColors.textPrimary,
+                        size: 20
+                      ),
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface
+                            : AppColors.textPrimary,
+                        fontSize: 14
+                      ),
+                      dropdownColor: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).cardTheme.color
+                          : AppColors.surface,
                       isDense: true,
                       items: [
                         DropdownMenuItem(value: 'all', child: Row(
@@ -274,7 +333,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).cardTheme.color
+                  : AppColors.surface,
               borderRadius: BorderRadius.circular(12),
             ),
             child: TabBar(
@@ -286,7 +347,9 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
               indicatorSize: TabBarIndicatorSize.tab,
               indicatorPadding: const EdgeInsets.all(4),
               labelColor: Colors.white,
-              unselectedLabelColor: AppColors.textSecondary,
+              unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
+                  : AppColors.textSecondary,
               labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
               dividerColor: Colors.transparent,
@@ -333,11 +396,22 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.quiz_outlined, color: Colors.white24, size: 64),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.quiz_outlined, color: AppColors.primary, size: 48),
+            ),
             const SizedBox(height: 16),
             Text(
               'No questions found for this topic',
-              style: TextStyle(color: Colors.white54, fontSize: 16),
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -361,19 +435,30 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              type == 'mcq' ? Icons.quiz_outlined : Icons.edit_document,
-              color: Colors.white24,
-              size: 64,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                type == 'mcq' ? Icons.quiz_outlined : Icons.edit_document,
+                color: AppColors.primary,
+                size: 48,
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               'No $typeName questions found',
-              style: TextStyle(color: Colors.white54, fontSize: 16),
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             if (_searchQuery.isNotEmpty || _marksFilter != 'all') ...[
               const SizedBox(height: 12),
-              TextButton(
+              TextButton.icon(
                 onPressed: () {
                   _searchController.clear();
                   setState(() {
@@ -381,7 +466,11 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
                     _marksFilter = 'all';
                   });
                 },
-                child: const Text('Clear filters'),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Clear filters'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                ),
               ),
             ],
           ],
@@ -410,11 +499,13 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
             question: question,
             paperName: paperName,
             latestAttempt: latestAttempt,
+            topicId: widget.topicId,
           );
         } else {
           return QuestionCard(
             question: question,
             latestAttempt: latestAttempt,
+            topicId: widget.topicId,
             onReturn: _loadQuestions, // Refresh when returning from detail
           );
         }

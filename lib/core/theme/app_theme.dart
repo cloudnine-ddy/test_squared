@@ -31,7 +31,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
-      
+
       // AppBar Theme
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
@@ -42,6 +42,16 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
         iconTheme: IconThemeData(color: AppColors.textPrimary),
+      ),
+
+      // NavigationRail Theme (Sidebar)
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: AppColors.sidebar,
+        selectedIconTheme: IconThemeData(color: AppColors.primary),
+        unselectedIconTheme: IconThemeData(color: AppColors.textSecondary),
+        selectedLabelTextStyle: TextStyle(color: AppColors.primary),
+        unselectedLabelTextStyle: TextStyle(color: AppColors.textSecondary),
+        indicatorColor: AppColors.accent.withValues(alpha: 0.3),
       ),
 
       // Card Theme
@@ -104,51 +114,58 @@ class AppTheme {
     );
   }
 
-  // Dark theme configuration - Warm Cream & Tan Theme
+  // Dark theme configuration - Deep Dark Theme
   static ThemeData get darkTheme {
+    const primary = Color(0xFF3B82F6);
+    const background = Color(0xFF0F1115);
+    const surface = Color(0xFF181B21);
+    const textPrimary = AppColors.background; // Cream
+    const textSecondary = AppColors.accent; // Beige
+    const accent = Color(0xFF1F2937);
+
     final colorScheme = ColorScheme.dark(
-      primary: AppColors.primary,
-      onPrimary: AppColors.textOnDark,
-      secondary: AppColors.accent,
-      onSecondary: AppColors.textPrimary,
-      background: AppColors.background,
-      surface: AppColors.sidebar,
-      onSurface: AppColors.textPrimary,
+      primary: primary,
+      onPrimary: Colors.white,
+      secondary: accent,
+      onSecondary: Colors.white,
+      background: background,
+      surface: surface,
+      onSurface: textPrimary,
       surfaceTint: Colors.transparent,
     );
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: AppColors.background,
-      
+      scaffoldBackgroundColor: background,
+
       // AppBar Theme
-      appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.background,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: background,
         elevation: 0,
         titleTextStyle: TextStyle(
-          color: AppColors.textPrimary,
+          color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: textPrimary),
       ),
 
       // NavigationRail Theme
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: AppColors.sidebar,
-        selectedIconTheme: IconThemeData(color: AppColors.primary),
-        unselectedIconTheme: IconThemeData(color: AppColors.textSecondary),
-        selectedLabelTextStyle: TextStyle(color: AppColors.primary),
-        unselectedLabelTextStyle: TextStyle(color: AppColors.textSecondary),
-        indicatorColor: AppColors.accent.withValues(alpha: 0.3),
+        backgroundColor: background,
+        selectedIconTheme: const IconThemeData(color: primary),
+        unselectedIconTheme: const IconThemeData(color: textSecondary),
+        selectedLabelTextStyle: const TextStyle(color: primary),
+        unselectedLabelTextStyle: const TextStyle(color: textSecondary),
+        indicatorColor: accent.withValues(alpha: 0.3),
       ),
 
       // Card Theme
       cardTheme: CardThemeData(
-        color: AppColors.surface,
+        color: surface,
         elevation: 2,
-        shadowColor: AppColors.shadow,
+        shadowColor: Colors.black.withValues(alpha: 0.5),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
@@ -158,51 +175,50 @@ class AppTheme {
       // ElevatedButton Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.textOnDark,
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 2,
-          shadowColor: AppColors.shadow,
+          shadowColor: Colors.black.withValues(alpha: 0.5),
         ),
       ),
 
-      // InputDecoration Theme (for Search Bar)
+      // InputDecoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: Color(0xFF2D3340)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: Color(0xFF2D3340)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderSide: const BorderSide(color: primary, width: 2),
         ),
-        hintStyle: TextStyle(color: AppColors.textSecondary),
-        prefixIconColor: AppColors.textSecondary,
-        labelStyle: TextStyle(color: AppColors.textSecondary),
+        hintStyle: const TextStyle(color: textSecondary),
+        prefixIconColor: textSecondary,
+        labelStyle: const TextStyle(color: textSecondary),
       ),
 
       // Text Theme
-      textTheme: TextTheme(
-        bodyLarge: TextStyle(color: AppColors.textPrimary),
-        bodyMedium: TextStyle(color: AppColors.textPrimary),
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(color: textPrimary),
+        bodyMedium: TextStyle(color: textPrimary),
         titleLarge: TextStyle(
-          color: AppColors.textPrimary,
+          color: textPrimary,
           fontWeight: FontWeight.bold,
         ),
         titleMedium: TextStyle(
-          color: AppColors.textPrimary,
+          color: textPrimary,
           fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
 }
-

@@ -26,10 +26,14 @@ class BookmarkFolderPanel extends StatelessWidget {
     return Container(
       width: 250,
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.sidebar,
         border: Border(
           right: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).dividerColor
+                : Colors.white.withValues(alpha: 0.1),
           ),
         ),
       ),
@@ -47,10 +51,12 @@ class BookmarkFolderPanel extends StatelessWidget {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Folders',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.onSurface
+                        : AppColors.textPrimary,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -80,7 +86,7 @@ class BookmarkFolderPanel extends StatelessWidget {
               itemBuilder: (context, index) {
                 final folder = folders[index];
                 final isSelected = folder == selectedFolder;
-                
+
                 return _buildFolderItem(
                   context,
                   folder,
@@ -113,7 +119,11 @@ class BookmarkFolderPanel extends StatelessWidget {
         title: Text(
           folder,
           style: TextStyle(
-            color: isSelected ? AppColors.primary : Colors.white,
+            color: isSelected
+                ? AppColors.primary
+                : Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Colors.white,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             fontSize: 14,
           ),
@@ -168,11 +178,24 @@ class BookmarkFolderPanel extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.sidebar,
-        title: const Text('Delete Folder', style: TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.sidebar,
+        title: Text(
+          'Delete Folder',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : AppColors.textPrimary,
+          )
+        ),
         content: Text(
           'Are you sure you want to delete "$folder"? All bookmarks in this folder will be moved to "My Bookmarks".',
-          style: const TextStyle(color: AppColors.textSecondary),
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                : AppColors.textSecondary,
+          ),
         ),
         actions: [
           TextButton(
@@ -193,19 +216,36 @@ class BookmarkFolderPanel extends StatelessWidget {
 
   void _showRenameDialog(BuildContext context, String folder) {
     final controller = TextEditingController(text: folder);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.sidebar,
-        title: const Text('Rename Folder', style: TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.sidebar,
+        title: Text(
+          'Rename Folder',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : AppColors.textPrimary,
+          )
+        ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'Folder name',
-            hintStyle: TextStyle(color: Colors.white54),
+            hintStyle: TextStyle(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                  : Colors.white54,
+            ),
           ),
-          style: const TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : AppColors.textPrimary,
+          ),
           autofocus: true,
         ),
         actions: [

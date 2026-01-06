@@ -10,12 +10,14 @@ import '../../progress/utils/question_status_helper.dart';
 class QuestionCard extends StatelessWidget {
   final QuestionModel question;
   final Map<String, dynamic>? latestAttempt;
+  final String? topicId; // Context for navigation
   final VoidCallback? onReturn; // Callback when returning from detail screen
 
   const QuestionCard({
     super.key,
     required this.question,
     this.latestAttempt,
+    this.topicId,
     this.onReturn,
   });
 
@@ -29,10 +31,16 @@ class QuestionCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasAttempt ? statusColor.withValues(alpha: 0.5) : AppColors.border.withValues(alpha: 0.5),
+          color: hasAttempt
+              ? statusColor.withValues(alpha: 0.5)
+              : (Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).dividerColor
+                  : AppColors.border.withValues(alpha: 0.5)),
           width: hasAttempt ? 2 : 1,
         ),
         // Add subtle glow for attempted questions
@@ -49,7 +57,11 @@ class QuestionCard extends StatelessWidget {
         child: InkWell(
           onTap: () async {
             // Navigate to question detail and refresh on return
-            await context.push('/question/${question.id}');
+            final uri = Uri(
+              path: '/question/${question.id}',
+              queryParameters: topicId != null ? {'topicId': topicId} : null,
+            );
+            await context.push(uri.toString());
             // Trigger refresh when coming back
             onReturn?.call();
           },
@@ -90,7 +102,9 @@ class QuestionCard extends StatelessWidget {
                           Text(
                             question.content,
                             style: TextStyle(
-                              color: AppColors.textPrimary,
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Theme.of(context).colorScheme.onSurface
+                                  : AppColors.textPrimary,
                               fontSize: 15,
                               fontWeight: FontWeight.w500,
                               height: 1.4,
@@ -113,13 +127,17 @@ class QuestionCard extends StatelessWidget {
                     Icon(
                       question.isMCQ ? Icons.radio_button_checked : Icons.edit,
                       size: 14,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                          : AppColors.textSecondary,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       question.isMCQ ? 'MCQ' : 'Written',
                       style: TextStyle(
-                        color: AppColors.textSecondary,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                            : AppColors.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -132,7 +150,9 @@ class QuestionCard extends StatelessWidget {
                         width: 3,
                         height: 3,
                         decoration: BoxDecoration(
-                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                              : AppColors.textSecondary.withValues(alpha: 0.5),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -144,7 +164,9 @@ class QuestionCard extends StatelessWidget {
                       Text(
                         question.paperLabel,
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                              : AppColors.textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -157,7 +179,9 @@ class QuestionCard extends StatelessWidget {
                         width: 3,
                         height: 3,
                         decoration: BoxDecoration(
-                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                              : AppColors.textSecondary.withValues(alpha: 0.5),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -171,7 +195,9 @@ class QuestionCard extends StatelessWidget {
                       Text(
                         '${question.marks} ${question.marks == 1 ? 'mark' : 'marks'}',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                              : AppColors.textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -235,7 +261,9 @@ class QuestionCard extends StatelessWidget {
                         Icon(
                           Icons.chevron_right,
                           size: 18,
-                          color: AppColors.textSecondary.withValues(alpha: 0.5),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
+                              : AppColors.textSecondary.withValues(alpha: 0.5),
                         ),
                       ],
                     ),
@@ -258,17 +286,17 @@ class QuestionCard extends StatelessWidget {
   /// Get score text for display
   String _getScoreText() {
     if (latestAttempt == null) return '';
-    
+
     final score = latestAttempt!['score'] as int?; // This is 0-100 percentage
     final isCorrect = latestAttempt!['is_correct'] as bool?;
-    
+
     if (score != null) {
       // Score is stored as percentage (0-100)
       if (question.marks != null) {
         // Calculate actual points from percentage
         final actualScore = (score / 100 * question.marks!).toStringAsFixed(1);
         // Remove trailing .0 if whole number
-        final scoreStr = actualScore.endsWith('.0') 
+        final scoreStr = actualScore.endsWith('.0')
             ? actualScore.substring(0, actualScore.length - 2)
             : actualScore;
         return '$scoreStr/${question.marks} ($score%)';
@@ -279,7 +307,7 @@ class QuestionCard extends StatelessWidget {
     } else if (isCorrect != null) {
       return isCorrect ? 'Correct' : 'Incorrect';
     }
-    
+
     return 'Attempted';
   }
 }

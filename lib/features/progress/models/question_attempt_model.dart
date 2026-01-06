@@ -27,7 +27,7 @@ class QuestionAttemptModel {
   bool get isPass => score != null && score! >= 50;
   double get scorePercentage => score?.toDouble() ?? 0.0;
   String get scoreDisplay => score != null ? '$score%' : 'Not graded';
-  
+
   String get timeSpentDisplay {
     if (timeSpentSeconds < 60) {
       return '${timeSpentSeconds}s';
@@ -60,8 +60,7 @@ class QuestionAttemptModel {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id,
+    final map = {
       'user_id': userId,
       'question_id': questionId,
       'answer_text': answerText,
@@ -72,6 +71,13 @@ class QuestionAttemptModel {
       'hints_used': hintsUsed,
       'attempted_at': attemptedAt.toIso8601String(),
     };
+
+    // Only include ID if it's set (checking for empty string)
+    if (id.isNotEmpty) {
+      map['id'] = id;
+    }
+
+    return map;
   }
 
   QuestionAttemptModel copyWith({

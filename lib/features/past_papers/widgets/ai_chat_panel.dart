@@ -186,9 +186,16 @@ class _AIChatPanelState extends State<AIChatPanel> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).cardTheme.color
+            : AppColors.surface,
         border: Border(
-          left: BorderSide(color: AppColors.border, width: 1),
+          left: BorderSide(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).dividerColor
+                : AppColors.border,
+            width: 1
+          ),
         ),
       ),
       child: Column(
@@ -220,9 +227,16 @@ class _AIChatPanelState extends State<AIChatPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.background,
         border: Border(
-          bottom: BorderSide(color: AppColors.border, width: 1),
+          bottom: BorderSide(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.transparent
+                : AppColors.border,
+            width: 1
+          ),
         ),
       ),
       child: Row(
@@ -247,7 +261,9 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 Text(
                   'AI Study Assistant',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).colorScheme.onSurface
+                        : AppColors.textPrimary,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -429,9 +445,16 @@ class _AIChatPanelState extends State<AIChatPanel> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.background,
         border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
+          top: BorderSide(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.transparent
+                : AppColors.border,
+            width: 1
+          ),
         ),
       ),
       child: Column(
@@ -453,28 +476,37 @@ class _AIChatPanelState extends State<AIChatPanel> {
               return InkWell(
                 onTap: () => _sendQuickPrompt(prompt.$2),
                 borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: AppColors.border, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(prompt.$1, style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 6),
-                      Text(
-                        prompt.$2,
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13,
-                        ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).cardTheme.color
+                          : AppColors.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).dividerColor
+                            : AppColors.border,
+                        width: 1
                       ),
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(prompt.$1, style: const TextStyle(fontSize: 14)),
+                        const SizedBox(width: 6),
+                        Text(
+                          prompt.$2,
+                          style: TextStyle(
+                            color: Theme.of(context).brightness == Brightness.dark
+                                ? Theme.of(context).colorScheme.onSurface
+                                : AppColors.textPrimary,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               );
             }).toList(),
           ),
@@ -487,9 +519,16 @@ class _AIChatPanelState extends State<AIChatPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.background,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.background,
         border: Border(
-          top: BorderSide(color: AppColors.border, width: 1),
+          top: BorderSide(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.transparent
+                : AppColors.border,
+            width: 1
+          ),
         ),
       ),
       child: Row(
@@ -507,15 +546,27 @@ class _AIChatPanelState extends State<AIChatPanel> {
                   fontSize: 14,
                 ),
                 filled: true,
-                fillColor: Colors.white,
+                fillColor: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).cardTheme.color
+                    : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: AppColors.border, width: 1),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).dividerColor
+                        : AppColors.border,
+                    width: 1
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: AppColors.border, width: 1),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).dividerColor
+                        : AppColors.border,
+                    width: 1
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
@@ -523,7 +574,9 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 ),
               ),
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textPrimary,
                 fontSize: 14,
               ),
               maxLines: null,
@@ -553,7 +606,9 @@ class _AIChatPanelState extends State<AIChatPanel> {
      return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      color: AppColors.background,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : AppColors.background,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),

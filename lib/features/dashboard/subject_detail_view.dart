@@ -31,7 +31,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
   String _viewMode = 'Topics'; // 'Topics' or 'Years'
   bool _isPinned = false;
   bool _isTogglingPin = false;
-  
+
   // Search and filter state
   String _searchQuery = '';
   String _sortBy = 'Alphabetical'; // 'Alphabetical', 'Progress', 'Questions'
@@ -64,24 +64,20 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         // Top Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          decoration: BoxDecoration(
-            color: AppColors.sidebar,
-            border: Border(
-              bottom: BorderSide(
-                color: Colors.white10,
-                width: 1,
-              ),
-            ),
-          ),
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).scaffoldBackgroundColor
+              : AppColors.sidebar.withValues(alpha: 0.3),
+          // Removed card decoration to match seamless background
+
           child: Row(
             children: [
               // Subject Name
               Text(
                 widget.subjectName,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const Spacer(),
@@ -104,10 +100,10 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                   });
                 },
                 style: SegmentedButton.styleFrom(
-                  selectedBackgroundColor: AppColors.primary,
+                  selectedBackgroundColor: Theme.of(context).primaryColor,
                   selectedForegroundColor: Colors.white,
-                  backgroundColor: AppColors.sidebar,
-                  foregroundColor: AppColors.textSecondary,
+                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
               const SizedBox(width: 16),
@@ -126,7 +122,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                       )
                     : Icon(
                         _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                        color: _isPinned ? AppColors.primary : AppColors.textSecondary,
+                        color: _isPinned ? Theme.of(context).primaryColor : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                       ),
                 tooltip: _isPinned ? 'Unpin' : 'Pin to Sidebar',
                 onPressed: _isTogglingPin ? null : _handlePinToggle,
@@ -234,14 +230,14 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         }
 
         var topics = snapshot.data!;
-        
+
         // Apply search filter
         if (_searchQuery.isNotEmpty) {
           topics = topics.where((topic) {
             return topic.name.toLowerCase().contains(_searchQuery.toLowerCase());
           }).toList();
         }
-        
+
         // Default alphabetical sort
         topics = List.from(topics);
         topics.sort((a, b) => a.name.compareTo(b.name));
@@ -251,12 +247,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
             // Search Bar Only
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.sidebar,
-                border: Border(
-                  bottom: BorderSide(color: AppColors.border, width: 1),
-                ),
-              ),
+              // Removed card decoration to match seamless background
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
@@ -274,23 +265,31 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                         )
                       : null,
                   filled: true,
-                  fillColor: AppColors.surface,
+                  fillColor: Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).scaffoldBackgroundColor
+                      : AppColors.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.border),
+                    borderSide: Theme.of(context).brightness == Brightness.dark
+                        ? BorderSide(color: Theme.of(context).dividerColor)
+                        : const BorderSide(color: AppColors.border),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.border),
+                    borderSide: Theme.of(context).brightness == Brightness.dark
+                        ? BorderSide(color: Theme.of(context).dividerColor)
+                        : const BorderSide(color: AppColors.border),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                    borderSide: Theme.of(context).brightness == Brightness.dark
+                        ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+                        : const BorderSide(color: AppColors.primary, width: 2),
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintStyle: TextStyle(color: AppColors.textSecondary),
+                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
-                style: TextStyle(color: AppColors.textPrimary),
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                 onChanged: (value) {
                   setState(() {
                     _searchQuery = value;
@@ -298,7 +297,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                 },
               ),
             ),
-            
+
             // Topics Grid
             Expanded(
               child: topics.isEmpty
@@ -373,8 +372,8 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.surface,
-                  AppColors.surface.withValues(alpha: 0.8),
+                  Theme.of(context).cardTheme.color ?? Colors.white,
+                  (Theme.of(context).cardTheme.color ?? Colors.white).withValues(alpha: 0.8),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
@@ -412,7 +411,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                     ),
                   ),
                 ),
-                
+
                 // Content
                 Padding(
                   padding: const EdgeInsets.all(18),
@@ -444,7 +443,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 height: 1.3,
                               ),
                               maxLines: 2,
@@ -453,9 +452,9 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                           ),
                         ],
                       ),
-                      
+
                       const Spacer(),
-                      
+
                       // Question count badge
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -486,9 +485,9 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                           ],
                         ),
                       ),
-                      
+
                       const SizedBox(height: 12),
-                      
+
                       // Progress bar and percentage
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -499,7 +498,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                               Text(
                                 'Progress',
                                 style: TextStyle(
-                                  color: AppColors.textSecondary,
+                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -529,7 +528,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                           Text(
                             '$completedQuestions/$totalQuestions completed',
                             style: TextStyle(
-                              color: AppColors.textSecondary,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                               fontSize: 11,
                             ),
                           ),

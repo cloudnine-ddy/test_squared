@@ -121,35 +121,51 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : AppColors.background,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Search Questions',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).colorScheme.onSurface
+                : AppColors.textPrimary,
           ),
         ),
         centerTitle: true,
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? Theme.of(context).scaffoldBackgroundColor
+            : AppColors.background,
         elevation: 0,
+        iconTheme: IconThemeData(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Theme.of(context).colorScheme.onSurface
+              : AppColors.textPrimary,
+        ),
       ),
       body: Column(
         children: [
           // Search Bar with light background
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: AppColors.background,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).scaffoldBackgroundColor
+                : AppColors.background,
             child: Column(
               children: [
                 // Prominent search bar
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Theme.of(context).cardTheme.color
+                        : AppColors.surface,
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -191,7 +207,9 @@ class _SearchScreenState extends State<SearchScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).cardTheme.color
+                          : AppColors.surface,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(28),
@@ -210,7 +228,9 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).colorScheme.onSurface
+                          : AppColors.textPrimary,
                       fontSize: 15,
                     ),
                     onChanged: (value) {
@@ -280,17 +300,29 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.sidebar : Colors.white,
+          color: isSelected
+              ? AppColors.primary
+              : Theme.of(context).brightness == Brightness.dark
+                  ? Theme.of(context).cardTheme.color
+                  : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? AppColors.sidebar : AppColors.border.withValues(alpha: 0.3),
+            color: isSelected
+                ? AppColors.primary
+                : Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).dividerColor
+                    : AppColors.border,
             width: 1,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : AppColors.textPrimary,
+            color: isSelected
+                ? Colors.white
+                : Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textPrimary,
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
@@ -305,26 +337,33 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Empty state illustration
-            Image.asset(
-              'lib/core/assets/images/search_empty_state.png',
-              width: 200,
-              height: 200,
-              errorBuilder: (context, error, stackTrace) {
-                // Fallback if image fails to load
-                return Icon(
-                  Icons.search,
-                  size: 100,
-                  color: AppColors.textSecondary.withValues(alpha: 0.3),
-                );
-              },
+            // Premium Empty State Illustration
+            Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.manage_search_rounded,
+                  size: 80,
+                  color: AppColors.primary,
+                ),
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             Text(
               'Start your search or browse by category',
+              textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 16,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
               ),
             ),
           ],
@@ -350,17 +389,23 @@ class _SearchScreenState extends State<SearchScreen> {
             Text(
               'No results found',
               style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Try different keywords or filters',
               style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
+                    : AppColors.textSecondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -379,13 +424,18 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildQuestionCard(QuestionModel question) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
+        color: isDark ? Theme.of(context).cardTheme.color : colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.1)
+              : colorScheme.onSurface.withValues(alpha: 0.1),
         ),
       ),
       child: InkWell(
@@ -437,8 +487,8 @@ class _SearchScreenState extends State<SearchScreen> {
               const SizedBox(height: 12),
               Text(
                 question.content,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
                   fontSize: 14,
                 ),
                 maxLines: 3,
@@ -449,7 +499,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 Text(
                   question.paperLabel,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.5),
+                    color: colorScheme.onSurface.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
                 ),

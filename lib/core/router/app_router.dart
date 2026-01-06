@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/landing/landing_page.dart';
@@ -49,9 +50,20 @@ final goRouter = GoRouter(
     ),
     GoRoute(
       path: '/question/:questionId',
-      builder: (context, state) {
+      pageBuilder: (context, state) {
         final questionId = state.pathParameters['questionId']!;
-        return QuestionDetailScreenWithChat(questionId: questionId);
+        final topicId = state.uri.queryParameters['topicId'];
+        return CustomTransitionPage(
+          key: state.pageKey,
+          child: QuestionDetailScreenWithChat(
+            questionId: questionId,
+            topicId: topicId,
+          ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 200),
+        );
       },
     ),
     GoRoute(

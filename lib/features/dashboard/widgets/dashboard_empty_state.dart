@@ -24,7 +24,7 @@ class DashboardEmptyState extends StatelessWidget {
               width: 200,
               height: 200,
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Stack(
@@ -43,7 +43,7 @@ class DashboardEmptyState extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: AppColors.primary.withValues(alpha: 0.2 - (index * 0.05)),
+                              color: Theme.of(context).primaryColor.withValues(alpha: 0.2 - (index * 0.05)),
                               width: 2,
                             ),
                           ),
@@ -55,7 +55,7 @@ class DashboardEmptyState extends StatelessWidget {
                   Icon(
                     Icons.school_outlined,
                     size: 80,
-                    color: AppColors.primary,
+                    color: Theme.of(context).primaryColor,
                   ),
                 ],
               ),
@@ -69,7 +69,7 @@ class DashboardEmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -81,7 +81,7 @@ class DashboardEmptyState extends StatelessWidget {
               'Select a subject from the sidebar to start practicing,\nor explore our subjects to begin your learning journey.',
               style: TextStyle(
                 fontSize: 16,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
                 height:1.6,
               ),
               textAlign: TextAlign.center,
@@ -96,13 +96,15 @@ class DashboardEmptyState extends StatelessWidget {
               alignment: WrapAlignment.center,
               children: [
                 _buildQuickActionCard(
+                  context,
                   icon: Icons.library_books_outlined,
                   title: 'Browse Subjects',
                   description: 'Explore all available subjects',
-                  color: AppColors.primary,
+                  color: Theme.of(context).primaryColor,
                   onTap: onExploreSubjects,
                 ),
                 _buildQuickActionCard(
+                  context,
                   icon: Icons.bar_chart_outlined,
                   title: 'View Progress',
                   description: 'Track your learning journey',
@@ -110,6 +112,7 @@ class DashboardEmptyState extends StatelessWidget {
                   onTap: () => context.push('/progress'),
                 ),
                 _buildQuickActionCard(
+                  context,
                   icon: Icons.bookmark_outline,
                   title: 'Saved Questions',
                   description: 'Review bookmarked questions',
@@ -125,10 +128,10 @@ class DashboardEmptyState extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.secondary.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -137,7 +140,7 @@ class DashboardEmptyState extends StatelessWidget {
                 children: [
                   Icon(
                     Icons.lightbulb_outline,
-                    color: AppColors.accent,
+                    color: Theme.of(context).colorScheme.secondary,
                     size: 28,
                   ),
                   const SizedBox(width: 16),
@@ -146,7 +149,7 @@ class DashboardEmptyState extends StatelessWidget {
                       '"Success is the sum of small efforts repeated day in and day out."',
                       style: TextStyle(
                         fontSize: 15,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontStyle: FontStyle.italic,
                         height: 1.5,
                       ),
@@ -162,7 +165,8 @@ class DashboardEmptyState extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActionCard({
+  Widget _buildQuickActionCard(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required String description,
@@ -176,12 +180,12 @@ class DashboardEmptyState extends StatelessWidget {
         width: 200,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1),
+          border: Border.all(color: Theme.of(context).dividerColor, width: 1),
           boxShadow: [
             BoxShadow(
-              color: AppColors.shadow.withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -207,7 +211,7 @@ class DashboardEmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
               textAlign: TextAlign.center,
             ),
@@ -216,7 +220,7 @@ class DashboardEmptyState extends StatelessWidget {
               description,
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8),
               ),
               textAlign: TextAlign.center,
             ),
