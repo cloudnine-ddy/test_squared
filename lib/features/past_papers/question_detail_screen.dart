@@ -282,19 +282,32 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   Future<void> _checkAnswer() async {
     if (_question == null || _studentAnswerController.text.trim().isEmpty) return;
 
-    // Check premium access for AI answer checking
-    if (!AccessControlService.checkPremium(
-      context,
-      ref,
-      featureName: 'AI Answer Checking',
-      highlights: [
-        'Instant AI-powered feedback',
-        'Detailed scoring and analysis',
-        'Personalized improvement hints',
-        'Track your progress over time',
-      ],
-    )) {
+    // Check if user can use check answer (premium or has free checks remaining)
+    final canUseCheckAnswer = ref.read(canUseCheckAnswerProvider);
+    final isPremium = ref.read(isPremiumProvider);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    if (!canUseCheckAnswer) {
+      // Show upgrade dialog when free checks exhausted
+      AccessControlService.checkPremium(
+        context,
+        ref,
+        featureName: 'AI Answer Checking',
+        highlights: [
+          'You have used all 5 free answer checks',
+          'Upgrade to Premium for unlimited checks',
+          'Get instant AI-powered feedback',
+          'Track your progress over time',
+        ],
+      );
       return;
+    }
+
+    // Decrement free checks for non-premium users
+    if (!isPremium && userId != null) {
+      await decrementFreeChecks(userId);
+      // Invalidate the provider to refresh the count
+      ref.invalidate(currentUserProvider);
     }
 
     setState(() {
@@ -302,7 +315,6 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     });
 
     try {
-      final userId = Supabase.instance.client.auth.currentUser?.id;
       final timeSpent = _questionStartTime != null
           ? DateTime.now().difference(_questionStartTime!).inSeconds
           : 0;
@@ -393,20 +405,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Future<void> _showAiExplainDialog() async {
-    // Check premium access
-    if (!AccessControlService.checkPremium(
-      context,
-      ref,
-      featureName: 'AI Explanation',
-      highlights: [
-        'Get step-by-step explanations',
-        'Understand key concepts deeply',
-        'Learn from AI-powered insights',
-        'Improve faster with guided learning',
-      ],
-    )) {
-      return;
-    }
+    // AI Explanation is now free for all users!
 
     showDialog(
       context: context,

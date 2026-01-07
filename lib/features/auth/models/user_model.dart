@@ -7,6 +7,7 @@ class UserModel {
   final String subscriptionTier;
   final DateTime? premiumUntil;
   final DateTime? createdAt;
+  final int freeChecksRemaining;
 
   const UserModel({
     required this.id,
@@ -16,6 +17,7 @@ class UserModel {
     this.subscriptionTier = 'free',
     this.premiumUntil,
     this.createdAt,
+    this.freeChecksRemaining = 5,
   });
 
   /// Check if user has active premium access
@@ -52,6 +54,9 @@ class UserModel {
     // Default to false for unknown tiers or null subscriptionTier
     return false;
   }
+
+  /// Check if free user can still use check answer feature
+  bool get canUseCheckAnswer => isPremium || freeChecksRemaining > 0;
 
   /// Get a display-friendly subscription status
   String get subscriptionStatus {
@@ -90,6 +95,7 @@ class UserModel {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
+      freeChecksRemaining: json['free_checks_remaining'] as int? ?? 5,
     );
   }
 
@@ -101,6 +107,7 @@ class UserModel {
       'subscription_tier': subscriptionTier,
       'premium_until': premiumUntil?.toIso8601String(),
       'created_at': createdAt?.toIso8601String(),
+      'free_checks_remaining': freeChecksRemaining,
     };
   }
 
@@ -111,6 +118,7 @@ class UserModel {
     String? subscriptionTier,
     DateTime? premiumUntil,
     DateTime? createdAt,
+    int? freeChecksRemaining,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -119,6 +127,7 @@ class UserModel {
       subscriptionTier: subscriptionTier ?? this.subscriptionTier,
       premiumUntil: premiumUntil ?? this.premiumUntil,
       createdAt: createdAt ?? this.createdAt,
+      freeChecksRemaining: freeChecksRemaining ?? this.freeChecksRemaining,
     );
   }
 }

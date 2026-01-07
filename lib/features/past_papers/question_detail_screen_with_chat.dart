@@ -27,7 +27,7 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
     final isPremium = userAsync.maybeWhen(
-      data: (user) => user?.subscriptionTier == 'premium',
+      data: (user) => user?.isPremium ?? false,
       orElse: () => false,
     );
 

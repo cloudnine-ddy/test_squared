@@ -10,6 +10,7 @@ import '../../core/services/toast_service.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
 import '../auth/services/auth_service.dart';
+import '../auth/providers/auth_provider.dart';
 import 'subject_detail_view.dart';
 import 'widgets/dashboard_empty_state.dart';
 
@@ -305,57 +306,58 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      // Premium Upgrade Banner
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              Theme.of(context).primaryColor,
-                              Theme.of(context).colorScheme.secondary,
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
+                      // Premium Upgrade Banner - Only show for non-premium users
+                      if (!ref.watch(isPremiumProvider))
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Theme.of(context).primaryColor,
+                                Theme.of(context).colorScheme.secondary,
+                              ],
+                            ),
                             borderRadius: BorderRadius.circular(12),
-                            onTap: () => context.push('/premium'),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.workspace_premium,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      'Upgrade to Premium',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => context.push('/premium'),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.workspace_premium,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        'Upgrade to Premium',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.white,
-                                    size: 12,
-                                  ),
-                                ],
+                                    Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Colors.white,
+                                      size: 12,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                       Divider(
                         color: Theme.of(context).dividerColor,
                         thickness: 1,

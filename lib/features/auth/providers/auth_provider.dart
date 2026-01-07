@@ -25,7 +25,7 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
     final supabase = ref.watch(supabaseClientProvider);
     final response = await supabase
         .from('profiles')
-        .select('id, email, role, subscription_tier, premium_until, created_at')
+        .select('id, email, role, subscription_tier, premium_until, created_at, free_checks_remaining')
         .eq('id', authState.id)
         .maybeSingle();
 
@@ -56,3 +56,37 @@ final isPremiumProvider = Provider<bool>((ref) {
     error: (_, __) => false,
   );
 });
+
+/// Provider to get remaining free checks for non-premium users
+final freeChecksRemainingProvider = Provider<int>((ref) {
+  final user = ref.watch(currentUserProvider);
+  
+  return user.when(
+    data: (userData) => userData?.freeChecksRemaining ?? 5,
+    loading: () => 5,
+    error: (_, __) => 5,
+  );
+});
+
+/// Provider to check if user can use check answer feature
+/// Returns true if user is premium OR has remaining free checks
+final canUseCheckAnswerProvider = Provider<bool>((ref) {
+  final user = ref.watch(currentUserProvider);
+  
+  return user.when(
+    data: (userData) => userData?.canUseCheckAnswer ?? true,
+    loading: () => true,
+    error: (_, __) => true,
+  );
+});
+
+/// Function to decrement free checks in database
+Future<void> decrementFreeChecks(String userId) async {
+  try {
+    await Supabase.instance.client.rpc('decrement_free_checks', params: {
+      'user_id': userId,
+    });
+  } catch (e) {
+    print('Error decrementing free checks: $e');
+  }
+}
