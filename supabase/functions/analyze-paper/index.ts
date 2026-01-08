@@ -363,27 +363,33 @@ async function analyzePageImage(
   mimeType: string = "image/png"
 ): Promise<{ page_number: number, questions: RawQuestion[] } | null> {
 
-  const prompt = `Analyze this Biology exam page using Multimodal Vision Parsing.
+  const prompt = `Analyze this IGCSE exam page using Multimodal Vision Parsing.
 
-TASK 1: TEXT EXTRACTION & COMBINATION QUESTIONS
-- Extract English text only.
-- COMBINATION QUESTIONS (Roman Numerals I, II, III + Options A, B, C, D):
-    - IF a question has statements listed as I, II, III, etc.:
-    - Store these statements in the 'statements' array (e.g. ["I. Cell wall is present", "II. Nucleus is absent"]).
-    - The 'options' should ONLY be the final choices (e.g. A. I and II, B. II and III).
-    - Do NOT mix them.
+TASK 1: TEXT EXTRACTION & PATTERNS
+- Extract text in English.
+- MARK SCHEMES: If page contains a table with headers "Question", "Answer", "Marks" (or similar):
+    - IGNORE normal question processing.
+    - Extract ALL row pairs into 'mark_scheme' array (e.g. [{q:1, a:"C"}, {q:2, a:"A"}]).
+    - If valid mark scheme found, return { "is_mark_scheme": true, "data": [...] }.
+- COMBINATION QUESTIONS (I, II, III Roman Numerals):
+    - Separate statements (I, II, III) into 'statements' array.
+    - Keep A-D options separate.
+- TABLE OPTIONS:
+    - If Options A, B, C, D are headings in a table (e.g. cols = A, B, C, D rows = properties):
+    - OR if Options are rows in a table (e.g. Row 1 = A, Row 2 = B):
+    - Extract as normal options but set 'type': 'mcq_table'.
+    - VISUAL: Create a figure for the table if complex.
 
 TASK 2: FIGURE MULTIMODAL ANALYSIS
-- Look for "Diagram", "Figure", "Table", "Graph", "Chart", "Rajah".
-- VISUAL ANALYSIS: "See" the image. If there is a diagram:
-    - Create an entry in the 'figures' array.
-    - 'description': Describe the diagram in detail (e.g. "A cross-section of a leaf showing xylem and phloem").
-    - 'ymin/xmin/ymax/xmax': Bounding box (0-1000) covering the ENTIRE visual element + labels.
+- Look for "Diagram", "Figure", "Table", "Graph", "Chart".
+- MARK SCHEME TABLES: Do NOT treat as figures to crop.
+- VISUAL ANALYSIS:
+    - Normal Diagram -> 'figures' array.
+    - Table in Question -> 'figures' array (detected as Table).
 
 TASK 3: SOLVE
-- MCQ: Extract ALL 4 options (A-D). Set 'correct_answer' to the letter.
-- Structured: Key points for 'correct_answer'.
-- Explanation: 1-2 sentences.
+- MCQ: Extract A-D.
+- structured: Key points.
 
 TOPICS: ${topicsJson}
 `

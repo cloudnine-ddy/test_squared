@@ -26,16 +26,16 @@ class QuestionEditor extends StatefulWidget {
 class _QuestionEditorState extends State<QuestionEditor> {
   final _supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _isLoading = true;
   bool _isSaving = false;
   bool _hasChanges = false;
-  
+
   // Question data
   Map<String, dynamic>? _question;
   Map<String, dynamic>? _paper;
   List<Map<String, dynamic>> _allTopics = [];
-  
+
   // Form controllers
   late TextEditingController _contentController;
   late TextEditingController _officialAnswerController;
@@ -43,7 +43,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   List<String> _selectedTopicIds = [];
   String _topicSearchQuery = '';
   String? _imageUrl;
-  
+
   // Figure cropping
   bool _hasFigure = false;
   int _figurePage = 1;
@@ -51,7 +51,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   double _figureY = 30;
   double _figureWidth = 40;
   double _figureHeight = 30;
-  
+
   // MCQ fields
   bool _isMCQ = false;
   List<Map<String, dynamic>> _options = [];
@@ -75,7 +75,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Future<void> _loadQuestion() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Load question
       final questionRes = await _supabase
@@ -83,14 +83,14 @@ class _QuestionEditorState extends State<QuestionEditor> {
           .select()
           .eq('id', widget.questionId)
           .single();
-      
+
       // Load paper
       final paperRes = await _supabase
           .from('papers')
           .select()
           .eq('id', widget.paperId)
           .single();
-      
+
       // Load topics for this subject only
       final subjectId = paperRes['subject_id'];
       final topicsRes = await _supabase
@@ -98,23 +98,23 @@ class _QuestionEditorState extends State<QuestionEditor> {
           .select('id, name')
           .eq('subject_id', subjectId)
           .order('name');
-      
+
       _question = questionRes;
       _paper = paperRes;
       _allTopics = List<Map<String, dynamic>>.from(topicsRes);
-      
+
       // Populate form
       _contentController.text = _question?['content'] ?? '';
       _officialAnswerController.text = _question?['official_answer'] ?? '';
       _questionNumber = _question?['question_number'] ?? 1;
       _imageUrl = _question?['image_url'];
-      
+
       // Topic IDs
       final topicIds = _question?['topic_ids'];
       if (topicIds is List) {
         _selectedTopicIds = topicIds.map((e) => e.toString()).toList();
       }
-      
+
       // Figure data from ai_answer
       final aiAnswer = _question?['ai_answer'];
       if (aiAnswer is Map) {
@@ -128,7 +128,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
           _figureHeight = (loc['height_percent'] as num?)?.toDouble() ?? 30;
         }
       }
-      
+
       // MCQ data
       _isMCQ = _question?['type'] == 'mcq';
       _correctAnswer = _question?['correct_answer']?.toString();
@@ -137,7 +137,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       if (optionsRaw is List) {
         _options = optionsRaw.map((o) => Map<String, dynamic>.from(o as Map)).toList();
       }
-      
+
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -151,9 +151,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Future<void> _saveQuestion() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (mounted) setState(() => _isSaving = true);
-    
+
     try {
       // Build ai_answer
       Map<String, dynamic>? aiAnswer;
@@ -169,7 +169,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
           },
         };
       }
-      
+
       // Prepare update data
       final updateData = {
         'content': _contentController.text.trim(),
@@ -180,19 +180,19 @@ class _QuestionEditorState extends State<QuestionEditor> {
         'options': _isMCQ ? _options : null,
         'correct_answer': _isMCQ ? _correctAnswer : null,
       };
-      
+
       print('[QuestionEditor] Updating question ${widget.questionId}');
       print('[QuestionEditor] Update data: $updateData');
-      
+
       // Update question
       final response = await _supabase
           .from('questions')
           .update(updateData)
           .eq('id', widget.questionId)
           .select();
-      
+
       print('[QuestionEditor] Update response: $response');
-      
+
       if (!mounted) return;
       ToastService.showSuccess('Question saved!');
       setState(() {
@@ -206,7 +206,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       print('  Message: ${e.message}');
       print('  Details: ${e.details}');
       print('  Hint: ${e.hint}');
-      
+
       if (mounted) {
         ToastService.showError('Database error: ${e.message}\nDetails: ${e.details ?? "None"}');
         setState(() => _isSaving = false);
@@ -215,7 +215,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       // General error logging
       print('[QuestionEditor] General error: $e');
       print('[QuestionEditor] Stack trace: $stackTrace');
-      
+
       if (mounted) {
         ToastService.showError('Failed to save: $e');
         setState(() => _isSaving = false);
@@ -225,9 +225,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Future<void> _cropFigure() async {
     if (_paper == null) return;
-    
+
     if (mounted) setState(() => _isSaving = true);
-    
+
     try {
       final response = await _supabase.functions.invoke(
         'crop-figure',
@@ -243,9 +243,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
           },
         },
       );
-      
+
       if (!mounted) return;
-      
+
       if (response.data?['image_url'] != null) {
         // Add timestamp to bust browser cache
         final imageUrl = '${response.data['image_url']}?t=${DateTime.now().millisecondsSinceEpoch}';
@@ -285,7 +285,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
         children: [
           // Header
           _buildHeader(paperInfo),
-          
+
           // Form (Split View)
           Expanded(
             child: Form(
@@ -311,10 +311,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               onChanged: (_) => _markChanged(),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 24),
-                          
-                          // Figure section 
+
+                          // Figure section
                           _buildSection(
                             'Figure & Image',
                             _buildFigureSection(),
@@ -323,9 +323,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       ),
                     ),
                   ),
-                  
+
                   Container(width: 1, color: AppColors.border),
-                  
+
                   // RIGHT COLUMN - Metadata & Answers
                   Expanded(
                     flex: 2,
@@ -349,7 +349,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                                 },
                               ),
                             ),
-                            
+
                             const SizedBox(height: 24),
 
                             // Topics (Optimized)
@@ -357,9 +357,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               'Topics',
                               _buildOptimizedTopicSelector(),
                             ),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // Official Answer
                             _buildSection(
                               'Official Answer',
@@ -371,58 +371,111 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               ),
                             ),
 
-                             // MCQ Options (read-only display)
-                            if (_isMCQ && _options.isNotEmpty) ...[
+                             // MCQ Options (Editable)
+                            if (_isMCQ) ...[
                               const SizedBox(height: 24),
-                              _buildSection(
-                                'MCQ Options',
-                                Column(
-                                  children: [
-                                    for (int i = 0; i < _options.length; i++)
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildSection('MCQ Options', const SizedBox.shrink()),
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        final nextLabel = String.fromCharCode(65 + _options.length); // A, B, C...
+                                        _options.add({'label': nextLabel, 'text': ''});
+                                        _markChanged();
+                                      });
+                                    },
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Add Option'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Column(
+                                children: [
+                                  for (int i = 0; i < _options.length; i++)
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
                                           color: _options[i]['label'] == _correctAnswer
-                                              ? Colors.green.withOpacity(0.1)
-                                              : AppColors.background,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: _options[i]['label'] == _correctAnswer
-                                                ? Colors.green
-                                                : AppColors.border,
-                                          ),
+                                              ? Colors.green
+                                              : AppColors.border,
                                         ),
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              _options[i]['label'] ?? '',
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // Correct Answer Radio
+                                          Radio<String>(
+                                            value: _options[i]['label'] ?? '',
+                                            groupValue: _correctAnswer,
+                                            activeColor: Colors.green,
+                                            onChanged: (val) {
+                                              setState(() {
+                                                _correctAnswer = val;
+                                                _markChanged();
+                                              });
+                                            },
+                                          ),
+                                          // Label Field
+                                          SizedBox(
+                                            width: 40,
+                                            child: TextFormField(
+                                              initialValue: _options[i]['label'],
+                                              textAlign: TextAlign.center,
+                                              decoration: const InputDecoration(
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                              ),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
                                               ),
+                                              onChanged: (val) {
+                                                _options[i]['label'] = val;
+                                                _markChanged();
+                                              },
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                _options[i]['text'] ?? '',
-                                                style: TextStyle(
-                                                  color: AppColors.textPrimary.withOpacity(0.8),
-                                                ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // Text Field
+                                          Expanded(
+                                            child: TextFormField(
+                                              initialValue: _options[i]['text'],
+                                              decoration: const InputDecoration(
+                                                border: InputBorder.none,
+                                                hintText: 'Option text...',
+                                                isDense: true,
                                               ),
+                                              style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
+                                              maxLines: null,
+                                              onChanged: (val) {
+                                                _options[i]['text'] = val;
+                                                _markChanged();
+                                              },
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Text(
-                                        'Note: Edit answer text in the field above to update correct answer logic.',
-                                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic),
+                                          ),
+                                          // Delete Option
+                                          IconButton(
+                                            icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                                            onPressed: () {
+                                              setState(() {
+                                                if (_correctAnswer == _options[i]['label']) {
+                                                  _correctAnswer = null;
+                                                }
+                                                _options.removeAt(i);
+                                                _markChanged();
+                                              });
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ],
                           ],
@@ -446,7 +499,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       final query = _topicSearchQuery.toLowerCase();
       return name.contains(query);
     }).toList();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -476,7 +529,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               }).toList(),
             ),
           ),
-          
+
         // Selector Container
         Container(
           height: 300,
@@ -498,7 +551,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                   onChanged: (v) => setState(() => _topicSearchQuery = v),
                 ),
               ),
-              
+
               // List
               Expanded(
                 child: ListView.builder(
@@ -571,10 +624,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
               ),
             ],
           ),
-          
+
           if (_hasFigure) ...[
             const SizedBox(height: 16),
-            
+
             // Current image preview
             if (_imageUrl != null) ...[
               Container(
@@ -600,7 +653,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               ),
               const SizedBox(height: 16),
             ],
-            
+
             // Crop controls
             Row(
               children: [
@@ -636,9 +689,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 })),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Crop button - opens dialog
             SizedBox(
               width: double.infinity,
@@ -881,13 +934,13 @@ class _CropDialog extends StatefulWidget {
 
 class _CropDialogState extends State<_CropDialog> {
   final _supabase = Supabase.instance.client;
-  
+
   late int _page;
   late double _x;
   late double _y;
   late double _width;
   late double _height;
-  
+
   String? _pageImageUrl;
   bool _isLoadingPage = false;
 
@@ -904,7 +957,7 @@ class _CropDialogState extends State<_CropDialog> {
 
   Future<void> _loadPage() async {
     setState(() => _isLoadingPage = true);
-    
+
     try {
       final response = await _supabase.functions.invoke(
         'render-page',
@@ -913,7 +966,7 @@ class _CropDialogState extends State<_CropDialog> {
           'page': _page,
         },
       );
-      
+
       if (response.data?['image_url'] != null) {
         setState(() {
           _pageImageUrl = response.data['image_url'];
@@ -979,7 +1032,7 @@ class _CropDialogState extends State<_CropDialog> {
               ],
             ),
           ),
-          
+
           // Main content
           Expanded(
             child: Row(
@@ -1019,7 +1072,7 @@ class _CropDialogState extends State<_CropDialog> {
                           ),
                   ),
                 ),
-                
+
                 // Controls
                 Container(
                   width: 280,
@@ -1079,9 +1132,9 @@ class _CropDialogState extends State<_CropDialog> {
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // Position
                       _buildSlider('X Position', _x, (v) => setState(() => _x = v)),
                       _buildSlider('Y Position', _y, (v) => setState(() => _y = v)),
@@ -1103,7 +1156,7 @@ class _CropDialogState extends State<_CropDialog> {
     const aspectRatio = 595 / 842;
     double w = maxW;
     double h = maxH;
-    
+
     if (w / h > aspectRatio) {
       w = h * aspectRatio;
     } else {
@@ -1145,7 +1198,7 @@ class _CropDialogState extends State<_CropDialog> {
                 child: Text('Page preview', style: TextStyle(color: Colors.grey)),
               ),
             ),
-          
+
           // Dark overlay on non-crop areas
           Positioned.fill(
             child: CustomPaint(
@@ -1154,7 +1207,7 @@ class _CropDialogState extends State<_CropDialog> {
               ),
             ),
           ),
-          
+
           // Crop box border (draggable to move)
           Positioned(
             left: cropLeft,
@@ -1183,7 +1236,7 @@ class _CropDialogState extends State<_CropDialog> {
               ),
             ),
           ),
-          
+
           // Corner resize handles
           // Top-left
           _buildResizeHandle(cropLeft - 6, cropTop - 6, w, h, 'topLeft'),
@@ -1197,7 +1250,7 @@ class _CropDialogState extends State<_CropDialog> {
       ),
     );
   }
-  
+
   Widget _buildResizeHandle(double left, double top, double containerW, double containerH, String corner) {
     return Positioned(
       left: left,
@@ -1207,7 +1260,7 @@ class _CropDialogState extends State<_CropDialog> {
           setState(() {
             final dx = (d.delta.dx / containerW) * 100;
             final dy = (d.delta.dy / containerH) * 100;
-            
+
             switch (corner) {
               case 'topLeft':
                 _x = (_x + dx).clamp(0, _x + _width - 5);
@@ -1287,7 +1340,7 @@ class _CropOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.black.withValues(alpha: 0.5);
-    
+
     // Top
     canvas.drawRect(
       Rect.fromLTRB(0, 0, size.width, cropRect.top),
