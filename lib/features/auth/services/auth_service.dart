@@ -107,5 +107,21 @@ class AuthService {
     
     await _supabase.auth.signOut();
   }
+
+  // Send password reset email
+  Future<void> resetPasswordForEmail(String email) async {
+    await _supabase.auth.resetPasswordForEmail(
+      email,
+      // Redirect to root - the app will detect recovery session and navigate to reset-password
+      redirectTo: 'http://localhost:3000/',
+    );
+  }
+
+  // Update user password (after recovery)
+  Future<void> updatePassword(String newPassword) async {
+    await _supabase.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
 }
 

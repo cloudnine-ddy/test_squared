@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/landing/landing_page.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
+import '../../features/auth/forgot_password_page.dart';
+import '../../features/auth/reset_password_page.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/past_papers/topic_detail_screen.dart';
 import '../../features/past_papers/question_detail_screen.dart';
@@ -17,9 +19,17 @@ import '../../features/bookmarks/screens/bookmarks_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/settings/screens/accessibility_settings_screen.dart';
 import '../../features/premium/premium_page.dart';
+import '../../main.dart' show isPasswordRecoverySession;
 
 final goRouter = GoRouter(
   initialLocation: '/',
+  redirect: (context, state) {
+    // If this is a password recovery session, redirect to reset-password page
+    if (isPasswordRecoverySession && state.matchedLocation != '/reset-password') {
+      return '/reset-password';
+    }
+    return null;
+  },
   routes: [
     GoRoute(
       path: '/',
@@ -32,6 +42,14 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/signup',
       builder: (context, state) => const SignUpScreen(),
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordPage(),
+    ),
+    GoRoute(
+      path: '/reset-password',
+      builder: (context, state) => const ResetPasswordPage(),
     ),
     GoRoute(
       path: '/dashboard',

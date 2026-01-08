@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/providers/auth_provider.dart';
+import '../../main.dart' show isPasswordRecoverySession;
 
 /// Landing page for non-authenticated users
 /// Modern design inspired by SaveMyExams with clean aesthetics
@@ -11,13 +12,35 @@ class LandingPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Redirect to dashboard if already authenticated
+    // Check URL for recovery params directly (robust fallback)
+    final isRecoveryUrl = Uri.base.toString().contains('type=recovery');
+    
+    // If this is a password recovery session, redirect to reset-password page instead of dashboard
+    if (isPasswordRecoverySession || isRecoveryUrl) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Ensure we don't loop if we are already there (though LandingPage shouldn't be ResetPage)
+        context.go('/reset-password');
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // Redirect to dashboard if already authenticated (and NOT in recovery session)
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
     if (isAuthenticated) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go('/dashboard');
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Small delay to allow any pending auth events (like passwordRecovery) to fire first
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (context.mounted) {
+             // Re-check recovery status just in case
+             if (Uri.base.toString().contains('type=recovery')) {
+                context.go('/reset-password');
+             } else {
+                context.go('/dashboard');
+             }
+        }
       });
     }
+
 
     return Scaffold(
       backgroundColor: AppColors.background,
