@@ -66,7 +66,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Analytics Dashboard',
+                      'Admin Dashboard',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 28,

@@ -400,12 +400,12 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       iconColor = Colors.blue;
       iconData = Icons.radio_button_on;
     } else {
-      iconColor = Colors.grey;
+      iconColor = AppColors.textSecondary.withValues(alpha: 0.3);
       iconData = Icons.radio_button_off;
     }
     
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           if (isCurrent && !isComplete)
@@ -427,14 +427,14 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                 Text(
                   title,
                   style: TextStyle(
-                    color: isComplete || isCurrent ? Colors.white : Colors.white54,
+                    color: isComplete || isCurrent ? AppColors.textPrimary : AppColors.textSecondary,
                     fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: AppColors.textPrimary.withValues(alpha: 0.5),
+                    color: AppColors.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -442,6 +442,52 @@ class _UploadPaperViewState extends State<UploadPaperView> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStepIcon(int step, String label, bool isActive) {
+    return Column(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: isActive ? const Color(0xFF6366F1) : AppColors.background,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: isActive ? const Color(0xFF6366F1) : AppColors.border,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              step.toString(),
+              style: TextStyle(
+                color: isActive ? Colors.white : AppColors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepLine(bool isActive) {
+    return Expanded(
+      child: Container(
+        height: 2,
+        color: isActive ? const Color(0xFF6366F1) : AppColors.border,
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 16), // Align with circle center roughly
       ),
     );
   }
@@ -508,337 +554,226 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                     ),
                     const SizedBox(height: 32),
                     
-                    // Curriculum dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedCurriculum,
-                      decoration: InputDecoration(
-                        labelText: 'Exam Type / Curriculum',
-                        filled: true,
-                        fillColor: AppColors.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      items: _curriculums
-                          .map(
-                            (curriculum) => DropdownMenuItem<String>(
-                              value: curriculum,
-                              child: Text(
-                                curriculum,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _selectedCurriculum = value;
-                          });
-                          _fetchSubjects(); // Reload subjects for new curriculum
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Subject dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedSubjectId,
-                      decoration: InputDecoration(
-                        labelText: 'Subject',
-                        filled: true,
-                        fillColor: AppColors.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      items: _subjects
-                          .map(
-                            (subject) => DropdownMenuItem<String>(
-                              value: subject['id']?.toString(),
-                              child: Text(
-                                subject['name']?.toString() ?? 'Unknown',
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _isLoadingSubjects
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _selectedSubjectId = value;
-                              });
-                            },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select a subject';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    
-                    // Paper Type Toggle
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    // Visual Stepper
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Paper Type',
-                          style: TextStyle(
-                            color: AppColors.textPrimary.withValues(alpha: 0.7),
-                            fontSize: 14,
+                        _buildStepIcon(1, 'Details', _uploadStep >= 0),
+                        _buildStepLine(_uploadStep >= 1),
+                        _buildStepIcon(2, 'Upload', _uploadStep >= 1),
+                         _buildStepLine(_uploadStep >= 2),
+                        _buildStepIcon(3, 'Process', _uploadStep >= 2),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Curriculum and Subject Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedCurriculum,
+                            decoration: InputDecoration(
+                              labelText: 'Curriculum',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            items: _curriculums.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(color: AppColors.textPrimary)))).toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _selectedCurriculum = value);
+                                _fetchSubjects();
+                              }
+                            },
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _paperType = 'objective'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  decoration: BoxDecoration(
-                                    color: _paperType == 'objective'
-                                        ? Colors.blue.withValues(alpha: 0.2)
-                                        : AppColors.background,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _paperType == 'objective'
-                                          ? Colors.blue
-                                          : Colors.transparent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.quiz_outlined,
-                                        color: _paperType == 'objective'
-                                            ? Colors.blue
-                                            : Colors.white54,
-                                        size: 28,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'MCQ',
-                                        style: TextStyle(
-                                          color: _paperType == 'objective'
-                                              ? Colors.blue
-                                              : Colors.white54,
-                                          fontWeight: _paperType == 'objective'
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedSubjectId,
+                            decoration: InputDecoration(
+                              labelText: 'Subject',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _paperType = 'subjective'),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  decoration: BoxDecoration(
-                                    color: _paperType == 'subjective'
-                                        ? Colors.purple.withValues(alpha: 0.2)
-                                        : AppColors.background,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: _paperType == 'subjective'
-                                          ? Colors.purple
-                                          : Colors.transparent,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      Icon(
-                                        Icons.edit_document,
-                                        color: _paperType == 'subjective'
-                                            ? Colors.purple
-                                            : Colors.white54,
-                                        size: 28,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Written',
-                                        style: TextStyle(
-                                          color: _paperType == 'subjective'
-                                              ? Colors.purple
-                                              : Colors.white54,
-                                          fontWeight: _paperType == 'subjective'
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                            items: _subjects.map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name'] ?? 'Unknown', style: const TextStyle(color: AppColors.textPrimary)))).toList(),
+                            onChanged: _isLoadingSubjects ? null : (v) => setState(() => _selectedSubjectId = v),
+                            validator: (v) => v == null ? 'Required' : null,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 20),
-                    // Year input
-                    TextFormField(
-                      controller: _yearController,
-                      decoration: InputDecoration(
-                        labelText: 'Year',
-                        hintText: 'e.g. 2024',
-                        filled: true,
-                        fillColor: AppColors.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a year';
-                        }
-                        if (int.tryParse(value) == null) {
-                          return 'Please enter a valid year';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    // Season dropdown
-                    DropdownButtonFormField<String>(
-                      value: _selectedSeason,
-                      decoration: InputDecoration(
-                        labelText: 'Season',
-                        filled: true,
-                        fillColor: AppColors.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      items: _seasons
-                          .map(
-                            (season) => DropdownMenuItem<String>(
-                              value: season,
-                              child: Text(
-                                season,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
+                    
+                    // Paper Details Row (Year, Season, Variant)
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextFormField(
+                            controller: _yearController,
+                            decoration: InputDecoration(
+                              labelText: 'Year',
+                              hintText: '2024',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedSeason = value;
-                        });
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please select a season';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 20),
-                    // Variant input
-                    TextFormField(
-                      controller: _variantController,
-                      decoration: InputDecoration(
-                        labelText: 'Variant',
-                        hintText: 'e.g. 1, 2, 3',
-                        filled: true,
-                        fillColor: AppColors.background,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
+                            style: const TextStyle(color: AppColors.textPrimary),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            validator: (v) => v?.isNotEmpty == true ? null : 'Required',
+                          ),
                         ),
-                      ),
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedSeason,
+                            decoration: InputDecoration(
+                              labelText: 'Season',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                            items: _seasons.map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(color: AppColors.textPrimary)))).toList(),
+                            onChanged: (v) => setState(() => _selectedSeason = v),
+                            validator: (v) => v == null ? 'Required' : null,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: TextFormField(
+                            controller: _variantController,
+                            decoration: InputDecoration(
+                              labelText: 'Variant',
+                              hintText: '1',
+                              filled: true,
+                              fillColor: AppColors.background,
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                            style: const TextStyle(color: AppColors.textPrimary),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            validator: (v) => v?.isNotEmpty == true ? null : 'Required',
+                          ),
+                        ),
                       ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a variant';
-                        }
-                        if (int.tryParse(value) == null) {
-                          return 'Please enter a valid variant';
-                        }
-                        return null;
-                      },
                     ),
+                    
                     const SizedBox(height: 24),
-                    // File picker
-                    Container(
-                      padding: const EdgeInsets.all(20),
+                    
+                    // Paper Type Selection
+                     Container(
+                      padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: AppColors.background,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _selectedFileName != null
-                              ? const Color(0xFF6366F1).withValues(alpha: 0.5)
-                              : AppColors.border,
-                          width: _selectedFileName != null ? 2 : 1,
-                        ),
                       ),
-                      child: Column(
+                      child: Row(
                         children: [
-                          Icon(
-                            _selectedFileName != null
-                                ? Icons.check_circle
-                                : Icons.cloud_upload_outlined,
-                            color: _selectedFileName != null
-                                ? const Color(0xFF10B981)
-                                : AppColors.textSecondary,
-                            size: 40,
-                          ),
-                          const SizedBox(height: 12),
-                          if (_selectedFileName != null) ...[
-                            Text(
-                              _selectedFileName!,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w500,
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _paperType = 'objective'),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: _paperType == 'objective' ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: _paperType == 'objective' ? Colors.blue : Colors.transparent),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text('Objective (MCQ)', style: TextStyle(color: _paperType == 'objective' ? Colors.blue : Colors.white54, fontWeight: FontWeight.bold)),
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 8),
-                          ],
-                          OutlinedButton.icon(
-                            onPressed: _isSubmitting ? null : _pickPdf,
-                            icon: const Icon(Icons.attach_file),
-                            label: Text(_selectedFileName != null
-                                ? 'Change PDF'
-                                : 'Select PDF'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF818CF8),
-                              side: const BorderSide(color: Color(0xFF6366F1)),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 12,
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _paperType = 'subjective'),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: _paperType == 'subjective' ? Colors.purple.withOpacity(0.2) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: _paperType == 'subjective' ? Colors.purple : Colors.transparent),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text('Subjective (Written)', style: TextStyle(color: _paperType == 'subjective' ? Colors.purple : Colors.white54, fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 24),
+
+                    // Enhanced Drop Zone
+                    InkWell(
+                      onTap: _isSubmitting ? null : _pickPdf,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        height: 200,
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _selectedFileName != null ? const Color(0xFF6366F1) : AppColors.border,
+                            width: 2,
+                            style: BorderStyle.none, // Dotted border would be better but requires custom painter
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_selectedFileName != null) ...[
+                               const Icon(Icons.check_circle, size: 48, color: Colors.green),
+                               const SizedBox(height: 16),
+                               Text(
+                                _selectedFileName!,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                             ] else ...[
+                              Icon(Icons.cloud_upload_outlined, size: 48, color: AppColors.textPrimary.withOpacity(0.5)),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Click to upload PDF',
+                                style: TextStyle(
+                                  color: AppColors.textPrimary.withOpacity(0.7),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Supports PDF files up to 10MB',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),

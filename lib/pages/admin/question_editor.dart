@@ -41,6 +41,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   late TextEditingController _officialAnswerController;
   int _questionNumber = 1;
   List<String> _selectedTopicIds = [];
+  String _topicSearchQuery = '';
   String? _imageUrl;
   
   // Figure cropping
@@ -285,168 +286,374 @@ class _QuestionEditorState extends State<QuestionEditor> {
           // Header
           _buildHeader(paperInfo),
           
-          // Form
+          // Form (Split View)
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Question number
-                    _buildSection(
-                      'Question Number',
-                      Row(
+            child: Form(
+              key: _formKey,
+              child: Row(
+                children: [
+                  // LEFT COLUMN - Content & Visuals
+                  Expanded(
+                    flex: 3,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: 100,
-                            child: TextFormField(
-                              initialValue: _questionNumber.toString(),
-                              decoration: _inputDecoration('Q#'),
-                              keyboardType: TextInputType.number,
-                              onChanged: (v) {
-                                _questionNumber = int.tryParse(v) ?? 1;
-                                _markChanged();
-                              },
+                          // Content
+                          _buildSection(
+                            'Question Content',
+                            TextFormField(
+                              controller: _contentController,
+                              decoration: _inputDecoration('Enter question content...'),
+                              maxLines: 8,
+                              style: const TextStyle(fontSize: 16),
+                              onChanged: (_) => _markChanged(),
                             ),
+                          ),
+                          
+                          const SizedBox(height: 24),
+                          
+                          // Figure section 
+                          _buildSection(
+                            'Figure & Image',
+                            _buildFigureSection(),
                           ),
                         ],
                       ),
                     ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Content
-                    _buildSection(
-                      'Question Content',
-                      TextFormField(
-                        controller: _contentController,
-                        decoration: _inputDecoration('Enter question content...'),
-                        maxLines: 6,
-                        onChanged: (_) => _markChanged(),
-                      ),
-                    ),
-                    
-                    // MCQ Options (read-only display)
-                    if (_isMCQ && _options.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      _buildSection(
-                        'MCQ Options',
-                        Column(
+                  ),
+                  
+                  Container(width: 1, color: AppColors.border),
+                  
+                  // RIGHT COLUMN - Metadata & Answers
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      color: AppColors.surface.withOpacity(0.5),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            for (int i = 0; i < _options.length; i++)
-                              Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: _options[i]['label'] == _correctAnswer
-                                      ? Colors.green.withValues(alpha: 0.2)
-                                      : AppColors.surface,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: _options[i]['label'] == _correctAnswer
-                                        ? Colors.green
-                                        : Colors.white.withValues(alpha: 0.1),
-                                    width: _options[i]['label'] == _correctAnswer ? 2 : 1,
-                                  ),
-                                ),
-                                child: Row(
+                             // Question number
+                            _buildSection(
+                              'Question Number',
+                              TextFormField(
+                                initialValue: _questionNumber.toString(),
+                                decoration: _inputDecoration('Q#'),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) {
+                                  _questionNumber = int.tryParse(v) ?? 1;
+                                  _markChanged();
+                                },
+                              ),
+                            ),
+                            
+                            const SizedBox(height: 24),
+
+                            // Topics (Optimized)
+                            _buildSection(
+                              'Topics',
+                              _buildOptimizedTopicSelector(),
+                            ),
+                            
+                            const SizedBox(height: 24),
+                            
+                            // Official Answer
+                            _buildSection(
+                              'Official Answer',
+                              TextFormField(
+                                controller: _officialAnswerController,
+                                decoration: _inputDecoration('Enter official answer...'),
+                                maxLines: 6,
+                                onChanged: (_) => _markChanged(),
+                              ),
+                            ),
+
+                             // MCQ Options (read-only display)
+                            if (_isMCQ && _options.isNotEmpty) ...[
+                              const SizedBox(height: 24),
+                              _buildSection(
+                                'MCQ Options',
+                                Column(
                                   children: [
-                                    // Letter badge
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: _options[i]['label'] == _correctAnswer
-                                            ? Colors.green
-                                            : Colors.white.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      child: Center(
-                                        child: _options[i]['label'] == _correctAnswer
-                                            ? const Icon(Icons.check, color: Colors.white, size: 20)
-                                            : Text(
-                                                _options[i]['label'] ?? '',
-                                                style: const TextStyle(
-                                                  color: AppColors.textPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 16,
+                                    for (int i = 0; i < _options.length; i++)
+                                      Container(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: _options[i]['label'] == _correctAnswer
+                                              ? Colors.green.withOpacity(0.1)
+                                              : AppColors.background,
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: _options[i]['label'] == _correctAnswer
+                                                ? Colors.green
+                                                : AppColors.border,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Text(
+                                              _options[i]['label'] ?? '',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                _options[i]['text'] ?? '',
+                                                style: TextStyle(
+                                                  color: AppColors.textPrimary.withOpacity(0.8),
                                                 ),
                                               ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // Editable text field
-                                    Expanded(
-                                      child: TextFormField(
-                                        initialValue: _options[i]['text'] ?? '',
-                                        style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.9)),
-                                        decoration: InputDecoration(
-                                          isDense: true,
-                                          border: InputBorder.none,
-                                          hintText: 'Option ${_options[i]['label']}...',
-                                          hintStyle: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.3)),
+                                            ),
+                                          ],
                                         ),
-                                        onChanged: (value) {
-                                          _options[i]['text'] = value;
-                                          _markChanged();
-                                        },
+                                      ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 8),
+                                      child: Text(
+                                        'Note: Edit answer text in the field above to update correct answer logic.',
+                                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic),
                                       ),
                                     ),
-                                    if (_options[i]['label'] == _correctAnswer)
-                                      const Text('✓ Correct', style: TextStyle(color: Colors.green, fontSize: 12)),
                                   ],
                                 ),
                               ),
-                            // Note about changing correct answer
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text(
-                                'To change the correct answer, edit the Official Answer field below',
-                                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.4), fontSize: 11, fontStyle: FontStyle.italic),
-                              ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
-                    ],
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Topics
-                    _buildSection(
-                      'Topics',
-                      _buildTopicSelector(),
                     ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Official Answer
-                    _buildSection(
-                      'Official Answer',
-                      TextFormField(
-                        controller: _officialAnswerController,
-                        decoration: _inputDecoration('Enter official answer...'),
-                        maxLines: 4,
-                        onChanged: (_) => _markChanged(),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 20),
-                    
-                    // Figure section
-                    _buildSection(
-                      'Figure',
-                      _buildFigureSection(),
-                    ),
-                    
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptimizedTopicSelector() {
+    // Filter available topics based on search query
+    final filteredTopics = _allTopics.where((t) {
+      final name = (t['name'] ?? '').toString().toLowerCase();
+      final query = _topicSearchQuery.toLowerCase();
+      return name.contains(query);
+    }).toList();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Selected Topics Chips (Keep these for quick view/remove)
+        if (_selectedTopicIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedTopicIds.map((id) {
+                final topic = _allTopics.firstWhere((t) => t['id'] == id, orElse: () => {'name': 'Unknown'});
+                return Chip(
+                  label: Text(topic['name'], style: const TextStyle(fontSize: 12)),
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  labelStyle: const TextStyle(color: AppColors.primary),
+                  deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                  onDeleted: () {
+                    setState(() {
+                      _selectedTopicIds.remove(id);
+                      _markChanged();
+                    });
+                  },
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                );
+              }).toList(),
+            ),
+          ),
+          
+        // Selector Container
+        Container(
+          height: 300,
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
+                  decoration: _inputDecoration('Search topics...').copyWith(
+                    prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  onChanged: (v) => setState(() => _topicSearchQuery = v),
+                ),
+              ),
+              
+              // List
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredTopics.length,
+                  itemBuilder: (context, index) {
+                    final topic = filteredTopics[index];
+                    final isSelected = _selectedTopicIds.contains(topic['id']);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      title: Text(topic['name'] ?? '', style: const TextStyle(color: AppColors.textPrimary)),
+                      activeColor: AppColors.primary,
+                      checkColor: Colors.white,
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: (bool? selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedTopicIds.add(topic['id']);
+                          } else {
+                            _selectedTopicIds.remove(topic['id']);
+                          }
+                          _markChanged();
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFigureSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Has figure toggle
+          Row(
+            children: [
+              Switch(
+                value: _hasFigure,
+                onChanged: (v) {
+                  setState(() {
+                    _hasFigure = v;
+                    _markChanged();
+                  });
+                },
+                activeColor: const Color(0xFF6366F1),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Has Figure',
+                style: TextStyle(
+                  color: AppColors.textPrimary.withOpacity(0.8),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          
+          if (_hasFigure) ...[
+            const SizedBox(height: 16),
+            
+            // Current image preview
+            if (_imageUrl != null) ...[
+              Container(
+                height: 250, // Larger preview
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.border,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    _imageUrl!,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Center(
+                      child: Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            
+            // Crop controls
+            Row(
+              children: [
+                Expanded(
+                  child: _buildSlider('Page', _figurePage.toDouble(), 1, 20, (v) {
+                    setState(() {
+                      _figurePage = v.round();
+                      _markChanged();
+                    });
+                  }),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildSlider('X', _figureX, 0, 100, (v) {
+                  setState(() { _figureX = v; _markChanged(); });
+                })),
+                const SizedBox(width: 16),
+                Expanded(child: _buildSlider('Y', _figureY, 0, 100, (v) {
+                  setState(() { _figureY = v; _markChanged(); });
+                })),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(child: _buildSlider('W', _figureWidth, 5, 100, (v) {
+                  setState(() { _figureWidth = v; _markChanged(); });
+                })),
+                const SizedBox(width: 16),
+                Expanded(child: _buildSlider('H', _figureHeight, 5, 100, (v) {
+                  setState(() { _figureHeight = v; _markChanged(); });
+                })),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Crop button - opens dialog
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : _openCropDialog,
+                icon: const Icon(Icons.crop),
+                label: const Text('Open Crop Editor'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -572,170 +779,6 @@ class _QuestionEditorState extends State<QuestionEditor> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(color: AppColors.primary, width: 2),
-      ),
-    );
-  }
-
-  Widget _buildTopicSelector() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _allTopics.map((topic) {
-        final isSelected = _selectedTopicIds.contains(topic['id']);
-        return FilterChip(
-          label: Text(topic['name'] ?? ''),
-          selected: isSelected,
-          onSelected: (selected) {
-            setState(() {
-              if (selected) {
-                _selectedTopicIds.add(topic['id']);
-              } else {
-                _selectedTopicIds.remove(topic['id']);
-              }
-              _markChanged();
-            });
-          },
-          selectedColor: const Color(0xFF6366F1).withValues(alpha: 0.3),
-          checkmarkColor: Colors.white,
-          labelStyle: TextStyle(
-            color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.7),
-          ),
-          backgroundColor: AppColors.background,
-          side: BorderSide(
-            color: isSelected 
-                ? const Color(0xFF6366F1) 
-                : Colors.white.withValues(alpha: 0.1),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildFigureSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Has figure toggle
-          Row(
-            children: [
-              Switch(
-                value: _hasFigure,
-                onChanged: (v) {
-                  setState(() {
-                    _hasFigure = v;
-                    _markChanged();
-                  });
-                },
-                activeColor: const Color(0xFF6366F1),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Has Figure',
-                style: TextStyle(
-                  color: AppColors.textPrimary.withValues(alpha: 0.8),
-                ),
-              ),
-            ],
-          ),
-          
-          if (_hasFigure) ...[
-            const SizedBox(height: 16),
-            
-            // Current image preview
-            if (_imageUrl != null) ...[
-              Text(
-                'Current Image:',
-                style: TextStyle(
-                  color: AppColors.textPrimary.withValues(alpha: 0.6),
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 150,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.border,
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    _imageUrl!,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Center(
-                      child: Icon(Icons.broken_image, color: Colors.grey),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            
-            // Crop controls
-            Row(
-              children: [
-                Expanded(
-                  child: _buildSlider('Page', _figurePage.toDouble(), 1, 20, (v) {
-                    setState(() {
-                      _figurePage = v.round();
-                      _markChanged();
-                    });
-                  }),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(child: _buildSlider('X %', _figureX, 0, 100, (v) {
-                  setState(() { _figureX = v; _markChanged(); });
-                })),
-                const SizedBox(width: 16),
-                Expanded(child: _buildSlider('Y %', _figureY, 0, 100, (v) {
-                  setState(() { _figureY = v; _markChanged(); });
-                })),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(child: _buildSlider('Width %', _figureWidth, 5, 100, (v) {
-                  setState(() { _figureWidth = v; _markChanged(); });
-                })),
-                const SizedBox(width: 16),
-                Expanded(child: _buildSlider('Height %', _figureHeight, 5, 100, (v) {
-                  setState(() { _figureHeight = v; _markChanged(); });
-                })),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Crop button - opens dialog
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _openCropDialog,
-                icon: const Icon(Icons.crop),
-                label: const Text('Open Crop Editor'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ],
       ),
     );
   }

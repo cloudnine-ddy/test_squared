@@ -202,433 +202,245 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     }
   }
 
+  void _navigateToQuestion(String questionId) {
+    setState(() {
+      _selectedQuestionId = questionId;
+      // Also update selected paper if needed
+      for (final paperId in _questionsByPaper.keys) {
+        if (_questionsByPaper[paperId]?.any((q) => q['id'] == questionId) == true) {
+          _selectedPaperId = paperId;
+          break;
+        }
+      }
+    });
+  }
+
+  void _navigateRelative(int offset) {
+    if (_selectedPaperId == null || _selectedQuestionId == null) return;
+    
+    final questions = _questionsByPaper[_selectedPaperId] ?? [];
+    // Sort by question number
+    questions.sort((a, b) => (a['question_number'] as int).compareTo(b['question_number'] as int));
+    
+    final currentIndex = questions.indexWhere((q) => q['id'] == _selectedQuestionId);
+    if (currentIndex == -1) return;
+    
+    final newIndex = currentIndex + offset;
+    if (newIndex >= 0 && newIndex < questions.length) {
+      _navigateToQuestion(questions[newIndex]['id']);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.background,
-      child: Row(
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Row(
         children: [
-          // Left panel - Tree navigation
+          // LEFT SIDEBAR (Navigation)
           Container(
-            width: 350,
+            width: 320,
             decoration: BoxDecoration(
               color: AppColors.sidebar,
-              border: Border(
-                right: BorderSide(
-                  color: Colors.white.withValues(alpha: 0.1),
-                ),
-              ),
+              border: Border(right: BorderSide(color: AppColors.border)),
             ),
             child: Column(
               children: [
-                _buildTreeHeader(),
+                // Sidebar Header (Subject Filter)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.border)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Question Manager', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _selectedSubjectId,
+                        isExpanded: true,
+                        decoration: InputDecoration(
+                          labelText: 'Subject',
+                          labelStyle: const TextStyle(color: AppColors.textSecondary),
+                          filled: true,
+                          fillColor: AppColors.surface,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                        ),
+                        items: _subjects.map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary)))).toList(),
+                        onChanged: (v) {
+                          setState(() {
+                            _selectedSubjectId = v;
+                            _selectedPaperId = null; 
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Paper List
                 Expanded(
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _buildTree(),
+                  child: _isLoading 
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildPaperList(),
                 ),
               ],
             ),
           ),
           
-          // Right panel - Question editor or placeholder
+          // RIGHT MAIN CONTENT (Editor)
           Expanded(
-            child: _selectedQuestionId != null
-                ? QuestionEditor(
-                    key: ValueKey(_selectedQuestionId), // Force rebuild when switching
-                    questionId: _selectedQuestionId!,
-                    paperId: _selectedPaperId!,
-                    onClose: _closeEditor,
-                    onDelete: () => _deleteQuestion(_selectedQuestionId!),
+            child: _selectedQuestionId != null && _selectedPaperId != null
+                ? Column(
+                    children: [
+                      // Fast Navigation Bar
+                      Container(
+                        height: 60,
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          border: Border(bottom: BorderSide(color: AppColors.border)),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              _getPaperLabel(_selectedPaperId!),
+                              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: () => _navigateRelative(-1),
+                              icon: const Icon(Icons.chevron_left, color: AppColors.textPrimary),
+                              tooltip: 'Previous Question',
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () => _navigateRelative(1),
+                              icon: const Icon(Icons.chevron_right, color: AppColors.textPrimary),
+                              tooltip: 'Next Question',
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Editor
+                      Expanded(
+                        child: QuestionEditor(
+                          key: ValueKey(_selectedQuestionId),
+                          questionId: _selectedQuestionId!,
+                          paperId: _selectedPaperId!,
+                          onClose: () => setState(() => _selectedQuestionId = null),
+                          onDelete: () => _deleteQuestion(_selectedQuestionId!),
+                        ),
+                      ),
+                    ],
                   )
-                : _buildPlaceholder(),
+                : Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.arrow_back, size: 48, color: AppColors.textPrimary.withOpacity(0.2)),
+                        const SizedBox(height: 16),
+                        Text('Select a question from the sidebar', style: TextStyle(color: AppColors.textPrimary.withOpacity(0.5), fontSize: 18)),
+                      ],
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTreeHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.account_tree_outlined,
-            color: Colors.white.withValues(alpha: 0.7),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Question Manager',
-            style: TextStyle(
-              color: AppColors.textPrimary.withValues(alpha: 0.9),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            onPressed: _loadData,
-            icon: Icon(
-              Icons.refresh,
-              color: Colors.white.withValues(alpha: 0.5),
-              size: 20,
-            ),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-    );
+  List<Map<String, dynamic>> _getFilteredPapers() {
+    if (_selectedSubjectId == null) return [];
+    return _papersBySubject[_selectedSubjectId] ?? [];
   }
 
-  Widget _buildTree() {
-    if (_subjects.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.folder_open,
-              size: 48,
-              color: Colors.white.withValues(alpha: 0.2),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No subjects found',
-              style: TextStyle(
-                color: AppColors.textPrimary.withValues(alpha: 0.4),
-              ),
-            ),
-          ],
-        ),
-      );
+  String _getPaperLabel(String paperId) {
+    // Helper to find paper name
+    if (_selectedSubjectId == null) return 'Unknown Paper';
+    final papers = _papersBySubject[_selectedSubjectId] ?? [];
+    final paper = papers.firstWhere((p) => p['id'] == paperId, orElse: () => {});
+    if (paper.isEmpty) return 'Unknown Paper';
+    return '${paper['year']} ${paper['season']} V${paper['variant']}';
+  }
+
+  Widget _buildPaperList() {
+    final papers = _getFilteredPapers();
+    if (papers.isEmpty) {
+      return const Center(child: Text('No papers found', style: TextStyle(color: AppColors.textSecondary)));
     }
-    
+
     return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: _subjects.length,
+      itemCount: papers.length,
       itemBuilder: (context, index) {
-        final subject = _subjects[index];
-        return _buildSubjectNode(subject);
-      },
-    );
-  }
+        final paper = papers[index];
+        final paperId = paper['id'] as String;
+        final questions = _questionsByPaper[paperId] ?? [];
+        // Sort questions
+        questions.sort((a, b) => (a['question_number'] as int).compareTo(b['question_number'] as int));
 
-  Widget _buildSubjectNode(Map<String, dynamic> subject) {
-    final subjectId = subject['id'] as String;
-    final isExpanded = _expandedSubjects.contains(subjectId);
-    final papers = _papersBySubject[subjectId] ?? [];
-    final totalQuestions = papers.fold<int>(
-      0, 
-      (sum, p) => sum + (_questionsByPaper[p['id']]?.length ?? 0),
-    );
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Subject row
-        InkWell(
-          onTap: () {
-            setState(() {
-              if (isExpanded) {
-                _expandedSubjects.remove(subjectId);
-              } else {
-                _expandedSubjects.add(subjectId);
-              }
-            });
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                Icon(
-                  isExpanded ? Icons.expand_more : Icons.chevron_right,
-                  color: Colors.white.withValues(alpha: 0.5),
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.science_outlined,
-                  color: const Color(0xFF6366F1),
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    subject['name'] ?? 'Unknown',
-                    style: TextStyle(
-                      color: AppColors.textPrimary.withValues(alpha: 0.9),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${papers.length}P / ${totalQuestions}Q',
-                    style: TextStyle(
-                      color: AppColors.textPrimary.withValues(alpha: 0.5),
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        
-        // Papers (if expanded)
-        if (isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 24),
-            child: Column(
-              children: papers.map((paper) => _buildPaperNode(paper)).toList(),
-            ),
-          ),
-      ],
-    );
-  }
+        final isActive = _selectedPaperId == paperId;
 
-  Widget _buildPaperNode(Map<String, dynamic> paper) {
-    final paperId = paper['id'] as String;
-    final isExpanded = _expandedPapers.contains(paperId);
-    final questions = _questionsByPaper[paperId] ?? [];
-    
-    final year = paper['year'] ?? '?';
-    final season = paper['season'] ?? '';
-    final variant = paper['variant'] ?? '';
-    final paperLabel = '$year $season V$variant';
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Paper row
-        InkWell(
-          onTap: () {
-            setState(() {
-              if (isExpanded) {
-                _expandedPapers.remove(paperId);
-              } else {
-                _expandedPapers.add(paperId);
-              }
-            });
-          },
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  isExpanded ? Icons.expand_more : Icons.chevron_right,
-                  color: Colors.white.withValues(alpha: 0.4),
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Icon(
-                  Icons.description_outlined,
-                  color: Colors.orange.withValues(alpha: 0.7),
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    paperLabel,
-                    style: TextStyle(
-                      color: AppColors.textPrimary.withValues(alpha: 0.8),
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${questions.length}',
-                  style: TextStyle(
-                    color: AppColors.textPrimary.withValues(alpha: 0.4),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // PDF Preview button
-                IconButton(
-                  onPressed: () async {
-                    final pdfUrl = paper['pdf_url'] as String?;
-                    final subjectId = paper['subject_id'] as String?;
-                    if (pdfUrl != null) {
-                      try {
-                        String filePath;
-                        
-                        // Check if it's a full URL or just a filename
-                        if (pdfUrl.startsWith('http')) {
-                          // Full URL - extract path after exam-papers/
-                          if (pdfUrl.contains('/exam-papers/')) {
-                            filePath = pdfUrl.split('/exam-papers/').last;
-                          } else {
-                            ToastService.showError('Unknown URL format');
-                            return;
-                          }
-                        } else {
-                          // Just a filename - construct the path
-                          if (subjectId != null) {
-                            filePath = 'pdfs/$subjectId/$pdfUrl';
-                          } else {
-                            filePath = 'pdfs/$pdfUrl';
-                          }
-                        }
-                        
-                        print('DEBUG: Using file path: $filePath');
-                        
-                        // Create a signed URL (valid for 1 hour)
-                        final signedUrl = await Supabase.instance.client.storage
-                            .from('exam-papers')
-                            .createSignedUrl(filePath, 3600);
-                        
-                        showPdfPreview(context, signedUrl, paperLabel);
-                      } catch (e) {
-                        print('DEBUG error: $e');
-                        ToastService.showError('Failed to load PDF: $e');
-                      }
-                    } else {
-                      ToastService.showError('PDF URL not available');
-                    }
-                  },
-                  icon: Icon(
-                    Icons.visibility,
-                    size: 16,
-                    color: Colors.blue.withValues(alpha: 0.7),
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                  tooltip: 'Preview PDF',
-                ),
-                IconButton(
-                  onPressed: () => _deletePaper(paperId, paperLabel),
-                  icon: Icon(
-                    Icons.delete_outline,
-                    size: 16,
-                    color: Colors.red.withValues(alpha: 0.5),
-                  ),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                  tooltip: 'Delete paper',
-                ),
-              ],
-            ),
-          ),
-        ),
-        
-        // Questions (if expanded)
-        if (isExpanded)
-          Padding(
-            padding: const EdgeInsets.only(left: 32),
-            child: Column(
-              children: questions.map((q) => _buildQuestionNode(q, paperId)).toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildQuestionNode(Map<String, dynamic> question, String paperId) {
-    final questionId = question['id'] as String;
-    final isSelected = _selectedQuestionId == questionId;
-    final hasImage = question['image_url'] != null;
-    final hasFigure = question['ai_answer']?['has_figure'] == true;
-    
-    // Status icon
-    IconData statusIcon;
-    Color statusColor;
-    
-    if (hasImage) {
-      statusIcon = Icons.check_circle;
-      statusColor = Colors.green;
-    } else if (hasFigure) {
-      statusIcon = Icons.warning;
-      statusColor = Colors.orange;
-    } else {
-      statusIcon = Icons.circle_outlined;
-      statusColor = Colors.grey;
-    }
-    
-    return InkWell(
-      onTap: () => _selectQuestion(questionId, paperId),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected 
-              ? const Color(0xFF6366F1).withValues(alpha: 0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-          border: isSelected
-              ? Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.4))
-              : null,
-        ),
-        child: Row(
-          children: [
-            Icon(statusIcon, size: 14, color: statusColor),
-            const SizedBox(width: 8),
-            Text(
-              'Q${question['question_number']}',
-              style: TextStyle(
-                color: isSelected 
-                    ? Colors.white 
-                    : Colors.white.withValues(alpha: 0.7),
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-            const Spacer(),
-            if (hasImage)
-              Icon(
-                Icons.image,
-                size: 14,
-                color: Colors.white.withValues(alpha: 0.3),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.touch_app_outlined,
-            size: 64,
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Select a question to edit',
+        return ExpansionTile(
+          initiallyExpanded: isActive,
+          maintainState: true,
+          collapsedIconColor: AppColors.textSecondary,
+          iconColor: AppColors.primary,
+          backgroundColor: AppColors.background.withValues(alpha: 0.5),
+          title: Text(
+            '${paper['year']} ${paper['season']} V${paper['variant']}',
             style: TextStyle(
-              color: AppColors.textPrimary.withValues(alpha: 0.5),
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Use the tree on the left to navigate',
-            style: TextStyle(
-              color: AppColors.textPrimary.withValues(alpha: 0.3),
+              color: isActive ? Colors.blueAccent : AppColors.textPrimary,
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
               fontSize: 14,
             ),
           ),
-        ],
-      ),
+          subtitle: Text(
+            '${questions.length} Questions',
+            style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: questions.map((q) {
+                  final isSelected = _selectedQuestionId == q['id'];
+                  final hasImage = q['image_url'] != null;
+                  
+                  return InkWell(
+                    onTap: () => _navigateToQuestion(q['id']),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : (hasImage ? Colors.green.withValues(alpha: 0.2) : AppColors.surface),
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : (hasImage ? Colors.green : AppColors.border),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '${q['question_number']}',
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

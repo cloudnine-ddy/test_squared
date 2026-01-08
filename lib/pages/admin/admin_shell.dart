@@ -12,9 +12,9 @@ import 'analytics_dashboard_view.dart';
 
 /// Enum for admin navigation items - add new items here for future features
 enum AdminSection {
+  dashboard,
   uploadPaper,
   questionManager,
-  analytics,
   // Add future sections here:
   // userManagement,
   // settings,
@@ -30,7 +30,7 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   bool _isCheckingAccess = true;
-  AdminSection _currentSection = AdminSection.uploadPaper;
+  AdminSection _currentSection = AdminSection.dashboard;
   bool _isSidebarExpanded = true;
 
   @override
@@ -94,36 +94,36 @@ class _AdminShellState extends State<AdminShell> {
 
   Widget _buildCurrentView() {
     switch (_currentSection) {
+      case AdminSection.dashboard:
+        return const AnalyticsDashboardView();
       case AdminSection.uploadPaper:
         return const UploadPaperView();
       case AdminSection.questionManager:
         return const QuestionManagerView();
-      case AdminSection.analytics:
-        return const AnalyticsDashboardView();
       // Add future cases here:
     }
   }
 
   String _getSectionTitle(AdminSection section) {
     switch (section) {
+      case AdminSection.dashboard:
+        return 'Dashboard';
       case AdminSection.uploadPaper:
         return 'Upload Papers';
       case AdminSection.questionManager:
         return 'Question Manager';
-      case AdminSection.analytics:
-        return 'Analytics';
       // Add future cases here
     }
   }
 
   IconData _getSectionIcon(AdminSection section) {
     switch (section) {
+      case AdminSection.dashboard:
+        return Icons.dashboard_rounded;
       case AdminSection.uploadPaper:
         return Icons.upload_file;
       case AdminSection.questionManager:
         return Icons.account_tree;
-      case AdminSection.analytics:
-        return Icons.analytics;
       // Add future cases here
     }
   }
@@ -233,6 +233,7 @@ class _AdminShellState extends State<AdminShell> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
+                _buildNavItem(AdminSection.dashboard),
                 _buildNavItem(AdminSection.uploadPaper),
                 _buildNavItem(AdminSection.questionManager),
                 // Add more navigation items here as needed
