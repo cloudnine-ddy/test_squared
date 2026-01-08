@@ -141,6 +141,8 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
 
       print('Edge function response: ${response.data}');
 
+      if (!mounted) return;
+
       // Clear from local state
       setState(() {
         _papersBySubject.forEach((_, papers) {
@@ -189,7 +191,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     try {
       await _supabase.from('questions').delete().eq('id', questionId);
       ToastService.showSuccess('Question deleted!');
-      if (_selectedQuestionId == questionId) {
+      if (mounted && _selectedQuestionId == questionId) {
         setState(() => _selectedQuestionId = null);
       }
       _loadData();

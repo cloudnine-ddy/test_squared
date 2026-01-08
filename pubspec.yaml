@@ -42,6 +42,7 @@ dependencies:
   confetti: ^0.8.0
   google_sign_in: ^6.2.1
   flutter_markdown: ^0.6.14
+  syncfusion_flutter_pdfviewer: ^24.1.41
 
   # Charts for analytics
   fl_chart: ^0.69.0

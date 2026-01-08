@@ -10,7 +10,7 @@ class QuestionModel {
   final String aiSolution; // Legacy AI steps
   final Map<String, dynamic>? aiAnswerRaw; // Full JSON including boundingBox
   final Map<String, dynamic>? explanationRaw; // New explanation field
-  
+
   // MCQ-specific fields
   final String type; // 'mcq' or 'structured'
   final List<Map<String, String>>? options; // [{label: 'A', text: '...'}]
@@ -21,6 +21,7 @@ class QuestionModel {
   final String? paperSeason;
   final int? paperVariant;
   final String? paperType; // 'objective' or 'subjective'
+  final String? pdfUrl;
 
   const QuestionModel({
     required this.id,
@@ -41,6 +42,7 @@ class QuestionModel {
     this.paperSeason,
     this.paperVariant,
     this.paperType,
+    this.pdfUrl,
   });
 
   // Helper getters
@@ -178,7 +180,7 @@ class QuestionModel {
     // MCQ fields
     final type = map['type']?.toString() ?? 'structured';
     final correctAnswer = map['correct_answer']?.toString();
-    
+
     // Parse options array
     List<Map<String, String>>? options;
     final optionsRaw = map['options'];
@@ -193,11 +195,14 @@ class QuestionModel {
         return {'label': '', 'text': ''};
       }).toList();
     }
-    
+
     // Paper type from joined papers table
     String? paperType;
+    String? pdfUrl; // Extracted from paperData
+
     if (paperData is Map<String, dynamic>) {
       paperType = paperData['paper_type']?.toString();
+      pdfUrl = paperData['pdf_url']?.toString();
     }
 
     return QuestionModel(
@@ -219,6 +224,7 @@ class QuestionModel {
       paperSeason: paperSeason,
       paperVariant: paperVariant,
       paperType: paperType,
+      pdfUrl: pdfUrl,
     );
   }
 
@@ -249,6 +255,7 @@ class QuestionModel {
     int? paperYear,
     String? paperSeason,
     int? paperVariant,
+    String? pdfUrl,
   }) {
     return QuestionModel(
       id: id ?? this.id,
@@ -265,6 +272,8 @@ class QuestionModel {
       paperYear: paperYear ?? this.paperYear,
       paperSeason: paperSeason ?? this.paperSeason,
       paperVariant: paperVariant ?? this.paperVariant,
+      paperType: paperType,
+      pdfUrl: pdfUrl ?? this.pdfUrl,
     );
   }
 }

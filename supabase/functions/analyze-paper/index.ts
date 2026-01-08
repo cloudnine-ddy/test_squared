@@ -1,55 +1,37 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1'
 
-// VERSION: 8.0 - Network Retry + Timeout Handling
+// VERSION: 4.0 - Optimized prompt for smaller output
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
-const MAX_RETRIES = 3
-const RETRY_DELAY_MS = 1000
 
-// Types
+// Types for structured data
 interface Topic {
   id: string
   name: string
 }
 
-interface RawFigure {
-  ymin: number // 0-1000
-  xmin: number // 0-1000
-  ymax: number // 0-1000
-  xmax: number // 0-1000
-  description?: string
+interface FigureBbox {
+  page: number        // 1-indexed page number
+  x: number           // percentage from left (0-100)
+  y: number           // percentage from top (0-100)
+  width: number       // percentage width (0-100)
+  height: number      // percentage height (0-100)
 }
 
-interface RawQuestion {
+interface ExtractedQuestion {
   question_number: number
   content: string
-  topic_ids?: string[]
+  topic_ids: string[]
   type: 'structured' | 'mcq'
   marks?: number
-  statements?: string[] // I, II, III statements
   options?: { label: string; text: string }[]
   correct_answer?: string
-  figures?: RawFigure[] // Multiple figures support
-  is_continuation?: boolean
-  explanation?: string
+  layout_scan?: string | null  // Forces spatial reasoning
+  figure_description?: string | null  // Forces vision encoder
+  figure?: FigureBbox
 }
 
-// Helper: Retry fetch with exponential backoff
-async function fetchWithRetry(url: string, options: RequestInit, retries = MAX_RETRIES): Promise<Response> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const response = await fetch(url, options)
-      return response
-    } catch (error) {
-      if (attempt === retries) {
-        throw error // Last attempt failed
-      }
-      const delay = RETRY_DELAY_MS * Math.pow(2, attempt - 1) // Exponential backoff
-      console.warn(`[Retry] Attempt ${attempt} failed, retrying in ${delay}ms...`, error)
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-  throw new Error('fetchWithRetry: should not reach here')
+interface AIResponse {
+  questions: ExtractedQuestion[]
 }
 
 Deno.serve(async (req) => {
@@ -62,509 +44,535 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const startTime = Date.now()
-
   try {
-    const { paperId, pdfUrl, paperType, startPage, endPage } = await req.json()
+    const { paperId, pdfUrl, markSchemeUrl, paperType } = await req.json()
     const isObjective = paperType === 'objective'
 
-    if (!paperId || !pdfUrl) throw new Error('Missing paperId or pdfUrl')
+    console.log(`[DEBUG] Paper type received: "${paperType}"`)
+    console.log(`[DEBUG] Is objective (MCQ): ${isObjective}`)
 
-    console.log(`[Start] Analyzing paper ${paperId} (${paperType})`)
-    if (startPage !== undefined || endPage !== undefined) {
-      console.log(`[Batch Mode] Processing pages ${startPage ?? 0} to ${endPage ?? 'end'}`)
+    if (!paperId || !pdfUrl) {
+      return new Response(
+        JSON.stringify({ error: 'Missing paperId or pdfUrl' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Initialize Clients
+    const hasMarkScheme = !!markSchemeUrl
+    console.log(`Mark scheme provided: ${hasMarkScheme}`)
+    if (hasMarkScheme) {
+      console.log(`Mark scheme URL: ${markSchemeUrl}`)
+    }
+
+    // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const supabase = createClient(supabaseUrl, supabaseKey)
     const apiKey = Deno.env.get('GEMINI_API_KEY')
-    const pdfCoApiKey = Deno.env.get('PDF_CO_API_KEY')
 
-    if (!apiKey) throw new Error('GEMINI_API_KEY not set')
-    if (!pdfCoApiKey) throw new Error('PDF_CO_API_KEY not set')
+    if (!apiKey) {
+      console.error('GEMINI_API_KEY not set')
+      return new Response(
+        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    console.log(`[Start] Analyzing paper ${paperId} (${paperType})`)
+    console.log(`[1/6] Starting analysis for paper: ${paperId}`)
 
-    // 1. Fetch Context (Subject & Topics)
-    const { data: paper } = await supabase
+    // Step 1: Get paper details to find subject_id
+    const { data: paper, error: paperError } = await supabase
       .from('papers')
-      .select('subject_id')
+      .select('id, subject_id, year, season, variant')
       .eq('id', paperId)
       .single()
 
-    if (!paper) throw new Error('Paper not found')
+    if (paperError || !paper) {
+      console.error('Paper not found:', paperError)
+      return new Response(
+        JSON.stringify({ error: 'Paper not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    const { data: topics } = await supabase
+    console.log(`[2/6] Paper found: ${paper.year} ${paper.season} (Subject: ${paper.subject_id})`)
+
+    // Step 2: Fetch topics for this subject
+    const { data: topics, error: topicsError } = await supabase
       .from('topics')
       .select('id, name')
       .eq('subject_id', paper.subject_id)
 
+    if (topicsError) {
+      console.error('Failed to fetch topics:', topicsError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch topics' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     const topicsList: Topic[] = topics || []
+    console.log(`[3/6] Found ${topicsList.length} topics for this subject`)
+
+    // Step 3: Download PDF and convert to base64
+    console.log(`[4/6] Downloading PDF from: ${pdfUrl}`)
+    const pdfResponse = await fetch(pdfUrl)
+    if (!pdfResponse.ok) {
+      console.error('Failed to download PDF:', pdfResponse.status)
+      return new Response(
+        JSON.stringify({ error: 'Failed to download PDF' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const pdfBlob = await pdfResponse.blob()
+    const arrayBuffer = await pdfBlob.arrayBuffer()
+    const pdfBytes = new Uint8Array(arrayBuffer)
+
+    // Convert to base64 (chunked to avoid stack overflow)
+    function uint8ArrayToBase64(bytes: Uint8Array): string {
+      const CHUNK_SIZE = 0x8000 // 32KB chunks
+      let binary = ''
+      for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+        const chunk = bytes.subarray(i, Math.min(i + CHUNK_SIZE, bytes.length))
+        binary += String.fromCharCode.apply(null, Array.from(chunk))
+      }
+      return btoa(binary)
+    }
+
+    const base64Data = uint8ArrayToBase64(pdfBytes)
+    console.log(`PDF downloaded: ${(pdfBytes.length / 1024 / 1024).toFixed(2)} MB`)
+
+    // Step 4: Build the prompt for Gemini based on paper type
     const topicsJson = JSON.stringify(topicsList.map(t => ({ id: t.id, name: t.name })))
 
-    // 2. Load PDF (Single Load)
-    console.log(`[PDF] Loading PDF...`)
-    const pdfRes = await fetchWithRetry(pdfUrl, {})
-    if (!pdfRes.ok) throw new Error('Failed to download PDF')
-    const pdfArrayBuffer = await pdfRes.arrayBuffer()
-    const srcDoc = await PDFDocument.load(pdfArrayBuffer)
-    const pageCount = srcDoc.getPageCount()
+    const objectivePrompt = `You are a Biology MCQ exam analyzer.
 
-    console.log(`[PDF] Document has ${pageCount} pages.`)
-    console.log(`[Warning] Edge Function execution time limit: ~150s (free) or ~600s (pro)`)
+CRITICAL: Questions often mention "The diagram shows..." THIS MEANS there is an image!
 
-    // Determine batch range
-    const batchStart = startPage ?? 0
-    const batchEnd = endPage ?? pageCount
-    const actualStart = Math.max(0, batchStart)
-    const actualEnd = Math.min(pageCount, batchEnd)
-    const pagesInBatch = actualEnd - actualStart
+REAL EXAM PATTERN:
+Number: 4
+Intro: "The diagram shows a cross-section through two guard cells..."
+  arrow down
+DIAGRAM with labels W,X,Y,Z
+  arrow down
+Question: "Which labelled structures would also be found in animal cell?"
+  arrow down
+Options: A, B, C, D
 
-    console.log(`[Batch] Processing pages ${actualStart + 1} to ${actualEnd} (${pagesInBatch} pages)`)
+DETECTION RULE:
+IF intro mentions "diagram/figure/graph/table" then set has_figure = true and provide coordinates
 
-    // 3. STRICT SERIAL Processing Loop (NO batching, NO Promise.all)
-    const allQuestions: (RawQuestion & { _source_page: number, _page_dims: { width: number, height: number } })[] = []
+TOPICS (use id NOT name):
+${topicsJson}
 
-    // Process ONE page at a time within the batch range
-    for (let pageIdx = actualStart; pageIdx < actualEnd; pageIdx++) {
-      const pageNum = pageIdx + 1
-      const elapsedSec = Math.floor((Date.now() - startTime) / 1000)
-      console.log(`[Page ${pageNum}/${pageCount}] Processing serially... (${elapsedSec}s elapsed)`)
+OUTPUT JSON:
+{
+  "questions": [
+    {
+      "question_number": 4,
+      "content": "Which labelled structures would also be found in an animal cell?",
+      "topic_ids": ["uuid"],
+      "type": "mcq",
+      "marks": 1,
+      "options": [
+        {"label":"A", "text":"W and X"},
+        {"label":"B", "text":"X and Y"},
+        {"label":"C", "text":"Y and Z"},
+        {"label":"D", "text":"Z and W"}
+      ],
+      "correct_answer": "C",
+      "layout_scan": "Found 4. Intro says The diagram shows. Below is labeled diagram. Below diagram is question. DIAGRAM DETECTED.",
+      "figure_description": "Cross-section of two guard cells with labeled structures W,X,Y,Z",
+      "figure": {"page":1, "x":20, "y":30, "width":60, "height":35}
+    }
+  ]
+}
 
-      // Timeout warning
-      if (elapsedSec > 120) {
-        console.warn(`[Warning] Approaching execution time limit (${elapsedSec}s). Consider splitting large PDFs.`)
+RULES:
+1. layout_scan = MANDATORY (describe what you see vertically)
+2. figure_description = Required if image exists
+3. figure = Percentages (0-100) of page width/height
+4. content = Question text ONLY (no A/B/C/D)
+5. Extract ALL questions
+
+Return valid JSON, no markdown.`
+
+    const subjectivePrompt = `You are a Biology structured question analyzer.
+
+PATTERN: Intro then Diagram then Sub-questions (a)(b)(c)
+
+DETECTION RULE:
+IF intro mentions "diagram/figure/graph" then set has_figure = true and provide coordinates
+
+TOPICS (use id NOT name):
+${topicsJson}
+
+OUTPUT JSON:
+{
+  "questions": [
+    {
+      "question_number": 1,
+      "content": "Full question with all parts: (a) Name structure X. (b) Describe function...",
+      "topic_ids": ["uuid"],
+      "type": "structured",
+      "marks": 6,
+      "layout_scan": "Found 1. Intro says The diagram shows a plant cell. Below is labeled diagram. Below are parts (a)(b). DIAGRAM DETECTED.",
+      "figure_description": "Labeled plant cell diagram showing nucleus, chloroplasts, cell wall",
+      "figure": {"page":1, "x":20, "y":25, "width":60, "height":40}
+    }
+  ]
+}
+
+RULES:
+1. layout_scan = MANDATORY
+2. figure_description = Required if image exists
+3. figure = Percentages (0-100)
+4. content = Combine ALL sub-parts into one text
+5. marks = Total marks
+
+Return valid JSON, no markdown.`
+
+    const prompt = isObjective ? objectivePrompt : subjectivePrompt
+    console.log(`Using ${isObjective ? 'OBJECTIVE (MCQ)' : 'SUBJECTIVE (Written)'} prompt`)
+
+    // Step 5: Send to Gemini
+    console.log('[5/6] Sending to Gemini for analysis...')
+
+    const geminiPayload = {
+      contents: [{
+        parts: [
+          { text: prompt },
+          {
+            inline_data: {
+              mime_type: "application/pdf",
+              data: base64Data
+            }
+          }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 16384,
       }
-
-      try {
-         // A. Get Dimensions JIT (Just-In-Time)
-         const { width, height } = srcDoc.getPage(pageIdx).getSize()
-         const pageDims = { width, height }
-
-         console.log(`[Page ${pageNum}] Dims: ${width}x${height}`)
-
-         // B. Extract Page as PDF locally (No PDF.co)
-         const newPdf = await PDFDocument.create()
-         const [copiedPage] = await newPdf.copyPages(srcDoc, [pageIdx])
-         newPdf.addPage(copiedPage)
-         const base64Pdf = await newPdf.saveAsBase64()
-
-         // C. Analyze (Native PDF)
-         const result = await analyzePageImage(base64Pdf, pageNum, isObjective, topicsJson, apiKey, "application/pdf")
-
-         if (result && result.questions) {
-             console.log(`[Page ${pageNum}] Extracted ${result.questions.length} items`)
-
-             // Map result to global list
-             const mapped = result.questions.map(q => ({
-                 ...q,
-                 _source_page: pageNum,
-                 _page_dims: pageDims
-             }))
-
-             allQuestions.push(...mapped)
-         } else {
-           console.log(`[Page ${pageNum}] No questions extracted (possibly empty or error)`)
-         }
-
-      } catch (err) {
-        console.error(`[Error] Failed to process page ${pageNum}, skipping...`, err)
-        // Do NOT rethrow - continue to next page so one bad page doesn't kill entire upload
-      }
-
-      // Small delay to allow GC to work between pages
-      await new Promise(resolve => setTimeout(resolve, 100))
     }
 
-    // 4. Merge & Deduplicate
-    console.log(`[Merge] Merging ${allQuestions.length} raw fragments...`)
-    const finalQuestions = mergeQuestions(allQuestions)
-    console.log(`[Merge] Resulted in ${finalQuestions.length} unique questions`)
-
-    // 5. Insert into Database
-    const dbRows = finalQuestions.map(q => {
-      let aiAnswer = null;
-      let explanationData = null;
-
-      // Handle Figure & Coordinates
-      // Process Figures
-      // Convert 'figures' array to ai_answer format
-      // If legacy 'figure' field exists, add it too (backward compat if needed, but schema changed)
-      // Actually we just use the new 'figures' array.
-
-      const figuresData = [];
-      const sources = q.figures || ( (q as any).figure ? [(q as any).figure] : [] );
-
-      if (sources.length > 0) {
-        // Dimensions are now attached to the question object from the loop
-        const dims = (q as any)._page_dims || { width: 595, height: 842 }
-
-        for (const fig of sources) {
-            // Gemini 0-1000 (Top-Left Origin) -> PDF Points (Bottom-Left Origin)
-            const xMinRel = fig.xmin / 1000;
-            const xMaxRel = fig.xmax / 1000;
-            const yMinRel = fig.ymin / 1000; // Top
-            const yMaxRel = fig.ymax / 1000; // Bottom
-
-            const x = xMinRel * dims.width;
-            const pdfYTop = (1 - yMinRel) * dims.height;
-            const pdfYBottom = (1 - yMaxRel) * dims.height;
-            const width = (xMaxRel - xMinRel) * dims.width;
-            const height = pdfYTop - pdfYBottom;
-
-            figuresData.push({
-                description: fig.description || 'Figure',
-                boundingBox: {
-                    x: Number(x.toFixed(2)),
-                    y: Number(pdfYBottom.toFixed(2)),
-                    width: Number(width.toFixed(2)),
-                    height: Number(height.toFixed(2)),
-                    page: (q as any)._source_page,
-                    page_width: dims.width,
-                    page_height: dims.height
-                },
-                raw_gemini: fig
-            });
-        }
-      }
-
-      aiAnswer = {
-          has_figure: figuresData.length > 0,
-          figures: figuresData,
-          statements: q.statements || []
-      }
-
-      // Handle Explanation
-      if (q.explanation) {
-          explanationData = {
-              text: q.explanation,
-              generated_at: new Date().toISOString()
-          }
-      }
-
-      const validTopics = (q.topic_ids || []).filter(tid => topicsList.some(t => t.id === tid))
-
-      // Validate options for MCQ
-      let finalOptions = q.options || null;
-      if (q.type === 'mcq' && (!finalOptions || finalOptions.length === 0)) {
-         // If MCQ has no options, it's invalid.
-         // Strategy: Warn and downgrade to 'structured' OR provide empty placeholder to pass constraint?
-         // Better to downgrade to structured if we can't parse options,
-         // BUT user might prefer we keep it as MCQ with empty options if the constraint allows (unlikely).
-         // Given the error "violates check constraint check_mcq_options", it likely requires valid options.
-         // Let's inspect the constraint in next step. For now, enforce [] if it's MCQ to see if [] passes,
-         // or if we should default to structured.
-         // A safe fallback is: if MCQ has no options, default to empty array [] which is valid JSONB.
-         // Wait, the error said "Failing row contains ... options: null". So null is definitely bad.
-         finalOptions = [];
-      }
-
-      return {
-        paper_id: paperId,
-        question_number: q.question_number,
-        content: q.content,
-        topic_ids: validTopics,
-        type: q.type,
-        options: finalOptions,
-        correct_answer: q.correct_answer || null,
-        marks: q.marks || null,
-        ai_answer: aiAnswer,
-        explanation: explanationData
-      }
+    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(geminiPayload)
     })
 
-    if (dbRows.length > 0) {
-      const { data: insertedQuestions, error: insertError } = await supabase
-        .from('questions')
-        .insert(dbRows)
-        .select()
-
-      if (insertError) throw insertError
-
-      // Trigger crop-figure for any questions with figures/tables
-      if (insertedQuestions && insertedQuestions.length > 0) {
-          const questionsWithFigures = insertedQuestions.filter((q: any) =>
-              q.ai_answer && (q.ai_answer.has_figure || q.ai_answer.has_table)
-          );
-
-          if (questionsWithFigures.length > 0) {
-              console.log(`[Batch] Triggering crop-figure for ${questionsWithFigures.length} questions...`);
-
-              // We do this asynchronously (fire and forget pattern) or await?
-              // Await is safer to ensure they start, but might slow down response.
-              // Given Edge Function limits, fire and forget is risky if the runtime kills bg tasks.
-              // Let's use Promise.allSettled but with a timeout? Or just await them.
-              // Since we are in an Edge Function, we should await to ensure execution.
-
-              const cropPromises = questionsWithFigures.map(async (q: any) => {
-                  try {
-                      console.log(`[Batch] Invoking crop-figure for Q${q.id}...`);
-                      const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/crop-figure`, {
-                          method: 'POST',
-                          headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${supabaseKey}` // Service role key
-                          },
-                          body: JSON.stringify({ record: q })
-                      });
-                      console.log(`[Batch] crop-figure response for Q${q.id}: ${res.status} ${res.statusText}`);
-                  } catch (err) {
-                      console.error(`[Error] Failed to trigger crop-figure for Q${q.id}`, err);
-                  }
-              });
-
-              // Don't block the ENTIRE response for too long, but wait a bit?
-              // Actually, crop-figure creates images. If we don't await, user might load page before images exist.
-              // But image generation is slow (PDF.co).
-              // Let's await.
-              await Promise.allSettled(cropPromises);
-          } else {
-              console.log('[Batch] No questions with figures/tables found in this batch.');
-          }
-      }
+    if (!geminiRes.ok) {
+      const errorText = await geminiRes.text()
+      console.error('Gemini API error:', geminiRes.status, errorText)
+      return new Response(
+        JSON.stringify({ error: 'Gemini API error', details: errorText }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    const totalTime = Math.floor((Date.now() - startTime) / 1000)
-    console.log(`[Complete] Batch complete. Total execution time: ${totalTime}s`)
+    const geminiJson = await geminiRes.json()
+
+    // Parse Gemini response
+    let extractedData: AIResponse
+    try {
+      let rawText = geminiJson.candidates[0].content.parts[0].text
+
+      // Remove markdown code blocks if present
+      if (rawText.includes('```')) {
+        rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim()
+      }
+
+      // Try parsing directly first
+      try {
+        extractedData = JSON.parse(rawText)
+      } catch (firstError) {
+        console.log('First parse failed, attempting repair...')
+
+        // Try to repair common issues
+        // 1. Fix unescaped control characters inside strings only
+        let repaired = rawText
+
+        // Replace unescaped newlines inside string values
+        // This regex finds strings and escapes newlines within them
+        repaired = repaired.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match: string) => {
+          return match
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t')
+        })
+
+        extractedData = JSON.parse(repaired)
+      }
+
+      console.log(`Gemini extracted ${extractedData.questions.length} questions`)
+    } catch (parseError) {
+      console.error('Failed to parse Gemini response:', parseError)
+      // Log first 2000 chars of response for debugging
+      const rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || 'No text'
+      console.error('Raw response (first 2000 chars):', rawText.substring(0, 2000))
+      console.error('Response length:', rawText.length)
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse AI response', details: String(parseError) }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Step 6: Process figures and insert questions
+    console.log('[6/6] Processing questions...')
+
+    // Identify questions with figures for later processing
+    const questionsWithFigures = extractedData.questions.filter(q => q.figure)
+    console.log(`Found ${questionsWithFigures.length} questions with figures`)
+
+    // Get valid topic IDs for validation
+    const validTopicIds = new Set(topicsList.map(t => t.id))
+
+    // UUID regex pattern for validation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+    // Process each question
+    const questionsToInsert = []
+
+    for (const question of extractedData.questions) {
+      if (question.figure) {
+        console.log(`Question ${question.question_number} has figure on page ${question.figure.page}`)
+      }
+
+      // Filter topic_ids to only include valid UUIDs that exist in our topics
+      let filteredTopicIds: string[] = []
+      if (question.topic_ids && Array.isArray(question.topic_ids)) {
+        filteredTopicIds = question.topic_ids.filter(id => {
+          const isValidUuid = typeof id === 'string' && uuidRegex.test(id)
+          const existsInDb = validTopicIds.has(id)
+          if (!isValidUuid) {
+            console.warn(`Filtering out invalid topic_id (not UUID): ${id}`)
+          } else if (!existsInDb) {
+            console.warn(`Filtering out topic_id (not in DB): ${id}`)
+          }
+          return isValidUuid && existsInDb
+        })
+      }
+
+      console.log(`Q${question.question_number}: ${filteredTopicIds.length} valid topic_ids`)
+
+      // Store figure metadata in ai_answer field for now (can be used for future cropping)
+      const figureMetadata = question.figure ? {
+        has_figure: true,
+        layout_scan: question.layout_scan,
+        figure_description: question.figure_description,
+        figure_location: {
+          page: question.figure.page,
+          x_percent: question.figure.x,
+          y_percent: question.figure.y,
+          width_percent: question.figure.width,
+          height_percent: question.figure.height
+        }
+      } : {
+        has_figure: false,
+        layout_scan: question.layout_scan
+      }
+
+      questionsToInsert.push({
+        paper_id: paperId,
+        question_number: question.question_number,
+        content: question.content,
+        topic_ids: filteredTopicIds,
+        type: question.type,
+        options: question.options || null,
+        correct_answer: question.correct_answer || null,
+        marks: question.marks || null,  // Save marks to proper column
+        image_url: null,
+        official_answer: null,
+        ai_answer: figureMetadata, // Store figure info here (temporary, until cropped)
+      })
+    }
+
+    // Insert all questions
+    const { data: insertedQuestions, error: insertError } = await supabase
+      .from('questions')
+      .insert(questionsToInsert)
+      .select('id, question_number')
+
+    if (insertError) {
+      console.error('Failed to insert questions:', insertError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to save questions', details: insertError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`✅ Successfully inserted ${questionsToInsert.length} questions`)
+
+    // Step 7: Process figures skipped (PDF.co credits expired)
+    /*
+    let figuresCropped = 0
+    if (insertedQuestions && questionsWithFigures.length > 0) {
+      console.log(`[7/7] Processing ${questionsWithFigures.length} figures with pdf.co...`)
+      // ... (Rest of code commented out)
+      // I will just comment out the loop
+    }
+    */
+    let figuresCropped = 0; // Default to 0
+    // Skip calling crop-figure due to 402 Error
+    console.log('[7/7] Skipping figure cropping (API limits)')
+
+    // Step 8: Process mark scheme if provided
+    let answersExtracted = 0
+    if (hasMarkScheme && insertedQuestions) {
+      console.log(`[8/8] Processing mark scheme...`)
+
+      try {
+        // Download mark scheme PDF
+        console.log(`Downloading mark scheme from: ${markSchemeUrl}`)
+        const msResponse = await fetch(markSchemeUrl)
+        console.log(`Mark scheme download status: ${msResponse.status}`)
+        if (!msResponse.ok) {
+          console.warn('Failed to download mark scheme')
+        } else {
+          const msBlob = await msResponse.blob()
+          const msArrayBuffer = await msBlob.arrayBuffer()
+          const msBytes = new Uint8Array(msArrayBuffer)
+          const msBase64 = uint8ArrayToBase64(msBytes)
+
+          console.log(`Mark scheme downloaded: ${(msBytes.length / 1024).toFixed(1)} KB`)
+
+          // Build prompt for answer extraction
+          const msPrompt = `You are analyzing an EXAM MARK SCHEME / ANSWER SHEET.
+
+Extract the OFFICIAL ANSWERS for each question. The mark scheme may contain:
+- Direct answers (e.g., "A", "42", "x = 5")
+- Marking criteria (e.g., "Award 1 mark for method, 2 for answer")
+- Acceptable alternative answers
+
+For each question, extract:
+1. question_number: The question number (1, 2, 3, etc.)
+2. official_answer: The official answer or marking criteria (as a clear string)
+3. marks: Number of marks available (extract from [1], [2 marks], etc.)
+
+Return ONLY valid JSON:
+{
+  "answers": [
+    {"question_number": 1, "official_answer": "B", "marks": 1},
+    {"question_number": 2, "official_answer": "x = 5\\nMethod: rearrange equation\\nAnswer: substitute and solve", "marks": 3}
+  ]
+}`
+
+          // Send to Gemini
+          const msGeminiPayload = {
+            contents: [{
+              parts: [
+                { text: msPrompt },
+                { inline_data: { mime_type: 'application/pdf', data: msBase64 } }
+              ]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 8192
+            }
+          }
+
+          const msGeminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(msGeminiPayload)
+          })
+
+          if (msGeminiRes.ok) {
+            const msGeminiJson = await msGeminiRes.json()
+            const msRawText = msGeminiJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
+            const msCleanJson = msRawText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim()
+
+            try {
+              const answersData = JSON.parse(msCleanJson)
+              console.log(`Extracted ${answersData.answers?.length || 0} answers from mark scheme`)
+
+              // Match answers to questions and generate AI solutions
+              for (const answer of answersData.answers || []) {
+                const matchingQ = insertedQuestions.find(
+                  (q: { question_number: number }) => q.question_number === answer.question_number
+                )
+
+                if (matchingQ) {
+                  // Generate AI step-by-step solution
+                  const solutionPrompt = `You are a helpful tutor. Generate a clear, student-friendly step-by-step solution.
+
+Question: ${questionsToInsert.find(q => q.question_number === answer.question_number)?.content || 'See paper'}
+
+Official Answer: ${answer.official_answer}
+Marks Available: ${answer.marks || 'Unknown'}
+
+Create a solution that:
+1. Explains the approach simply
+2. Shows clear working steps
+3. Explains WHY each step is correct
+4. Highlights common mistakes to avoid
+
+Format your response as clear numbered steps. Be concise but thorough.`
+
+                  const solutionRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: solutionPrompt }] }],
+                      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+                    })
+                  })
+
+                  let aiSolution = null
+                  if (solutionRes.ok) {
+                    const solutionJson = await solutionRes.json()
+                    aiSolution = solutionJson.candidates?.[0]?.content?.parts?.[0]?.text || null
+                  }
+
+                  // Update question with official answer and AI solution
+                  await supabase
+                    .from('questions')
+                    .update({
+                      official_answer: answer.official_answer,
+                      ai_answer: {
+                        ...questionsToInsert.find(q => q.question_number === answer.question_number)?.ai_answer,
+                        marks: answer.marks,
+                        ai_solution: aiSolution
+                      }
+                    })
+                    .eq('id', matchingQ.id)
+
+                  answersExtracted++
+                  console.log(`✅ Updated Q${answer.question_number} with answer + AI solution`)
+                }
+              }
+            } catch (parseErr) {
+              console.warn('Failed to parse mark scheme response:', parseErr)
+            }
+          } else {
+            console.warn('Mark scheme Gemini API error:', msGeminiRes.status)
+          }
+        }
+      } catch (msError) {
+        console.warn('Error processing mark scheme:', msError)
+      }
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        count: dbRows.length,
-        total_pages: pageCount,
-        batch_start: actualStart,
-        batch_end: actualEnd,
-        pages_processed: pagesInBatch,
-        has_more: actualEnd < pageCount,
-        execution_time_seconds: totalTime
+        message: `Extracted and saved ${questionsToInsert.length} questions`,
+        questions_count: questionsToInsert.length,
+        topics_matched: questionsToInsert.filter(q => q.topic_ids.length > 0).length,
+        figures_detected: questionsWithFigures.length,
+        figures_cropped: figuresCropped,
+        answers_extracted: answersExtracted
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Unexpected error:', error)
     return new Response(
-      JSON.stringify({ error: String(error) }),
+      JSON.stringify({ error: 'Unexpected error', details: String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
-
-// --- Helper Functions ---
-
-async function analyzePageImage(
-  base64Data: string,
-  pageNumber: number,
-  isObjective: boolean,
-  topicsJson: string,
-  apiKey: string,
-  mimeType: string = "image/png"
-): Promise<{ page_number: number, questions: RawQuestion[] } | null> {
-
-  const prompt = `Analyze this IGCSE exam page using Multimodal Vision Parsing.
-
-TASK 1: TEXT EXTRACTION & PATTERNS
-- Extract text in English.
-- MARK SCHEMES: If page contains a table with headers "Question", "Answer", "Marks" (or similar):
-    - IGNORE normal question processing.
-    - Extract ALL row pairs into 'mark_scheme' array (e.g. [{q:1, a:"C"}, {q:2, a:"A"}]).
-    - If valid mark scheme found, return { "is_mark_scheme": true, "data": [...] }.
-- COMBINATION QUESTIONS (I, II, III Roman Numerals):
-    - Separate statements (I, II, III) into 'statements' array.
-    - Keep A-D options separate.
-- TABLE OPTIONS:
-    - If Options A, B, C, D are headings in a table (e.g. cols = A, B, C, D rows = properties):
-    - OR if Options are rows in a table (e.g. Row 1 = A, Row 2 = B):
-    - Extract as normal options but set 'type': 'mcq_table'.
-    - VISUAL: Create a figure for the table if complex.
-
-TASK 2: FIGURE MULTIMODAL ANALYSIS
-- Look for "Diagram", "Figure", "Table", "Graph", "Chart".
-- MARK SCHEME TABLES: Do NOT treat as figures to crop.
-- VISUAL ANALYSIS:
-    - Normal Diagram -> 'figures' array.
-    - Table in Question -> 'figures' array (detected as Table).
-
-TASK 3: SOLVE
-- MCQ: Extract A-D.
-- structured: Key points.
-
-TOPICS: ${topicsJson}
-`
-
-  const schema = {
-    type: "OBJECT",
-    properties: {
-      questions: {
-        type: "ARRAY",
-        items: {
-          type: "OBJECT",
-          properties: {
-            question_number: { type: "INTEGER", minimum: 1, maximum: 100 },
-            content: { type: "STRING", maxLength: 5000 },
-            is_continuation: { type: "BOOLEAN" },
-            topic_ids: { type: "ARRAY", items: { type: "STRING" } },
-            type: { type: "STRING", enum: ["mcq", "structured"] },
-            marks: { type: "INTEGER", minimum: 1, maximum: 50 },
-            statements: { type: "ARRAY", items: { type: "STRING" } },
-            options: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  label: { type: "STRING" },
-                  text: { type: "STRING" }
-                }
-              }
-            },
-            correct_answer: { type: "STRING" },
-            explanation: { type: "STRING", maxLength: 1000 },
-            figures: {
-              type: "ARRAY",
-              items: {
-                type: "OBJECT",
-                properties: {
-                  description: { type: "STRING" },
-                  ymin: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                  xmin: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                  ymax: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                  xmax: { type: "INTEGER", minimum: 0, maximum: 1000 }
-                }
-              }
-            },
-            table: {
-              type: "OBJECT",
-              properties: {
-                ymin: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                xmin: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                ymax: { type: "INTEGER", minimum: 0, maximum: 1000 },
-                xmax: { type: "INTEGER", minimum: 0, maximum: 1000 }
-              }
-            }
-          },
-          required: ["question_number", "content", "type"]
-        }
-      }
-    }
-  }
-
-  const payload = {
-    contents: [{
-      parts: [
-        { text: prompt },
-        { inline_data: { mime_type: mimeType, data: base64Data } }
-      ]
-    }],
-    generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 8192,
-      response_mime_type: "application/json",
-      response_schema: schema,
-      topK: 40,
-      topP: 0.95
-    }
-  }
-
-  try {
-    const res = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-
-    if (!res.ok) {
-      console.warn(`Gemini error on page ${pageNumber}: ${res.status}`)
-      return null
-    }
-
-    const json = await res.json()
-    let text = json.candidates?.[0]?.content?.parts?.[0]?.text
-    if (!text) return null
-
-    // Clean up markdown code blocks if present
-    if (text.startsWith('```')) {
-      text = text.replace(/^```(json)?\n/, '').replace(/\n```$/, '')
-    }
-
-    // Basic validation: check if text looks like valid JSON before parsing
-    if (!text.trim().startsWith('{') || !text.trim().endsWith('}')) {
-      console.warn(`[Warning] Response doesn't look like JSON for page ${pageNumber}`)
-      return { page_number: pageNumber, questions: [] }
-    }
-
-    // Truncate if response is suspiciously large (over 1MB suggests hallucination)
-    if (text.length > 1000000) {
-      console.warn(`[Warning] Response too large (${text.length} chars) for page ${pageNumber}, likely hallucination`)
-      return { page_number: pageNumber, questions: [] }
-    }
-
-    try {
-      const parsed = JSON.parse(text)
-      return {
-        page_number: pageNumber,
-        questions: parsed.questions || []
-      }
-    } catch (e) {
-      // CRITICAL: Do NOT crash on malformed JSON - just skip this page
-      console.error(`[Error] JSON Parse Failed for Page ${pageNumber}. Raw text (first 500 chars):`, text.substring(0, 500))
-      console.error(`Parse error:`, e)
-      // Return empty result instead of crashing
-      return {
-        page_number: pageNumber,
-        questions: []
-      }
-    }
-
-  } catch (e) {
-    console.warn(`Failed to analyze page ${pageNumber}:`, e)
-    return null
-  }
-}
-
-function mergeQuestions(fragments: (RawQuestion & { _source_page: number, _page_dims: any })[]): RawQuestion[] {
-  const merged = new Map<number, RawQuestion>()
-
-  for (const frag of fragments) {
-    const qNum = frag.question_number
-
-    if (!merged.has(qNum)) {
-      merged.set(qNum, frag)
-    } else {
-      const existing = merged.get(qNum)!
-
-      if (frag.is_continuation) {
-        existing.content += "\n" + frag.content
-      } else {
-        // If not explicitly a continuation, but same number, usually logic is similar
-        existing.content += "\n" + frag.content
-      }
-
-      if (frag.marks && !existing.marks) existing.marks = frag.marks
-
-      if (frag.figures && frag.figures.length > 0) {
-         existing.figures = [ ...(existing.figures || []), ...frag.figures ];
-      }
-
-      if (frag.statements && frag.statements.length > 0) {
-         existing.statements = [ ...(existing.statements || []), ...frag.statements ];
-      }
-
-      if (!existing.explanation && frag.explanation) {
-          existing.explanation = frag.explanation
-      }
-
-      if (!existing.topic_ids?.length && frag.topic_ids?.length) {
-        existing.topic_ids = frag.topic_ids
-      }
-
-      // Fix: Merge options if they appear in later fragments
-      if (!existing.options?.length && frag.options?.length) {
-        existing.options = frag.options
-      }
-    }
-  }
-
-  return Array.from(merged.values())
-}
