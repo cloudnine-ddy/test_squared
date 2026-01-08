@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import '../../../core/services/pdf_helper.dart';
 
 class PdfCropViewer extends StatefulWidget {
   final String pdfUrl;
@@ -25,12 +26,15 @@ class PdfCropViewer extends StatefulWidget {
 
 class _PdfCropViewerState extends State<PdfCropViewer> {
   late PdfViewerController _pdfController;
+  late String _url;
   bool _isLoaded = false;
+  bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
     _pdfController = PdfViewerController();
+    _url = PdfHelper.getProxiedUrl(widget.pdfUrl);
   }
 
   @override
@@ -92,24 +96,53 @@ class _PdfCropViewerState extends State<PdfCropViewer> {
                    ..translate(dx, dy),
                  child: IgnorePointer(
                    child: SfPdfViewer.network(
-                     widget.pdfUrl,
+                     _url,
                      controller: _pdfController,
                      enableDoubleTapZooming: false,
                      enableTextSelection: false,
                      canShowScrollHead: false,
                      pageLayoutMode: PdfPageLayoutMode.single,
                      interactionMode: PdfInteractionMode.pan,
-                     onDocumentLoaded: (details) {
-                       _pdfController.jumpToPage(widget.pageNumber);
-                       setState(() => _isLoaded = true);
+                     onDocumentLoaded: (args) {
+                       if (mounted) {
+                         _pdfController.jumpToPage(widget.pageNumber);
+                         setState(() {
+                           _isLoaded = true;
+                           _hasError = false;
+                         });
+                       }
+                     },
+                     onDocumentLoadFailed: (args) {
+                       if (mounted) {
+                         setState(() {
+                           _isLoaded = false;
+                           _hasError = true;
+                         });
+                         debugPrint('PDF Load Failed: ${args.error}');
+                         debugPrint('Description: ${args.description}');
+                       }
                      },
                    ),
                  ),
                ),
 
-               if (!_isLoaded)
-                 const Center(
-                   child: CircularProgressIndicator(),
+               if (!_isLoaded || _hasError)
+                 Positioned.fill(
+                   child: Container(
+                     color: Colors.grey[100],
+                     child: Center(
+                       child: _hasError
+                           ? Column(
+                               mainAxisSize: MainAxisSize.min,
+                               children: [
+                                 const Icon(Icons.error_outline, color: Colors.red, size: 32),
+                                 const SizedBox(height: 8),
+                                 const Text('Failed to load PDF', style: TextStyle(color: Colors.red)),
+                               ],
+                             )
+                           : const CircularProgressIndicator(),
+                     ),
+                   ),
                  ),
             ],
           ),

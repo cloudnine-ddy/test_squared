@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
+import '../../core/services/pdf_helper.dart';
+import '../../features/past_papers/widgets/pdf_crop_viewer.dart';
 
 /// Full Question Editor - Edit all fields of a question
 class QuestionEditor extends StatefulWidget {
@@ -39,6 +42,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   // Form controllers
   late TextEditingController _contentController;
   late TextEditingController _officialAnswerController;
+  late TextEditingController _aiSolutionController;
   int _questionNumber = 1;
   List<String> _selectedTopicIds = [];
   String _topicSearchQuery = '';
@@ -63,6 +67,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
     super.initState();
     _contentController = TextEditingController();
     _officialAnswerController = TextEditingController();
+    _aiSolutionController = TextEditingController();
     _loadQuestion();
   }
 
@@ -70,6 +75,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   void dispose() {
     _contentController.dispose();
     _officialAnswerController.dispose();
+    _aiSolutionController.dispose();
     super.dispose();
   }
 
@@ -138,6 +144,11 @@ class _QuestionEditorState extends State<QuestionEditor> {
         _options = optionsRaw.map((o) => Map<String, dynamic>.from(o as Map)).toList();
       }
 
+      // AI Solution
+      if (aiAnswer is Map) {
+        _aiSolutionController.text = aiAnswer['text']?.toString() ?? aiAnswer['ai_solution']?.toString() ?? '';
+      }
+
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -155,19 +166,29 @@ class _QuestionEditorState extends State<QuestionEditor> {
     if (mounted) setState(() => _isSaving = true);
 
     try {
-      // Build ai_answer
-      Map<String, dynamic>? aiAnswer;
+      // Build ai_answer - Merge with existing
+      Map<String, dynamic> aiAnswer = {};
+      if (_question?['ai_answer'] is Map) {
+         aiAnswer = Map<String, dynamic>.from(_question!['ai_answer']);
+      }
+
       if (_hasFigure) {
-        aiAnswer = {
-          'has_figure': true,
-          'figure_location': {
+        aiAnswer['has_figure'] = true;
+        aiAnswer['figure_location'] = {
             'page': _figurePage,
             'x_percent': _figureX,
             'y_percent': _figureY,
             'width_percent': _figureWidth,
             'height_percent': _figureHeight,
-          },
         };
+      } else {
+        aiAnswer['has_figure'] = false;
+      }
+
+      // Save AI Solution
+      if (_aiSolutionController.text.isNotEmpty) {
+        aiAnswer['text'] = _aiSolutionController.text.trim();
+        aiAnswer['ai_solution'] = _aiSolutionController.text.trim();
       }
 
       // Prepare update data
@@ -371,7 +392,25 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               ),
                             ),
 
-                             // MCQ Options (Editable)
+
+                            const SizedBox(height: 24),
+
+                            // AI Solution (Step-by-Step)
+                            _buildSection(
+                              'AI Solution (Step-by-Step)',
+                              TextFormField(
+                                controller: _aiSolutionController,
+                                decoration: _inputDecoration('AI generated solution...'),
+                                maxLines: 8,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary.withOpacity(0.9),
+                                ),
+                                onChanged: (_) => _markChanged(),
+                              ),
+                            ),
+
+                            // MCQ Options (Editable)
                             if (_isMCQ) ...[
                               const SizedBox(height: 24),
                               Row(
@@ -652,6 +691,19 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 ),
               ),
               const SizedBox(height: 16),
+            ] else if (_paper != null && _paper!['pdf_url'] != null) ...[
+              // Client-side PDF Crop Preview
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: PdfCropViewer(
+                  pdfUrl: _paper!['pdf_url'],
+                  pageNumber: _figurePage,
+                  x: _figureX,
+                  y: _figureY,
+                  width: _figureWidth,
+                  height: _figureHeight,
+                ),
+              ),
             ],
 
             // Crop controls
@@ -935,14 +987,21 @@ class _CropDialog extends StatefulWidget {
 class _CropDialogState extends State<_CropDialog> {
   final _supabase = Supabase.instance.client;
 
+  final _pdfViewerController = PdfViewerController();
+  bool _isLoaded = false;
+  bool _hasError = false;
+  late String _url;
+
+  void notifyError(String msg) {
+    setState(() => _hasError = true);
+    debugPrint('PDF Error: $msg');
+  }
+
   late int _page;
   late double _x;
   late double _y;
   late double _width;
   late double _height;
-
-  String? _pageImageUrl;
-  bool _isLoadingPage = false;
 
   @override
   void initState() {
@@ -952,33 +1011,9 @@ class _CropDialogState extends State<_CropDialog> {
     _y = widget.y;
     _width = widget.width;
     _height = widget.height;
-    _loadPage();
+    _url = PdfHelper.getProxiedUrl(widget.pdfUrl);
   }
 
-  Future<void> _loadPage() async {
-    setState(() => _isLoadingPage = true);
-
-    try {
-      final response = await _supabase.functions.invoke(
-        'render-page',
-        body: {
-          'pdfUrl': widget.pdfUrl,
-          'page': _page,
-        },
-      );
-
-      if (response.data?['image_url'] != null) {
-        setState(() {
-          _pageImageUrl = response.data['image_url'];
-          _isLoadingPage = false;
-        });
-      } else {
-        setState(() => _isLoadingPage = false);
-      }
-    } catch (e) {
-      setState(() => _isLoadingPage = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1046,30 +1081,16 @@ class _CropDialogState extends State<_CropDialog> {
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: _isLoadingPage
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Loading page...',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
-                              ],
-                            ),
-                          )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Center(
-                                child: _buildPreviewWithCrop(
-                                  constraints.maxWidth * 0.9,
-                                  constraints.maxHeight * 0.9,
-                                ),
-                              );
-                            },
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Center(
+                          child: _buildPreviewWithCrop(
+                            constraints.maxWidth * 0.9,
+                            constraints.maxHeight * 0.9,
                           ),
+                        );
+                      },
+                    ),
                   ),
                 ),
 
@@ -1100,7 +1121,7 @@ class _CropDialogState extends State<_CropDialog> {
                           IconButton(
                             onPressed: _page > 1 ? () {
                               setState(() => _page--);
-                              _loadPage();
+                              _pdfViewerController.jumpToPage(_page);
                             } : null,
                             icon: const Icon(Icons.remove),
                             color: Colors.white,
@@ -1125,7 +1146,7 @@ class _CropDialogState extends State<_CropDialog> {
                           IconButton(
                             onPressed: () {
                               setState(() => _page++);
-                              _loadPage();
+                              _pdfViewerController.jumpToPage(_page);
                             },
                             icon: const Icon(Icons.add),
                             color: Colors.white,
@@ -1173,29 +1194,42 @@ class _CropDialogState extends State<_CropDialog> {
       height: h,
       child: Stack(
         children: [
-          // Page image
-          if (_pageImageUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                _pageImageUrl!,
-                width: w,
-                height: h,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.white,
-                  child: const Center(child: Icon(Icons.error)),
+          // PDF Viewer (Client-side)
+          IgnorePointer(
+            ignoring: true, // Disable interaction so we can drag our crop box
+            child: SfPdfViewer.network(
+              _url,
+              controller: _pdfViewerController,
+              enableDoubleTapZooming: false,
+              enableTextSelection: false,
+              canShowScrollHead: false,
+              pageLayoutMode: PdfPageLayoutMode.single,
+              onDocumentLoaded: (args) {
+                // Jump to initial page once loaded
+                _pdfViewerController.jumpToPage(_page);
+              },
+              onDocumentLoadFailed: (args) {
+                 if (mounted) notifyError(args.error);
+              },
+            ),
+          ),
+
+          if (_hasError)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.8),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                       Icon(Icons.error_outline, color: Colors.red, size: 48),
+                       SizedBox(height: 16),
+                       Text('Failed to load PDF', style: TextStyle(color: Colors.white, fontSize: 18)),
+                       SizedBox(height: 8),
+                       Text('Check network/CORS settings', style: TextStyle(color: Colors.white70)),
+                    ],
+                  ),
                 ),
-              ),
-            )
-          else
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Center(
-                child: Text('Page preview', style: TextStyle(color: Colors.grey)),
               ),
             ),
 
