@@ -19,6 +19,7 @@ import '../../features/bookmarks/screens/bookmarks_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/settings/screens/accessibility_settings_screen.dart';
 import '../../features/premium/premium_page.dart';
+import '../../features/vending/vending_page.dart';
 import '../../main.dart' show isPasswordRecoverySession;
 
 final goRouter = GoRouter(
@@ -125,6 +126,10 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/settings/accessibility',
       builder: (context, state) => const AccessibilitySettingsScreen(),
+    ),
+    GoRoute(
+      path: '/vending',
+      builder: (context, state) => const VendingPage(),
     ),
   ],
 );

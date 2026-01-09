@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/providers/auth_provider.dart';
 import '../../main.dart' show isPasswordRecoverySession;
+import '../vending/vending_page.dart';
 
 /// Landing page for non-authenticated users
 /// Modern design inspired by SaveMyExams with clean aesthetics
@@ -12,91 +13,8 @@ class LandingPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Check URL for recovery params directly (robust fallback)
-    final isRecoveryUrl = Uri.base.toString().contains('type=recovery');
-    
-    // If this is a password recovery session, redirect to reset-password page instead of dashboard
-    if (isPasswordRecoverySession || isRecoveryUrl) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Ensure we don't loop if we are already there (though LandingPage shouldn't be ResetPage)
-        context.go('/reset-password');
-      });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    // Redirect to dashboard if already authenticated (and NOT in recovery session)
-    final isAuthenticated = ref.watch(isAuthenticatedProvider);
-    if (isAuthenticated) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        // Small delay to allow any pending auth events (like passwordRecovery) to fire first
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (context.mounted) {
-             // Re-check recovery status just in case
-             if (Uri.base.toString().contains('type=recovery')) {
-                context.go('/reset-password');
-             } else {
-                context.go('/dashboard');
-             }
-        }
-      });
-    }
-
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: AppColors.backgroundGradient,
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                // Navigation Bar
-                _buildNavigationBar(context),
-                
-                const SizedBox(height: 40),
-                
-                // Main Content
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1200),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      children: [
-                        // Trust Indicator
-                        _buildTrustBadge(),
-                        const SizedBox(height: 32),
-                        
-                        // Hero Section
-                        _buildHeroSection(context),
-                        const SizedBox(height: 48),
-                        
-                        // CTA Buttons
-                        _buildCTAButtons(context),
-                        const SizedBox(height: 80),
-                        
-                        // "Why it works" Section
-                        _buildWhyItWorksSection(),
-                        const SizedBox(height: 60),
-                        
-                        // Feature Cards
-                        _buildFeatureCards(),
-                        const SizedBox(height: 80),
-                        
-                        // Final CTA
-                        _buildFinalCTA(context),
-                        const SizedBox(height: 60),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+    // TEMPORARY: Main entry point overridden to show Vending Page for verification
+    return const VendingPage();
   }
 
   Widget _buildNavigationBar(BuildContext context) {
