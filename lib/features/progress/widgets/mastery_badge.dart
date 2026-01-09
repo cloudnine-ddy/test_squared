@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class MasteryBadge extends StatelessWidget {
   final String level; // 'beginner', 'intermediate', 'advanced'
@@ -12,15 +13,11 @@ class MasteryBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final config = _getConfig(level);
 
-    return Container(
+    return WiredCard(
+      backgroundColor: config.color.withValues(alpha: 0.1),
+      borderColor: config.color.withValues(alpha: 0.5),
+      borderWidth: 1.0,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: config.color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: config.color.withValues(alpha: 0.4),
-        ),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -33,9 +30,10 @@ class MasteryBadge extends StatelessWidget {
           Text(
             config.label,
             style: TextStyle(
+              fontFamily: 'PatrickHand',
               color: config.color,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],

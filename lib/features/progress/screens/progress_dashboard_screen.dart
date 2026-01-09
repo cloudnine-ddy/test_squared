@@ -13,6 +13,7 @@ import '../widgets/stat_card.dart';
 import '../widgets/mastery_badge.dart';
 import '../widgets/streak_indicator.dart';
 import '../widgets/daily_progress_chart.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class ProgressDashboardScreen extends StatefulWidget {
   const ProgressDashboardScreen({super.key});
@@ -178,73 +179,72 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Force a light theme look specifically for this page
-    return Theme(
-      data: AppTheme.lightTheme.copyWith(
-        scaffoldBackgroundColor: const Color(0xFFFDFBF7), // Creamy/Beige background
-        appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFFFDFBF7),
-            elevation: 0,
-            iconTheme: IconThemeData(color: Colors.black87),
-            titleTextStyle: TextStyle(
-                color: Colors.black87,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-            ),
+    // Sketchy Theme Colors
+    const Color primaryColor = Color(0xFF2D3E50); // Deep Navy
+    const Color backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+    return Scaffold(
+      backgroundColor: backgroundColor,
+      appBar: AppBar(
+        title: Text(
+          'My Progress',
+          style: TextStyle(
+            fontFamily: 'PatrickHand',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: primaryColor,
+          ),
         ),
+        centerTitle: true,
+        backgroundColor: backgroundColor,
+        elevation: 0,
+        iconTheme: IconThemeData(color: primaryColor),
       ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFDFBF7),
-        appBar: AppBar(
-          title: const Text('My Progress'),
-          centerTitle: false,
-        ),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Daily Progress Chart
-                      // Use cached daily stats or fetch recently
-                      DailyProgressChart(
-                        dailyStats: _dailyStats, // Use stats fetched for streak
-                        daysToShow: 7,
-                      ),
-                      const SizedBox(height: 24),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator(color: primaryColor))
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              color: primaryColor,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Daily Progress Chart
+                    DailyProgressChart(
+                      dailyStats: _dailyStats,
+                      daysToShow: 7,
+                    ),
+                    const SizedBox(height: 24),
 
-                      // Overall Stats Cards
-                      _buildOverallStats(),
-                      const SizedBox(height: 24),
+                    // Overall Stats Cards
+                    _buildOverallStats(),
+                    const SizedBox(height: 24),
 
-                      // Streak Indicator
-                      StreakIndicator(
-                        currentStreak: _calculatedCurrentStreak,
-                        longestStreak: _calculatedLongestStreak,
-                      ),
-                      const SizedBox(height: 32),
+                    // Streak Indicator
+                    StreakIndicator(
+                      currentStreak: _calculatedCurrentStreak,
+                      longestStreak: _calculatedLongestStreak,
+                    ),
+                    const SizedBox(height: 32),
 
-                      // Weak Areas Section
-                      if (_weakAreas.isNotEmpty) ...[
-                        _buildSectionHeader('Areas to Improve'),
-                        const SizedBox(height: 16),
-                        _buildWeakAreas(),
-                        const SizedBox(height: 32),
-                      ],
-
-                      // Topic Mastery Grid
-                      _buildSectionHeader('Topic Mastery'),
+                    // Weak Areas Section
+                    if (_weakAreas.isNotEmpty) ...[
+                      _buildSectionHeader('Areas to Improve'),
                       const SizedBox(height: 16),
-                      _buildTopicMasteryGrid(),
+                      _buildWeakAreas(),
+                      const SizedBox(height: 32),
                     ],
-                  ),
+
+                    // Topic Mastery Grid
+                    _buildSectionHeader('Topic Mastery'),
+                    const SizedBox(height: 16),
+                    _buildTopicMasteryGrid(),
+                  ],
                 ),
               ),
-      ),
+            ),
     );
   }
 
@@ -293,29 +293,25 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
     return Text(
       title,
       style: const TextStyle(
-        color: Colors.black87,
-        fontSize: 20,
+        fontFamily: 'PatrickHand',
+        color: Color(0xFF2D3E50),
+        fontSize: 24,
         fontWeight: FontWeight.bold,
       ),
     );
   }
 
   Widget _buildWeakAreas() {
+    const primaryColor = Color(0xFF2D3E50);
+    
     return Column(
       children: _weakAreas.map((area) {
         final topicName = area['topic_name'] as String;
         final accuracy = (area['accuracy'] as num?)?.toDouble() ?? 0.0;
         final attempts = area['total_attempts'] ?? 0;
 
-        // Find subject name
-        // Iterate topics map to find topic with this name ?? unsafe
-        // Better: weakAreas from RPC should ideally have topic_id.
-        // Let's check `getWeakAreas` implementation in Repo again.
-        // It casts result to Map<String, dynamic>. The RPC likely returns topic_id.
-        // I will assume topic_id is present.
-
         String? subjectName;
-        String? topicId = area['topic_id']; // Try to get ID
+        String? topicId = area['topic_id'];
 
         if (topicId != null) {
           final topic = _topicsMap[topicId];
@@ -324,84 +320,89 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
           }
         }
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAE4D9).withValues(alpha: 0.3), // Light beige
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.black.withValues(alpha: 0.05),
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: WiredCard(
+            backgroundColor: const Color(0xFFEAE4D9).withValues(alpha: 0.3),
+            borderColor: primaryColor.withValues(alpha: 0.2),
+            borderWidth: 1.5,
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
+                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: const Icon(
                     Icons.trending_down,
                     color: Colors.orange,
                     size: 20,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (subjectName != null)
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (subjectName != null)
+                        Text(
+                          subjectName.toUpperCase(),
+                          style: TextStyle(
+                            fontFamily: 'PatrickHand',
+                            color: primaryColor.withValues(alpha: 0.6),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
                       Text(
-                        subjectName.toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                        topicName,
+                        style: const TextStyle(
+                          fontFamily: 'PatrickHand',
+                          color: primaryColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
                         ),
                       ),
-                    Text(
-                      topicName,
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
+                      const SizedBox(height: 4),
+                      Text(
+                        '$attempts attempts • ${accuracy.toStringAsFixed(1)}% accuracy',
+                        style: TextStyle(
+                          fontFamily: 'PatrickHand',
+                          color: primaryColor.withValues(alpha: 0.7),
+                          fontSize: 14,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$attempts attempts • ${accuracy.toStringAsFixed(1)}% accuracy',
-                      style: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              TextButton(
-                onPressed: () {
-                  if (topicId != null) {
-                     context.push('/topic/$topicId');
-                  } else {
-                     ToastService.showInfo('Topic details unavailable');
-                  }
-                },
-                style: TextButton.styleFrom(
-                    foregroundColor: Colors.black87,
+                TextButton(
+                  onPressed: () {
+                    if (topicId != null) {
+                      context.push('/topic/$topicId');
+                    } else {
+                      ToastService.showInfo('Topic details unavailable');
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: primaryColor,
                     backgroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: Colors.black.withValues(alpha: 0.1)),
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
                     ),
+                  ),
+                  child: const Text(
+                    'Practice',
+                    style: TextStyle(fontFamily: 'PatrickHand', fontSize: 16),
+                  ),
                 ),
-                child: const Text('Practice'),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -409,27 +410,29 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
   }
 
   Widget _buildTopicMasteryGrid() {
+    const primaryColor = Color(0xFF2D3E50);
+
     if (_topicStats.isEmpty) {
-      // ... Empty state code
-       return Container(
+      return WiredCard(
+        backgroundColor: const Color(0xFFEAE4D9).withValues(alpha: 0.3),
+        borderColor: primaryColor.withValues(alpha: 0.2),
+        borderWidth: 1.5,
         padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: const Color(0xFFEAE4D9).withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(16),
-        ),
         child: Center(
           child: Column(
             children: [
               Icon(
                 Icons.school_outlined,
                 size: 48,
-                color: Colors.black.withValues(alpha: 0.2),
+                color: primaryColor.withValues(alpha: 0.2),
               ),
               const SizedBox(height: 12),
               Text(
                 'Start practicing to see your progress!',
                 style: TextStyle(
-                  color: Colors.black.withValues(alpha: 0.5),
+                  fontFamily: 'PatrickHand',
+                  fontSize: 18,
+                  color: primaryColor.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -445,7 +448,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 1.1, // Adjusted for extra specific height
+        childAspectRatio: 1.1,
       ),
       itemCount: _topicStats.length,
       itemBuilder: (context, index) {
@@ -458,27 +461,18 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
   }
 
   Widget _buildTopicMasteryCard(TopicStatsModel stats, TopicModel? topic) {
+    const primaryColor = Color(0xFF2D3E50);
+
     SubjectModel? subject;
     if (topic != null) {
-       subject = _subjectsMap[topic.subjectId];
+      subject = _subjectsMap[topic.subjectId];
     }
 
-    return Container(
+    return WiredCard(
+      backgroundColor: Colors.white,
+      borderColor: primaryColor.withValues(alpha: 0.2),
+      borderWidth: 1.5,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-            ),
-        ],
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.05),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -488,8 +482,9 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
               child: Text(
                 subject.name.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  fontSize: 10,
+                  fontFamily: 'PatrickHand',
+                  color: primaryColor.withValues(alpha: 0.5),
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
@@ -504,14 +499,16 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                 child: Text(
                   topic?.name ?? 'Unknown Topic',
                   style: const TextStyle(
-                    color: Colors.black87,
+                    fontFamily: 'PatrickHand',
+                    color: primaryColor,
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: 16,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
+              // We'll keep MasteryBadge as is for now, assuming it blends or is small enough
               MasteryBadge(level: stats.masteryLevel),
             ],
           ),
@@ -519,16 +516,18 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
           Text(
             '${stats.accuracyDisplay} accuracy',
             style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.7),
-              fontSize: 12,
+              fontFamily: 'PatrickHand',
+              color: primaryColor.withValues(alpha: 0.8),
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             '${stats.totalAttempts} attempts',
             style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.4),
-              fontSize: 11,
+              fontFamily: 'PatrickHand',
+              color: primaryColor.withValues(alpha: 0.5),
+              fontSize: 12,
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class StreakIndicator extends StatelessWidget {
   final int currentStreak;
@@ -12,33 +13,21 @@ class StreakIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    const primaryColor = Color(0xFF2D3E50);
+
+    return WiredCard(
+      backgroundColor: const Color(0xFFFFF8E1), // Light yellow/orange tint
+      borderColor: Colors.orange.withValues(alpha: 0.5),
+      borderWidth: 1.5,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            const Color(0xFFFFECD2), // Peach
-            const Color(0xFFFCB69F), // Orange
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withValues(alpha: 0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.3),
+              color: Colors.white,
               shape: BoxShape.circle,
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
             ),
             child: const Icon(
               Icons.local_fire_department_rounded,
@@ -54,8 +43,9 @@ class StreakIndicator extends StatelessWidget {
                 Text(
                   'Study Streak',
                   style: TextStyle(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    fontSize: 14,
+                    fontFamily: 'PatrickHand',
+                    color: primaryColor.withValues(alpha: 0.7),
+                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -65,8 +55,9 @@ class StreakIndicator extends StatelessWidget {
                     Text(
                       '$currentStreak',
                       style: const TextStyle(
+                        fontFamily: 'PatrickHand',
                         color: Color(0xFFE65100), // Deep Orange
-                        fontSize: 32,
+                        fontSize: 36,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -74,8 +65,9 @@ class StreakIndicator extends StatelessWidget {
                     Text(
                       'day${currentStreak != 1 ? 's' : ''}',
                       style: TextStyle(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        fontSize: 18,
+                        fontFamily: 'PatrickHand',
+                        color: primaryColor.withValues(alpha: 0.7),
+                        fontSize: 20,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -86,8 +78,9 @@ class StreakIndicator extends StatelessWidget {
                   Text(
                     'Best: $longestStreak day${longestStreak != 1 ? 's' : ''}',
                     style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      fontSize: 13,
+                      fontFamily: 'PatrickHand',
+                      color: primaryColor.withValues(alpha: 0.5),
+                      fontSize: 15,
                     ),
                   ),
                 ],

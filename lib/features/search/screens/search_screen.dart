@@ -8,6 +8,7 @@ import '../search_repository.dart';
 import '../../past_papers/models/question_model.dart';
 import '../../past_papers/data/past_paper_repository.dart';
 import '../../past_papers/models/subject_model.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -20,6 +21,26 @@ class _SearchScreenState extends State<SearchScreen> {
   final _searchRepo = SearchRepository();
   final _paperRepo = PastPaperRepository();
   final _searchController = TextEditingController();
+
+  // Sketchy Theme Colors
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+  static const Color _backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+  // Patrick Hand text style helper
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
 
   List<QuestionModel> _results = [];
   List<SubjectModel> _subjects = [];
@@ -121,29 +142,20 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? Theme.of(context).scaffoldBackgroundColor
-          : AppColors.background,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
         title: Text(
           'Search Questions',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.onSurface
-                : AppColors.textPrimary,
+          style: _patrickHand(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.background,
+        backgroundColor: _backgroundColor,
         elevation: 0,
         iconTheme: IconThemeData(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Theme.of(context).colorScheme.onSurface
-              : AppColors.textPrimary,
+          color: _primaryColor,
         ),
       ),
       body: Column(
@@ -151,33 +163,22 @@ class _SearchScreenState extends State<SearchScreen> {
           // Search Bar with light background
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).scaffoldBackgroundColor
-                : AppColors.background,
+            color: _backgroundColor,
             child: Column(
               children: [
-                // Prominent search bar
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).cardTheme.color
-                        : AppColors.surface,
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
+                // Prominent search bar with sketchy style
+                WiredCard(
+                  backgroundColor: Colors.white,
+                  borderColor: _primaryColor,
+                  borderWidth: 1.5,
+                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Search questions...',
-                      hintStyle: TextStyle(
-                        color: AppColors.textSecondary.withValues(alpha: 0.5),
-                        fontSize: 15,
+                      hintStyle: _patrickHand(
+                        color: _primaryColor.withValues(alpha: 0.5),
+                        fontSize: 18,
                       ),
                       prefixIcon: _isLoading
                           ? Padding(
@@ -188,15 +189,15 @@ class _SearchScreenState extends State<SearchScreen> {
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary,
+                                    _primaryColor,
                                   ),
                                 ),
                               ),
                             )
-                          : Icon(Icons.search, color: AppColors.textSecondary),
+                          : Icon(Icons.search, color: _primaryColor),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                              icon: Icon(Icons.clear, color: AppColors.textSecondary),
+                              icon: Icon(Icons.clear, color: _primaryColor),
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() {
@@ -206,81 +207,67 @@ class _SearchScreenState extends State<SearchScreen> {
                               },
                             )
                           : null,
-                      filled: true,
-                      fillColor: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).cardTheme.color
-                          : AppColors.surface,
+                      filled: false,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(28),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 2,
-                        ),
-                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                     ),
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).colorScheme.onSurface
-                          : AppColors.textPrimary,
-                      fontSize: 15,
+                    style: _patrickHand(
+                      color: _primaryColor,
+                      fontSize: 18,
                     ),
                     onChanged: (value) {
-                      setState(() {}); // Update UI for clear button
-                      _onSearchChanged(value); // Trigger debounced search
+                      setState(() {});
+                      _onSearchChanged(value);
                     },
                   ),
                 ),
                 const SizedBox(height: 16),
                 // Filter Chips Row
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // All Subjects chip
-                    _buildFilterChip(
-                      'All Subjects',
-                      _selectedSubjectId == null && _selectedType == null,
-                      () {
-                        setState(() {
-                          _selectedSubjectId = null;
-                          _selectedType = null;
-                        });
-                        if (_hasSearched) _performSearch();
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    // MCQ chip
-                    _buildFilterChip(
-                      'MCQ',
-                      _selectedType == 'mcq',
-                      () {
-                        setState(() {
-                          _selectedType = _selectedType == 'mcq' ? null : 'mcq';
-                        });
-                        if (_hasSearched) _performSearch();
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    // Structured chip
-                    _buildFilterChip(
-                      'Structured',
-                      _selectedType == 'structured',
-                      () {
-                        setState(() {
-                          _selectedType = _selectedType == 'structured' ? null : 'structured';
-                        });
-                        if (_hasSearched) _performSearch();
-                      },
-                    ),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // All Subjects chip
+                      _buildFilterChip(
+                        'All Subjects',
+                        _selectedSubjectId == null && _selectedType == null,
+                        () {
+                          setState(() {
+                            _selectedSubjectId = null;
+                            _selectedType = null;
+                          });
+                          if (_hasSearched) _performSearch();
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      // MCQ chip
+                      _buildFilterChip(
+                        'MCQ',
+                        _selectedType == 'mcq',
+                        () {
+                          setState(() {
+                            _selectedType = _selectedType == 'mcq' ? null : 'mcq';
+                          });
+                          if (_hasSearched) _performSearch();
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      // Structured chip
+                      _buildFilterChip(
+                        'Structured',
+                        _selectedType == 'structured',
+                        () {
+                          setState(() {
+                            _selectedType = _selectedType == 'structured' ? null : 'structured';
+                          });
+                          if (_hasSearched) _performSearch();
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -297,34 +284,17 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildFilterChip(String label, bool isSelected, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: WiredCard(
+        backgroundColor: isSelected ? _primaryColor : Colors.white,
+        borderColor: _primaryColor,
+        borderWidth: 1.5,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primary
-              : Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).cardTheme.color
-                  : AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primary
-                : Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).dividerColor
-                    : AppColors.border,
-            width: 1,
-          ),
-        ),
         child: Text(
           label,
-          style: TextStyle(
-            color: isSelected
-                ? Colors.white
-                : Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface
-                    : AppColors.textPrimary,
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          style: _patrickHand(
+            color: isSelected ? Colors.white : _primaryColor,
+            fontSize: 16,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
       ),
@@ -337,19 +307,20 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Premium Empty State Illustration
-            Container(
-              width: 160,
-              height: 160,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+            // Sketchy Empty State Illustration
+            CustomPaint(
+              painter: WiredBorderPainter(
+                color: _primaryColor.withValues(alpha: 0.2),
+                strokeWidth: 1.5,
               ),
-              child: Center(
+              child: Container(
+                width: 140,
+                height: 140,
+                padding: const EdgeInsets.all(30),
                 child: Icon(
                   Icons.manage_search_rounded,
-                  size: 80,
-                  color: AppColors.primary,
+                  size: 70,
+                  color: _primaryColor.withValues(alpha: 0.6),
                 ),
               ),
             ),
@@ -357,13 +328,9 @@ class _SearchScreenState extends State<SearchScreen> {
             Text(
               'Start your search or browse by category',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface
-                    : AppColors.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
+              style: _patrickHand(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -372,7 +339,11 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: CircularProgressIndicator(
+          color: _primaryColor,
+        )
+      );
     }
 
     if (_results.isEmpty) {
@@ -383,29 +354,22 @@ class _SearchScreenState extends State<SearchScreen> {
             Icon(
               Icons.search_off,
               size: 80,
-              color: AppColors.textSecondary.withValues(alpha: 0.3),
+              color: _primaryColor.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 20),
             Text(
               'No results found',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface
-                    : AppColors.textPrimary,
-                fontSize: 20,
+              style: _patrickHand(
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Try different keywords or filters',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                    : AppColors.textSecondary,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
+              style: _patrickHand(
+                color: _primaryColor.withValues(alpha: 0.7),
+                fontSize: 18,
               ),
             ),
           ],
@@ -424,88 +388,73 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildQuestionCard(QuestionModel question) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? Theme.of(context).cardTheme.color : colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.1)
-              : colorScheme.onSurface.withValues(alpha: 0.1),
-        ),
-      ),
-      child: InkWell(
-        onTap: () => context.push('/question/${question.id}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
+      onTap: () => context.push('/question/${question.id}'),
+      child: WiredCard(
+        backgroundColor: Colors.white,
+        borderColor: _primaryColor.withValues(alpha: 0.3),
+        borderWidth: 1.5,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _primaryColor, width: 1),
+                  ),
+                  child: Text(
+                    'Q${question.questionNumber}',
+                    style: _patrickHand(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
                     ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (question.isMCQ)
+                  WiredCard(
+                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                    borderColor: Colors.blue.withValues(alpha: 0.4),
+                    borderWidth: 1,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Text(
-                      'Q${question.questionNumber}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                      'MCQ',
+                      style: _patrickHand(
+                        color: Colors.blue,
                         fontSize: 12,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (question.isMCQ)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'MCQ',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              question.content,
+              style: _patrickHand(
+                color: _primaryColor,
+                fontSize: 16,
               ),
-              const SizedBox(height: 12),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+            if (question.hasPaperInfo) ...[
+              const SizedBox(height: 8),
               Text(
-                question.content,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
+                question.paperLabel,
+                style: _patrickHand(
+                  color: _primaryColor.withValues(alpha: 0.6),
                   fontSize: 14,
                 ),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
               ),
-              if (question.hasPaperInfo) ...[
-                const SizedBox(height: 8),
-                Text(
-                  question.paperLabel,
-                  style: TextStyle(
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
             ],
-          ),
+          ],
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class StatCard extends StatelessWidget {
   final IconData icon;
@@ -18,31 +19,29 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    const primaryColor = Color(0xFF2D3E50);
+
+    return WiredCard(
+      backgroundColor: Colors.white,
+      borderColor: primaryColor.withValues(alpha: 0.3),
+      borderWidth: 1.5,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E2B3D), // Deep Blue
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: iconColor.withValues(alpha: 0.3),
+                width: 1,
+              ),
             ),
             child: Icon(
               icon,
-              color: Colors.white,
+              color: iconColor,
               size: 20,
             ),
           ),
@@ -50,17 +49,19 @@ class StatCard extends StatelessWidget {
           Text(
             title,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 13,
+              fontFamily: 'PatrickHand',
+              color: primaryColor.withValues(alpha: 0.7),
+              fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 26,
+            style: TextStyle(
+              fontFamily: 'PatrickHand',
+              color: primaryColor,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -68,8 +69,9 @@ class StatCard extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 12,
+              fontFamily: 'PatrickHand',
+              color: primaryColor.withValues(alpha: 0.5),
+              fontSize: 14,
             ),
           ),
         ],

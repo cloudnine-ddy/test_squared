@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/services/toast_service.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import '../../past_papers/models/question_model.dart';
 import '../data/bookmark_repository.dart';
 import '../data/notes_repository.dart';
-import '../../past_papers/models/question_model.dart';
-import 'note_editor_dialog.dart';
+import '../../../core/services/toast_service.dart';
 import '../widgets/bookmark_folder_panel.dart';
+import 'note_editor_dialog.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({super.key});
@@ -18,88 +17,105 @@ class BookmarksScreen extends StatefulWidget {
 }
 
 class _BookmarksScreenState extends State<BookmarksScreen> {
-  final _bookmarkRepo = BookmarkRepository();
-  final _notesRepo = NotesRepository();
-
-  List<String> _folders = [];
-  String _selectedFolder = 'My Bookmarks';
+  final BookmarkRepository _bookmarkRepo = BookmarkRepository();
+  final NotesRepository _notesRepo = NotesRepository();
+  
   List<QuestionModel> _questions = [];
-  Map<String, bool> _hasNotes = {};
+  List<String> _folders = ['My Bookmarks'];
+  String _selectedFolder = 'My Bookmarks';
   bool _isLoading = true;
+  Map<String, bool> _hasNotes = {};
+
+  // Sketchy Theme Colors
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+  static const Color _backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInitialData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
+    await _loadFolders();
+    await _loadQuestions();
+    setState(() => _isLoading = false);
+  }
 
-    try {
-      final folders = await _bookmarkRepo.getFolders();
-      if (folders.isEmpty) {
-        folders.add('My Bookmarks');
-      }
-
-      setState(() {
-        _folders = folders;
-        if (!folders.contains(_selectedFolder)) {
-          _selectedFolder = folders.first;
-        }
-      });
-
-      await _loadQuestions();
-    } catch (e) {
-      ToastService.showError('Failed to load bookmarks');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+  Future<void> _loadFolders() async {
+    final folders = await _bookmarkRepo.getFolders();
+    if (mounted) {
+      setState(() => _folders = ['My Bookmarks', ...folders]);
     }
   }
 
   Future<void> _loadQuestions() async {
+    setState(() => _isLoading = true);
     try {
-      final questions = await _bookmarkRepo.getBookmarkedQuestions(
-        folder: _selectedFolder,
-      );
-
-      // Check which questions have notes
-      final hasNotes = <String, bool>{};
-      for (final q in questions) {
-        hasNotes[q.id] = await _notesRepo.hasNote(q.id);
+      final questions = await _bookmarkRepo.getBookmarkedQuestions(folder: _selectedFolder);
+      
+      // Check for notes
+      final notesMap = <String, bool>{};
+      for (var q in questions) {
+        final note = await _notesRepo.getNote(q.id);
+        if (note != null) {
+          notesMap[q.id] = true;
+        }
       }
 
       if (mounted) {
         setState(() {
           _questions = questions;
-          _hasNotes = hasNotes;
+          _hasNotes = notesMap;
+          _isLoading = false;
         });
       }
     } catch (e) {
-      ToastService.showError('Failed to load questions');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ToastService.showError('Failed to load bookmarks');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? Theme.of(context).scaffoldBackgroundColor
-          : AppColors.background,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
         title: Text(
           'Bookmarks',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.onSurface
-                : Colors.white,
+          style: _patrickHand(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.sidebar,
+        backgroundColor: _backgroundColor,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _primaryColor),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: _primaryColor.withValues(alpha: 0.2),
+            height: 1,
+          ),
+        ),
       ),
       body: Row(
         children: [
@@ -115,15 +131,15 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             onDeleteFolder: _deleteFolder,
             onRenameFolder: _renameFolder,
           ),
-          // Vertical divider
+          // Vertical divider - sketchy style
           Container(
             width: 1,
-            color: Colors.white.withValues(alpha: 0.1),
+            color: _primaryColor.withValues(alpha: 0.2),
           ),
           // Content area
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: _primaryColor))
                 : _buildContent(),
           ),
         ],
@@ -137,27 +153,35 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.bookmark_border,
-              size: 64,
-              color: Colors.white.withValues(alpha: 0.3),
+            CustomPaint(
+              painter: WiredBorderPainter(
+                color: _primaryColor.withValues(alpha: 0.2),
+                strokeWidth: 1.5,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                child: Icon(
+                  Icons.bookmark_border,
+                  size: 48,
+                  color: _primaryColor.withValues(alpha: 0.4),
+                ),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               'No bookmarks in this folder',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
-                    : Colors.white.withValues(alpha: 0.6),
-                fontSize: 16,
+              style: _patrickHand(
+                fontSize: 20,
+                color: _primaryColor.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'Bookmark questions while practicing',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 14,
+              style: _patrickHand(
+                fontSize: 16,
+                color: _primaryColor.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -167,6 +191,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
     return RefreshIndicator(
       onRefresh: _loadQuestions,
+      color: _primaryColor,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _questions.length,
@@ -182,156 +207,143 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
   Widget _buildQuestionCard(QuestionModel question, bool hasNote) {
     final isAI = question.type == 'ai_generated';
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final cardColor = isAI
-        ? (isDark ? const Color(0xFFF5F0E1).withValues(alpha: 0.1) : const Color(0xFFF5F0E1))
-        : (isDark ? Theme.of(context).cardTheme.color : AppColors.sidebar);
-
-    final textColor = isAI
-        ? (isDark ? Colors.white : const Color(0xFF2D2D2D))
-        : (isDark ? Theme.of(context).colorScheme.onSurface : Colors.white);
-
-    final borderColor = isAI
-        ? (isDark ? Colors.transparent : const Color(0xFFE8DCC8))
-        : (isDark ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.1));
-
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-        boxShadow: isAI
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                )
-              ]
-            : null,
-      ),
-      child: InkWell(
-        onTap: () => context.push('/question/${question.id}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isAI ? AppColors.primary : null,
-                      gradient: isAI
-                          ? null
-                          : const LinearGradient(
-                              colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-                            ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      isAI ? 'AI Generated' : 'Q${question.questionNumber}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+      child: WiredCard(
+        backgroundColor: isAI ? const Color(0xFFF5F0E1) : Colors.white,
+        borderColor: isAI ? Colors.orange.withValues(alpha: 0.3) : _primaryColor.withValues(alpha: 0.2),
+        borderWidth: 1.5,
+        padding: const EdgeInsets.all(0),
+        child: InkWell(
+          onTap: () => context.push('/question/${question.id}'),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isAI ? Colors.orange : _primaryColor.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isAI ? Colors.orange : _primaryColor,
+                          width: 1.5,
+                        ),
                       ),
+                      child: Text(
+                        isAI ? 'AI Generated' : 'Q${question.questionNumber}',
+                        style: _patrickHand(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (question.isMCQ && !isAI)
+                      WiredCard(
+                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                        borderColor: Colors.blue.withValues(alpha: 0.4),
+                        borderWidth: 1.0,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Text(
+                          'MCQ',
+                          style: _patrickHand(
+                            color: Colors.blue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    const Spacer(),
+                    if (hasNote)
+                      Icon(
+                        Icons.note,
+                        color: isAI ? Colors.orange : Colors.amber,
+                        size: 20,
+                      ),
+                    const SizedBox(width: 8),
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        popupMenuTheme: PopupMenuThemeData(
+                          color: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
+                          ),
+                        ),
+                      ),
+                      child: PopupMenuButton(
+                        icon: Icon(
+                          Icons.more_vert,
+                          color: _primaryColor.withValues(alpha: 0.6),
+                        ),
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'move',
+                            child: Row(
+                              children: [
+                                Icon(Icons.folder_outlined, size: 18, color: _primaryColor),
+                                const SizedBox(width: 8),
+                                Text('Move to folder', style: _patrickHand(color: _primaryColor)),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'remove',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.bookmark_remove, size: 18, color: Colors.red),
+                                const SizedBox(width: 8),
+                                Text('Remove bookmark', style: _patrickHand(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        onSelected: (value) async {
+                          if (value == 'remove') {
+                            await _removeBookmark(question.id);
+                          } else if (value == 'move') {
+                            await _showMoveDialog(question.id);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                MarkdownBody(
+                  data: question.content.length > 150
+                      ? '${question.content.substring(0, 150)}...'
+                      : question.content,
+                  styleSheet: MarkdownStyleSheet(
+                    p: _patrickHand(
+                      color: _primaryColor,
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
+                    strong: _patrickHand(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  if (question.isMCQ && !isAI)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'MCQ',
-                        style: TextStyle(
-                          color: Colors.blue,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                ),
+                if (question.hasPaperInfo) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    question.paperLabel,
+                    style: _patrickHand(
+                      color: _primaryColor.withValues(alpha: 0.5),
+                      fontSize: 14,
                     ),
-                  const Spacer(),
-                  if (hasNote)
-                    Icon(
-                      Icons.note,
-                      color: isAI ? Colors.orange : Colors.amber,
-                      size: 18,
-                    ),
-                  const SizedBox(width: 8),
-                  PopupMenuButton(
-                    icon: Icon(
-                      Icons.more_vert,
-                      color: textColor.withValues(alpha: 0.6),
-                    ),
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).cardTheme.color
-                        : AppColors.sidebar,
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'move',
-                        child: const Row(
-                          children: [
-                            Icon(Icons.folder_outlined, size: 18, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text('Move to folder', style: TextStyle(color: Colors.white)),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'remove',
-                        child: Row(
-                          children: [
-                            Icon(Icons.bookmark_remove, size: 18, color: Colors.red),
-                            const SizedBox(width: 8),
-                            const Text('Remove bookmark', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
-                    onSelected: (value) async {
-                      if (value == 'remove') {
-                        await _removeBookmark(question.id);
-                      } else if (value == 'move') {
-                        await _showMoveDialog(question.id);
-                      }
-                    },
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              MarkdownBody(
-                data: question.content.length > 150
-                    ? '${question.content.substring(0, 150)}...'
-                    : question.content,
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(
-                    color: textColor,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                  strong: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              if (question.hasPaperInfo) ...[
-                const SizedBox(height: 8),
-                Text(
-                  question.paperLabel,
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.5),
-                    fontSize: 12,
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -351,33 +363,38 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   Future<void> _showMoveDialog(String questionId) async {
     final newFolder = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).cardTheme.color
-            : AppColors.sidebar,
-        title: Text(
-          'Move to folder',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.onSurface
-                : Colors.white,
-          )
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _folders.map((folder) {
-            return ListTile(
-              title: Text(
-                folder,
-                style: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Colors.white,
-                )
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: WiredCard(
+          backgroundColor: Colors.white,
+          borderColor: _primaryColor,
+          borderWidth: 1.5,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Move to folder',
+                style: _patrickHand(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              onTap: () => Navigator.pop(context, folder),
-            );
-          }).toList(),
+              const SizedBox(height: 16),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: _folders.map((folder) {
+                  return ListTile(
+                    title: Text(
+                      folder,
+                      style: _patrickHand(fontSize: 18),
+                    ),
+                    onTap: () => Navigator.pop(context, folder),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -398,45 +415,57 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).cardTheme.color
-            : AppColors.sidebar,
-        title: Text(
-          'New Folder',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.onSurface
-                : Colors.white,
-          )
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: WiredCard(
+          backgroundColor: Colors.white,
+          borderColor: _primaryColor,
+          borderWidth: 1.5,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'New Folder',
+                style: _patrickHand(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.3))),
+                ),
+                child: TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    hintText: 'Folder name',
+                    hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.5)),
+                    border: InputBorder.none,
+                  ),
+                  style: _patrickHand(fontSize: 18),
+                  autofocus: true,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: Text('Cancel', style: _patrickHand(color: Colors.grey)),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: Text('Create', style: _patrickHand(color: _primaryColor, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            hintText: 'Folder name',
-            hintStyle: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
-                  : Colors.white54,
-            ),
-          ),
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.onSurface
-                : Colors.white,
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
 

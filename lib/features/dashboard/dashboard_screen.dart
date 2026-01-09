@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../core/services/toast_service.dart';
+import '../../shared/wired/wired_widgets.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
 import '../auth/services/auth_service.dart';
@@ -22,7 +23,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  String _selectedCurriculum = 'SPM';
+  String _selectedCurriculum = 'IGCSE';
   int? _selectedSubjectIndex;
   String? _selectedSubjectName; // Nullable, initialized to null
   String? _selectedSubjectId; // Store subject ID for filtering
@@ -30,10 +31,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   bool _isLoadingPinnedSubjects = false;
 
   final List<String> _curriculums = [
-    'SPM',
-    'IGCSE (Coming Soon)',
+    'IGCSE',
+    'SPM (Coming Soon)',
     'A-Level (Coming Soon)',
   ];
+
+  // Sketchy Theme Colors (matching Landing Page)
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+  static const Color _backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+  // Patrick Hand text style helper
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
 
   @override
   void initState() {
@@ -69,15 +90,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Container(
             width: 260,
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).navigationRailTheme.backgroundColor
-                  : AppColors.sidebar,
-              border: Border(
+              color: _backgroundColor, // Beige background
+              border: const Border(
                 right: BorderSide(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context).dividerColor
-                      : AppColors.border,
-                  width: 1,
+                  color: _primaryColor,
+                  width: 2,
                 ),
               ),
             ),
@@ -85,40 +102,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               children: [
                 // Header Section
                 Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // App Logo
-                      Text(
-                        'Test²',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Curriculum Switcher (PopupMenuButton)
+                      // Curriculum Switcher (no logo)
                       PopupMenuButton<String>(
                         offset: const Offset(0, 40),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        color: Theme.of(context).cardTheme.color,
+                        color: _backgroundColor,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               _selectedCurriculum,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface,
-                                fontSize: 14,
-                              ),
+                              style: _patrickHand(fontSize: 18),
                             ),
                             Icon(
                               Icons.keyboard_arrow_down,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                              color: _primaryColor.withValues(alpha: 0.6),
                               size: 20,
                             ),
                           ],
@@ -129,10 +133,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               value: curriculum,
                               child: Text(
                                 curriculum,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                  fontSize: 14,
-                                ),
+                                style: _patrickHand(fontSize: 16),
                               ),
                             );
                           }).toList();
@@ -154,31 +155,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // Primary Action Button
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        _showSubjectSelector(context);
-                      },
-                      icon: const Icon(Icons.grid_view),
-                      label: const Text('Explore Subjects'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.textOnDark,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  child: WiredButton(
+                    onPressed: () => _showSubjectSelector(context),
+                    filled: true,
+                    backgroundColor: _primaryColor,
+                    borderColor: _primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.grid_view, color: Colors.white, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Explore Subjects',
+                          style: _patrickHand(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Divider
-                Divider(
-                  color: Theme.of(context).dividerColor,
-                  thickness: 1,
-                  height: 1,
+                // Divider (Wired)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: WiredDivider(color: _primaryColor, thickness: 1.5),
                 ),
                 const SizedBox(height: 20),
                 // Section Title
@@ -188,13 +193,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'MY SUBJECTS',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: _patrickHand(
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
-                            : AppColors.textPrimary.withValues(alpha: 0.6),
-                        letterSpacing: 0.5,
+                        color: _primaryColor.withValues(alpha: 0.7),
                       ),
                     ),
                   ),
@@ -203,16 +205,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // Pinned Subjects List
                 Expanded(
                   child: _isLoadingPinnedSubjects
-                      ? const Center(child: CircularProgressIndicator())
+                      ? Center(child: CircularProgressIndicator(color: _primaryColor))
                       : _pinnedSubjects.isEmpty
                           ? Center(
                               child: Padding(
                                 padding: const EdgeInsets.all(16.0),
                                 child: Text(
                                   'No pinned subjects',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
+                                  style: _patrickHand(
+                                    fontSize: 14,
+                                    color: _primaryColor.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ),
@@ -226,46 +228,32 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 12,
-                                    vertical: 4,
+                                    vertical: 2,
                                   ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(8),
-                                      onTap: () {
-                                        setState(() {
-                                          _selectedSubjectIndex = index;
-                                          _selectedSubjectName = subject.name;
-                                          _selectedSubjectId = subject.id;
-                                        });
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? Theme.of(context).primaryColor.withValues(alpha: 0.1)
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: isSelected
-                                                ? Theme.of(context).primaryColor
-                                                : Colors.transparent,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          subject.name,
-                                          style: TextStyle(
-                                            color: isSelected
-                                                ? Theme.of(context).primaryColor
-                                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9), // Higher contrast for unselected
-                                            fontWeight: isSelected
-                                                ? FontWeight.w700 // Bolder
-                                                : FontWeight.normal,
-                                          ),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedSubjectIndex = index;
+                                        _selectedSubjectName = subject.name;
+                                        _selectedSubjectId = subject.id;
+                                      });
+                                    },
+                                    child: WiredCard(
+                                      borderColor: isSelected ? _primaryColor : _primaryColor.withValues(alpha: 0.3),
+                                      borderWidth: isSelected ? 2 : 1,
+                                      backgroundColor: isSelected 
+                                          ? _primaryColor.withValues(alpha: 0.1)
+                                          : Colors.transparent,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        subject.name,
+                                        style: _patrickHand(
+                                          fontSize: 16,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          color: _primaryColor,
                                         ),
                                       ),
                                     ),
@@ -274,24 +262,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               },
                             ),
                 ),
-                // Navigation Items
+                const SizedBox(height: 16), // Gap before navigation
+                // Navigation Items (just above footer)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Column(
                     children: [
-                      _buildNavButton(
+                      _buildWiredNavButton(
                         icon: Icons.trending_up,
                         label: 'My Progress',
                         onTap: () => context.push('/progress'),
                       ),
                       const SizedBox(height: 8),
-                      _buildNavButton(
+                      _buildWiredNavButton(
                         icon: Icons.bookmark,
                         label: 'Bookmarks',
                         onTap: () => context.push('/bookmarks'),
                       ),
                       const SizedBox(height: 8),
-                      _buildNavButton(
+                      _buildWiredNavButton(
                         icon: Icons.search,
                         label: 'Search',
                         onTap: () => context.push('/search'),
@@ -299,8 +288,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ],
                   ),
                 ),
-                // Spacer pushes footer to bottom
-                const Spacer(),
+                const SizedBox(height: 12), // Small gap before premium
                 // Footer
                 Padding(
                   padding: const EdgeInsets.all(20),
@@ -308,61 +296,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     children: [
                       // Premium Upgrade Banner - Only show for non-premium users
                       if (!ref.watch(isPremiumProvider))
-                        Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Theme.of(context).primaryColor,
-                                Theme.of(context).colorScheme.secondary,
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: WiredButton(
+                            onPressed: () => context.push('/premium'),
+                            filled: true,
+                            backgroundColor: _primaryColor,
+                            borderColor: _primaryColor,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.workspace_premium, color: Colors.white, size: 18),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Upgrade to Premium',
+                                    style: _patrickHand(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 12),
                               ],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => context.push('/premium'),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.workspace_premium,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        'Upgrade to Premium',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: Colors.white,
-                                      size: 12,
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ),
                           ),
                         ),
-                      Divider(
-                        color: Theme.of(context).dividerColor,
-                        thickness: 1,
-                        height: 1,
-                      ),
+                      WiredDivider(color: _primaryColor, thickness: 1.5),
                       const SizedBox(height: 16),
                       // Profile Row
                       Builder(
@@ -376,13 +337,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             children: [
                               CircleAvatar(
                                 radius: 16,
-                                backgroundColor: Theme.of(context).primaryColor,
+                                backgroundColor: _primaryColor,
                                 child: Text(
                                   avatarText,
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: _patrickHand(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ),
@@ -394,22 +355,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   children: [
                                     Text(
                                       userName,
-                                      style: TextStyle(
-                                        color: Theme.of(context).brightness == Brightness.dark
-                                            ? Theme.of(context).colorScheme.onSurface
-                                            : AppColors.textPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                                      style: _patrickHand(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
                                       userEmail,
-                                      style: TextStyle(
-                                        color: Theme.of(context).brightness == Brightness.dark
-                                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
-                                            : AppColors.textPrimary.withValues(alpha: 0.6),
-                                        fontSize: 12,
+                                      style: _patrickHand(
+                                        fontSize: 13,
+                                        color: _primaryColor.withValues(alpha: 0.6),
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -419,12 +375,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           PopupMenuButton<String>(
                             icon: Icon(
                               Icons.settings,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+                              color: _primaryColor.withValues(alpha: 0.6),
                               size: 20,
                             ),
-                            color: Theme.of(context).cardTheme.color,
+                            color: Colors.white,
+                            elevation: 4,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(10),
+                              side: BorderSide(color: _primaryColor.withValues(alpha: 0.8), width: 1.5),
                             ),
                             itemBuilder: (context) => [
                                 PopupMenuItem(
@@ -435,7 +393,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         ref.watch(themeModeProvider) == ThemeMode.dark
                                             ? Icons.light_mode
                                             : Icons.dark_mode,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: _primaryColor,
                                         size: 20,
                                       ),
                                       const SizedBox(width: 12),
@@ -443,8 +401,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                         ref.watch(themeModeProvider) == ThemeMode.dark
                                             ? 'Light Mode'
                                             : 'Dark Mode',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onSurface,
+                                        style: _patrickHand(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ],
@@ -456,14 +415,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   children: [
                                       Icon(
                                         Icons.accessibility_new,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: _primaryColor,
                                         size: 20,
                                       ),
                                     const SizedBox(width: 12),
                                       Text(
                                         'Accessibility',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onSurface,
+                                        style: _patrickHand(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                   ],
@@ -475,14 +435,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   children: [
                                       Icon(
                                         Icons.logout,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: _primaryColor,
                                         size: 20,
                                       ),
                                     const SizedBox(width: 12),
                                       Text(
                                         'Logout',
-                                        style: TextStyle(
-                                          color: Theme.of(context).colorScheme.onSurface,
+                                        style: _patrickHand(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.red[400],
                                         ),
                                       ),
                                   ],
@@ -515,37 +477,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
           // Main Content Area
           Expanded(
-            child: Column(
-              children: [
-                // Custom Header
-                Container(
-                  height: 60,
-                  alignment: Alignment.center,
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  child: Text(
-                    'Test² Dashboard',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).colorScheme.onSurface
-                          : AppColors.primary,
-                    ),
-                  ),
-                ),
-                // Content
-                Expanded(
-                  child: _selectedSubjectName != null && _selectedSubjectId != null
-                      ? SubjectDetailView(
-                          subjectName: _selectedSubjectName!,
-                          subjectId: _selectedSubjectId!,
-                          isPinned: _pinnedSubjects.any((s) => s.id == _selectedSubjectId),
-                          onPinChanged: () => _loadPinnedSubjects(),
-                        )
-                      : _buildEmptyState(),
-                ),
-              ],
-            ),
+            child: _selectedSubjectName != null && _selectedSubjectId != null
+                ? SubjectDetailView(
+                    subjectName: _selectedSubjectName!,
+                    subjectId: _selectedSubjectId!,
+                    isPinned: _pinnedSubjects.any((s) => s.id == _selectedSubjectId),
+                    onPinChanged: () => _loadPinnedSubjects(),
+                  )
+                : _buildEmptyState(),
           ),
         ],
       ),
@@ -568,96 +507,74 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              backgroundColor: Theme.of(context).cardTheme.color,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                width: 500,
-                constraints: const BoxConstraints(maxHeight: 600),
+              backgroundColor: Colors.transparent,
+              child: WiredCard(
+                backgroundColor: _backgroundColor,
+                borderColor: _primaryColor,
+                borderWidth: 2,
                 padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title
-                    const Text(
-                      'Select Subject',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    // Search Bar
-                    TextField(
-                      controller: searchController,
-                      decoration: InputDecoration(
-                        hintText: 'Search for Biology, History...',
-                        hintStyle: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
-                              : AppColors.textSecondary,
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
-                              : AppColors.textSecondary,
-                        ),
-                        filled: true,
-                        fillColor: Theme.of(context).brightness == Brightness.dark
-                             ? Theme.of(context).scaffoldBackgroundColor
-                             : AppColors.surface,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: Theme.of(context).brightness == Brightness.dark
-                              ? BorderSide.none
-                              : const BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: Theme.of(context).brightness == Brightness.dark
-                              ? BorderSide.none
-                              : const BorderSide(color: AppColors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: Theme.of(context).brightness == Brightness.dark
-                              ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
-                              : const BorderSide(color: AppColors.primary, width: 2),
+                width: 500,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 500),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title
+                      Text(
+                        'Select Subject',
+                        style: _patrickHand(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface
-                            : AppColors.textPrimary,
+                      const SizedBox(height: 20),
+                      // Search Bar (WiredCard for sketchy border)
+                      WiredCard(
+                        backgroundColor: Colors.white,
+                        borderColor: _primaryColor.withValues(alpha: 0.6),
+                        borderWidth: 1.5,
+                        padding: EdgeInsets.zero,
+                        child: TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search for Biology, History...',
+                            hintStyle: _patrickHand(
+                              fontSize: 16,
+                              color: _primaryColor.withValues(alpha: 0.5),
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: _primaryColor.withValues(alpha: 0.6),
+                            ),
+                            filled: false,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                          style: _patrickHand(fontSize: 16),
+                          onChanged: (value) {
+                            setDialogState(() {
+                              searchQuery = value;
+                            });
+                          },
+                        ),
                       ),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          searchQuery = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
                     // Subjects List with FutureBuilder
                     Flexible(
                       child: FutureBuilder<List<SubjectModel>>(
-                        future: PastPaperRepository().getSubjects(curriculum: 'SPM'),
+                        future: PastPaperRepository().getSubjects(curriculum: _selectedCurriculum),
                         builder: (context, snapshot) {
                           // Loading State
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return Center(
                               child: Padding(
-                                padding: EdgeInsets.all(32.0),
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
+                                padding: const EdgeInsets.all(32.0),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: _primaryColor,
                                 ),
                               ),
                             );
@@ -667,11 +584,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           if (snapshot.hasError) {
                             return Center(
                               child: Padding(
-                                padding: EdgeInsets.all(32.0),
+                                padding: const EdgeInsets.all(32.0),
                                 child: Text(
                                   'Failed to load subjects',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                  style: _patrickHand(
+                                    fontSize: 16,
+                                    color: _primaryColor.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ),
@@ -682,11 +600,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
                             return Center(
                               child: Padding(
-                                padding: EdgeInsets.all(32.0),
+                                padding: const EdgeInsets.all(32.0),
                                 child: Text(
                                   'No subjects found',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                  style: _patrickHand(
+                                    fontSize: 16,
+                                    color: _primaryColor.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ),
@@ -705,11 +624,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           if (filteredSubjects.isEmpty) {
                             return Center(
                               child: Padding(
-                                padding: EdgeInsets.all(32.0),
+                                padding: const EdgeInsets.all(32.0),
                                 child: Text(
                                   'No subjects match your search',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
+                                  style: _patrickHand(
+                                    fontSize: 16,
+                                    color: _primaryColor.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ),
@@ -721,51 +641,56 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             itemCount: filteredSubjects.length,
                             itemBuilder: (context, index) {
                               final subject = filteredSubjects[index];
-                              return ListTile(
-                                title: Text(
-                                  subject.name,
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onSurface,
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 3),
+                                child: GestureDetector(
+                                  onTap: () async {
+                                    // Only set the selected subject (no auto-pinning)
+                                    setState(() {
+                                      _selectedSubjectName = subject.name;
+                                      _selectedSubjectId = subject.id;
+                                      // Update selected index if it's already in the pinned list
+                                      final pinnedIndex = _pinnedSubjects
+                                          .indexWhere((s) => s.id == subject.id);
+                                      if (pinnedIndex != -1) {
+                                        _selectedSubjectIndex = pinnedIndex;
+                                      } else {
+                                        _selectedSubjectIndex = null;
+                                      }
+                                    });
+                            
+                                    Navigator.of(context).pop();
+                            
+                                    // Check if subject has topics and show warning if empty
+                                    try {
+                                      final topics = await PastPaperRepository().getTopics(subjectId: subject.id);
+                                      if (topics.isEmpty && mounted) {
+                                        ToastService.showWarning('This subject has no content yet.');
+                                      }
+                                    } catch (e) {
+                                      // Silently fail - we don't want to show error for this check
+                                      print('Error checking topics: \$e');
+                                    }
+                                  },
+                                  child: WiredCard(
+                                    borderColor: _primaryColor.withValues(alpha: 0.3),
+                                    borderWidth: 1,
+                                    backgroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                    child: Text(
+                                      subject.name,
+                                      style: _patrickHand(fontSize: 16),
+                                    ),
                                   ),
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                          onTap: () async {
-                            // Only set the selected subject (no auto-pinning)
-                            setState(() {
-                              _selectedSubjectName = subject.name;
-                              _selectedSubjectId = subject.id;
-                              // Update selected index if it's already in the pinned list
-                              final pinnedIndex = _pinnedSubjects
-                                  .indexWhere((s) => s.id == subject.id);
-                              if (pinnedIndex != -1) {
-                                _selectedSubjectIndex = pinnedIndex;
-                              } else {
-                                _selectedSubjectIndex = null;
-                              }
-                            });
-
-                            Navigator.of(context).pop();
-
-                            // Check if subject has topics and show warning if empty
-                            try {
-                              final topics = await PastPaperRepository().getTopics(subjectId: subject.id);
-                              if (topics.isEmpty && mounted) {
-                                ToastService.showWarning('This subject has no content yet.');
-                              }
-                            } catch (e) {
-                              // Silently fail - we don't want to show error for this check
-                              print('Error checking topics: $e');
-                            }
-                          },
                               );
                             },
                           );
                         },
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -820,6 +745,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
     );
 
+  }
+
+  // New wired nav button method (sketchy style)
+  Widget _buildWiredNavButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return WiredButton(
+      onPressed: onTap,
+      filled: false,
+      borderColor: _primaryColor.withValues(alpha: 0.5),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(icon, color: _primaryColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: _patrickHand(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

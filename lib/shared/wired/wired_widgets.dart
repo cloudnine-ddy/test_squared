@@ -46,42 +46,35 @@ class WiredBorderPainter extends CustomPainter {
   void _drawRoughLine(Canvas canvas, Paint paint, Offset start, Offset end, math.Random random) {
     final path = Path();
     
-    // Roughness parameters
-    const roughness = 0.5; // Reduced from 1.0 for tighter lines
-    const bowing = 0.2; // Reduced from 1.0 to prevent "ballooning" on large shapes
+    // Roughness parameters - INCREASED for more hand-drawn look
+    const roughness = 1.5; // Increased for more visible wobble
+    const bowing = 0.4; // Increased for more curve
     
-    // Random offsets
-    final double offset = roughness * (random.nextDouble() - 0.5);
+    // Random offsets for start/end points
     final diff = end - start;
     final length = diff.distance;
     
     // Midpoint displacement (Bowing)
-    // We add a random point in the middle but pushed out perpendicular
     final mid = (start + end) / 2;
     final fallbackAngle = math.atan2(diff.dy, diff.dx);
     final normalAngle = fallbackAngle + math.pi / 2;
     
-    // Scale bowing by length but CAP it so giant cards don't look weird
-    double bowMagnitude = length * 0.002; // Very subtle bowing factor
-    if (bowMagnitude > 1.5) bowMagnitude = 1.5; // Cap at 1.5px bowing
+    // Scale bowing by length
+    double bowMagnitude = length * 0.005; // More visible bowing
+    if (bowMagnitude > 4.0) bowMagnitude = 4.0; // Higher cap
     
-    final bowOffset = bowing * (random.nextDouble() - 0.5) * bowMagnitude * 50; 
-    // Actually simpler:
-    // final bowOffset = (random.nextDouble() - 0.5) * math.min(length * 0.01, 5.0); 
-    
-    // Updated logic:
-    final computedBowing = (random.nextDouble() - 0.5) * bowing * length;
-    // We clamp the bowing effect to be very subtle
-    final clampedBowing = computedBowing.clamp(-3.0, 3.0); 
+    final computedBowing = (random.nextDouble() - 0.5) * bowing * bowMagnitude * 30;
+    final clampedBowing = computedBowing.clamp(-5.0, 5.0); 
 
-    // Control point
+    // Control point for curve
     final c = mid + Offset(
       math.cos(normalAngle) * clampedBowing,
       math.sin(normalAngle) * clampedBowing
     );
 
-    final s = start + Offset(roughness * (random.nextDouble() - 0.5), roughness * (random.nextDouble() - 0.5));
-    final e = end + Offset(roughness * (random.nextDouble() - 0.5), roughness * (random.nextDouble() - 0.5));
+    // Randomize start and end points slightly
+    final s = start + Offset(roughness * (random.nextDouble() - 0.5) * 2, roughness * (random.nextDouble() - 0.5) * 2);
+    final e = end + Offset(roughness * (random.nextDouble() - 0.5) * 2, roughness * (random.nextDouble() - 0.5) * 2);
 
     path.moveTo(s.dx, s.dy);
     path.quadraticBezierTo(c.dx, c.dy, e.dx, e.dy);

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
 import 'image_annotation_dialog.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 class NoteEditorDialog extends StatefulWidget {
   final String questionId;
@@ -27,6 +28,24 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
   bool _hasChanges = false;
   List<String> _imageUrls = [];
   bool _isUploading = false;
+
+  static const Color _primaryColor = Color(0xFF2D3E50);
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
+
 
   @override
   void initState() {
@@ -105,170 +124,157 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
     final wordCount = _controller.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
 
     return Dialog(
-      backgroundColor: const Color(0xFFE8DCC8), // Beige background like reference
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        width: 500,
+      backgroundColor: Colors.transparent,
+      child: WiredCard(
+        backgroundColor: Colors.white,
+        borderColor: _primaryColor,
+        borderWidth: 1.5,
         padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B6F47), // Brown
-                    borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                   Icon(Icons.edit_note, color: _primaryColor, size: 28),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Your Notes',
+                    style: _patrickHand(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 16),
-                const Text(
-                  'Your Notes',
-                  style: TextStyle(
-                    color: Color(0xFF2D2D2D),
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: _primaryColor),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Color(0xFF2D2D2D)),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Text Area
-            TextField(
-              controller: _controller,
-              maxLines: 10,
-              decoration: InputDecoration(
-                hintText: 'Write your thoughts, key points, or reminders here...',
-                hintStyle: const TextStyle(color: Color(0xFF999999)),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.all(16),
+                ],
               ),
-              style: const TextStyle(color: Color(0xFF2D2D2D), height: 1.5, fontSize: 15),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-            // Image Thumbnails
-            if (_imageUrls.isNotEmpty)
+              // Text Area
               Container(
-                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  border: Border.all(color: _primaryColor.withValues(alpha: 0.3)),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _imageUrls.map((url) => _buildImageThumbnail(url)).toList(),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: TextField(
+                  controller: _controller,
+                  maxLines: 10,
+                  decoration: InputDecoration(
+                    hintText: 'Write your thoughts, key points, or reminders here...',
+                    hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.4)),
+                    filled: true,
+                    fillColor: Colors.transparent,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  style: _patrickHand(fontSize: 18, height: 1.5),
                 ),
               ),
+              const SizedBox(height: 16),
 
-            if (_imageUrls.isNotEmpty) const SizedBox(height: 12),
-
-            // Upload Image Button
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _isUploading ? null : _pickAndUploadImage,
-                  icon: _isUploading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.image, size: 18),
-                  label: Text(_isUploading ? 'Uploading...' : 'Upload Image'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF8B6F47),
-                    side: const BorderSide(color: Color(0xFF8B6F47)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+              // Image Thumbnails
+              if (_imageUrls.isNotEmpty)
+                WiredCard(
+                  backgroundColor: _primaryColor.withValues(alpha: 0.05),
+                  borderColor: _primaryColor.withValues(alpha: 0.1),
+                  borderWidth: 1,
+                  padding: const EdgeInsets.all(12),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _imageUrls.map((url) => _buildImageThumbnail(url)).toList(),
                   ),
                 ),
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: _addSketch,
-                  icon: const Icon(Icons.edit, size: 18),
-                  label: const Text('Sketch'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF8B6F47),
-                    side: const BorderSide(color: Color(0xFF8B6F47)),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+
+              if (_imageUrls.isNotEmpty) const SizedBox(height: 12),
+
+              // Upload Image Button
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _isUploading ? null : _pickAndUploadImage,
+                    icon: _isUploading
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: _primaryColor),
+                          )
+                        : const Icon(Icons.image, size: 18),
+                    label: Text(_isUploading ? 'Uploading...' : 'Upload Image'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _primaryColor,
+                      side: BorderSide(color: _primaryColor.withValues(alpha: 0.5)),
+                      textStyle: _patrickHand(fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Footer
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD4C4A8),
-                    borderRadius: BorderRadius.circular(20),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _addSketch,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Sketch'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _primaryColor,
+                      side: BorderSide(color: _primaryColor.withValues(alpha: 0.5)),
+                      textStyle: _patrickHand(fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
                   ),
-                  child: Text(
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Footer
+              Row(
+                children: [
+                  Text(
                     '$wordCount words',
-                    style: const TextStyle(
-                      color: Color(0xFF6B5D4F),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                    style: _patrickHand(
+                      color: _primaryColor.withValues(alpha: 0.6),
+                      fontSize: 14,
                     ),
                   ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF666666))),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _hasChanges || widget.initialNote == null
-                      ? () => Navigator.pop(context, {'text': _controller.text, 'images': _imageUrls})
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8B6F47),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 0,
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Cancel', style: _patrickHand(color: Colors.grey)),
                   ),
-                  child: const Text('Save Note', style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _hasChanges || widget.initialNote == null
+                        ? () => Navigator.pop(context, {'text': _controller.text, 'images': _imageUrls})
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      textStyle: _patrickHand(fontWeight: FontWeight.bold),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text('Save Note'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
-
-
 
   Future<void> _addSketch() async {
     final newUrl = await showDialog<String>(
@@ -306,21 +312,27 @@ class _NoteEditorDialogState extends State<NoteEditorDialog> {
       children: [
         GestureDetector(
           onTap: () => _annotateImage(url),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              url,
-              width: 80,
-              height: 80,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: 80,
-                  height: 80,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.broken_image, color: Colors.grey),
-                );
-              },
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                url,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    width: 80,
+                    height: 80,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.broken_image, color: Colors.grey),
+                  );
+                },
+              ),
             ),
           ),
         ),

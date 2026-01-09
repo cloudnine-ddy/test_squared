@@ -8,6 +8,7 @@ import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/topic_model.dart';
 import '../progress/data/topic_progress_repository.dart';
 import '../past_papers/widgets/circular_topic_progress.dart';
+import '../../shared/wired/wired_widgets.dart';
 
 class SubjectDetailView extends StatefulWidget {
   final String subjectName;
@@ -37,6 +38,26 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
   String _sortBy = 'Alphabetical'; // 'Alphabetical', 'Progress', 'Questions'
   final TextEditingController _searchController = TextEditingController();
 
+  // Sketchy Theme Colors (matching sidebar)
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+  static const Color _backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+  // Patrick Hand text style helper
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -59,82 +80,109 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Top Bar
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Theme.of(context).scaffoldBackgroundColor
-              : AppColors.sidebar.withValues(alpha: 0.3),
-          // Removed card decoration to match seamless background
-
-          child: Row(
-            children: [
-              // Subject Name
-              Text(
-                widget.subjectName,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
+    return Container(
+      color: _backgroundColor,
+      child: Column(
+        children: [
+          // Top Bar (Sketchy style)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            decoration: BoxDecoration(
+              color: _backgroundColor,
+              border: Border(
+                bottom: BorderSide(
+                  color: _primaryColor.withValues(alpha: 0.2),
+                  width: 1.5,
                 ),
               ),
-              const Spacer(),
-              // View Toggle
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'Topics',
-                    label: Text('Topics'),
+            ),
+            child: Row(
+              children: [
+                // Subject Name
+                Text(
+                  widget.subjectName,
+                  style: _patrickHand(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
                   ),
-                  ButtonSegment(
-                    value: 'Years',
-                    label: Text('Years'),
-                  ),
-                ],
-                selected: {_viewMode},
-                onSelectionChanged: (Set<String> newSelection) {
-                  setState(() {
-                    _viewMode = newSelection.first;
-                  });
-                },
-                style: SegmentedButton.styleFrom(
-                  selectedBackgroundColor: Theme.of(context).primaryColor,
-                  selectedForegroundColor: Colors.white,
-                  backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                  foregroundColor: Theme.of(context).colorScheme.onSurface,
                 ),
-              ),
-              const SizedBox(width: 16),
-              // Pin/Unpin Button
-              IconButton(
-                icon: _isTogglingPin
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.primary,
+                const Spacer(),
+                // View Toggle (Custom sketchy buttons)
+                Row(
+                  children: [
+                    _buildToggleButton('Topics', _viewMode == 'Topics'),
+                    const SizedBox(width: 8),
+                    _buildToggleButton('Years', _viewMode == 'Years'),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                // Pin/Unpin Button
+                GestureDetector(
+                  onTap: _isTogglingPin ? null : _handlePinToggle,
+                  child: WiredCard(
+                    backgroundColor: _isPinned ? _primaryColor.withValues(alpha: 0.1) : Colors.white,
+                    borderColor: _primaryColor.withValues(alpha: 0.5),
+                    borderWidth: 1.5,
+                    padding: const EdgeInsets.all(8),
+                    child: _isTogglingPin
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _primaryColor,
+                            ),
+                          )
+                        : Icon(
+                            _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                            color: _isPinned ? _primaryColor : _primaryColor.withValues(alpha: 0.6),
+                            size: 20,
                           ),
-                        ),
-                      )
-                    : Icon(
-                        _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                        color: _isPinned ? Theme.of(context).primaryColor : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                tooltip: _isPinned ? 'Unpin' : 'Pin to Sidebar',
-                onPressed: _isTogglingPin ? null : _handlePinToggle,
-              ),
-            ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          // Body Content
+          Expanded(
+            child: _viewMode == 'Topics' ? _buildTopicsView() : _buildYearsView(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToggleButton(String label, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _viewMode = label;
+        });
+      },
+      child: WiredCard(
+        backgroundColor: isSelected ? _primaryColor : Colors.white,
+        borderColor: _primaryColor,
+        borderWidth: 1.5,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(Icons.check, size: 16, color: Colors.white),
+              ),
+            Text(
+              label,
+              style: _patrickHand(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : _primaryColor,
+              ),
+            ),
+          ],
         ),
-        // Body Content
-        Expanded(
-          child: _viewMode == 'Topics' ? _buildTopicsView() : _buildYearsView(),
-        ),
-      ],
+      ),
     );
   }
 
@@ -186,14 +234,17 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
       future: PastPaperRepository().getTopics(subjectId: widget.subjectId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
+          return Center(
+            child: CircularProgressIndicator(color: _primaryColor),
           );
         }
 
         if (snapshot.hasError) {
-          return const Center(
-            child: Text('Error loading topics'),
+          return Center(
+            child: Text(
+              'Error loading topics',
+              style: _patrickHand(fontSize: 18, color: _primaryColor.withValues(alpha: 0.6)),
+            ),
           );
         }
 
@@ -205,23 +256,23 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                 Icon(
                   Icons.inventory_2_outlined,
                   size: 64,
-                  color: Colors.white24,
+                  color: _primaryColor.withValues(alpha: 0.3),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'No topics available yet',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
+                  style: _patrickHand(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _primaryColor.withValues(alpha: 0.7),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Check back later or try another subject.',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
+                  style: _patrickHand(
+                    fontSize: 16,
+                    color: _primaryColor.withValues(alpha: 0.5),
                   ),
                 ),
               ],
@@ -244,57 +295,47 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
 
         return Column(
           children: [
-            // Search Bar Only
-            Container(
+            // Search Bar (WiredCard)
+            Padding(
               padding: const EdgeInsets.all(16),
-              // Removed card decoration to match seamless background
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search topics...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context).scaffoldBackgroundColor
-                      : AppColors.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: Theme.of(context).brightness == Brightness.dark
-                        ? BorderSide(color: Theme.of(context).dividerColor)
-                        : const BorderSide(color: AppColors.border),
+              child: WiredCard(
+                backgroundColor: Colors.white,
+                borderColor: _primaryColor.withValues(alpha: 0.5),
+                borderWidth: 1.5,
+                padding: EdgeInsets.zero,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search topics...',
+                    hintStyle: _patrickHand(
+                      fontSize: 16,
+                      color: _primaryColor.withValues(alpha: 0.5),
+                    ),
+                    prefixIcon: Icon(Icons.search, size: 20, color: _primaryColor.withValues(alpha: 0.6)),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, size: 20, color: _primaryColor.withValues(alpha: 0.6)),
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: Theme.of(context).brightness == Brightness.dark
-                        ? BorderSide(color: Theme.of(context).dividerColor)
-                        : const BorderSide(color: AppColors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: Theme.of(context).brightness == Brightness.dark
-                        ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
-                        : const BorderSide(color: AppColors.primary, width: 2),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                  style: _patrickHand(fontSize: 16),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
                 ),
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
               ),
             ),
 
@@ -305,16 +346,16 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off, size: 64, color: Colors.white24),
+                          Icon(Icons.search_off, size: 64, color: _primaryColor.withValues(alpha: 0.3)),
                           const SizedBox(height: 16),
                           Text(
                             'No topics found',
-                            style: TextStyle(color: Colors.grey[400], fontSize: 18),
+                            style: _patrickHand(fontSize: 20, fontWeight: FontWeight.bold, color: _primaryColor.withValues(alpha: 0.7)),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             'Try a different search term',
-                            style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                            style: _patrickHand(fontSize: 16, color: _primaryColor.withValues(alpha: 0.5)),
                           ),
                         ],
                       ),
@@ -349,193 +390,133 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         final completedQuestions = progress?['completed_questions'] ?? 0;
         final totalQuestions = progress?['total_questions'] ?? topic.questionCount;
 
-        // Determine progress color
-        Color progressColor = topic.color;
-        if (progressPercentage == 0) {
-          progressColor = Colors.grey;
-        } else if (progressPercentage < 50) {
-          progressColor = Colors.orange;
-        } else if (progressPercentage < 100) {
-          progressColor = Colors.blue;
-        } else {
-          progressColor = Colors.green;
-        }
-
-        return InkWell(
+        return GestureDetector(
           onTap: () {
             context.push('/topic/${topic.id}');
           },
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Theme.of(context).cardTheme.color ?? Colors.white,
-                  (Theme.of(context).cardTheme.color ?? Colors.white).withValues(alpha: 0.8),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: progressColor.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Stack(
+          child: WiredCard(
+            backgroundColor: Colors.white,
+            borderColor: _primaryColor.withValues(alpha: 0.4),
+            borderWidth: 1.5,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Background gradient accent
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        colors: [
-                          progressColor.withValues(alpha: 0.15),
-                          Colors.transparent,
-                        ],
+                // Header Row with topic icon and name
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Topic icon
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
                       ),
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(16),
+                      child: Icon(
+                        Icons.school_outlined,
+                        size: 18,
+                        color: _primaryColor,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    // Topic name
+                    Expanded(
+                      child: Text(
+                        topic.name,
+                        style: _patrickHand(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
 
-                // Content
-                Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const Spacer(),
+
+                // Question count badge
+                WiredCard(
+                  backgroundColor: _primaryColor.withValues(alpha: 0.08),
+                  borderColor: _primaryColor.withValues(alpha: 0.3),
+                  borderWidth: 1,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Header Row with topic name and icon
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Topic icon/badge
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: progressColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.school,
-                              size: 20,
-                              color: progressColor,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          // Topic name
-                          Expanded(
-                            child: Text(
-                              topic.name,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.onSurface,
-                                height: 1.3,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.quiz_outlined,
+                        size: 14,
+                        color: _primaryColor.withValues(alpha: 0.7),
                       ),
-
-                      const Spacer(),
-
-                      // Question count badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.blue.withValues(alpha: 0.3),
-                          ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$totalQuestions question${totalQuestions != 1 ? 's' : ''}',
+                        style: _patrickHand(
+                          fontSize: 13,
+                          color: _primaryColor.withValues(alpha: 0.8),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.quiz,
-                              size: 14,
-                              color: Colors.blue,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '$totalQuestions question${totalQuestions != 1 ? 's' : ''}',
-                              style: TextStyle(
-                                color: Colors.blue,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      // Progress bar and percentage
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Progress',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                '${progressPercentage.toInt()}%',
-                                style: TextStyle(
-                                  color: progressColor,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          // Progress bar
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: LinearProgressIndicator(
-                              value: progressPercentage / 100,
-                              backgroundColor: Colors.white.withValues(alpha: 0.1),
-                              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                              minHeight: 6,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$completedQuestions/$totalQuestions completed',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Progress section
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Progress',
+                          style: _patrickHand(
+                            fontSize: 13,
+                            color: _primaryColor.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        Text(
+                          '${progressPercentage.toInt()}%',
+                          style: _patrickHand(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Progress bar with sketchy look
+                    Container(
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: progressPercentage / 100,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$completedQuestions/$totalQuestions completed',
+                      style: _patrickHand(
+                        fontSize: 12,
+                        color: _primaryColor.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

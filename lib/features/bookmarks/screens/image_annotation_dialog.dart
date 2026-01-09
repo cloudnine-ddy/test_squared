@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+import '../../../shared/wired/wired_widgets.dart';
 
 class ImageAnnotationDialog extends StatefulWidget {
   final String? imageUrl;
@@ -108,12 +109,11 @@ class _ImageAnnotationDialogState extends State<ImageAnnotationDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Toolbar
-          Container(
+          WiredCard(
+            backgroundColor: Colors.white,
+            borderColor: const Color(0xFF2D3E50),
+            borderWidth: 1.5,
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -122,14 +122,20 @@ class _ImageAnnotationDialogState extends State<ImageAnnotationDialog> {
                 _buildColorButton(Colors.blue),
                 _buildColorButton(Colors.green),
                 _buildColorButton(Colors.yellow),
-                const VerticalDivider(width: 20),
+                const SizedBox(width: 12),
+                Container(
+                  width: 1,
+                  height: 24,
+                  color: const Color(0xFF2D3E50).withOpacity(0.2),
+                ),
+                const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.undo),
+                  icon: const Icon(Icons.undo, color: Color(0xFF2D3E50)),
                   onPressed: _history.isNotEmpty ? _undo : null,
                   tooltip: 'Undo',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline),
+                  icon: const Icon(Icons.delete_outline, color: Color(0xFF2D3E50)),
                   onPressed: () {
                      _saveToHistory();
                      setState(() => _points.clear());
@@ -140,7 +146,7 @@ class _ImageAnnotationDialogState extends State<ImageAnnotationDialog> {
                  TextButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: const Text('Cancel'),
+                  label: const Text('Cancel', style: TextStyle(fontFamily: 'PatrickHand', fontSize: 18)),
                   style: TextButton.styleFrom(foregroundColor: Colors.grey),
                 ),
                 const SizedBox(width: 8),
@@ -149,10 +155,11 @@ class _ImageAnnotationDialogState extends State<ImageAnnotationDialog> {
                   icon: _isSaving
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.check),
-                  label: Text(_isSaving ? 'Saving...' : 'Save'),
+                  label: Text(_isSaving ? 'Saving...' : 'Save', style: const TextStyle(fontFamily: 'PatrickHand', fontSize: 18, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.brown,
+                    backgroundColor: const Color(0xFF2D3E50),
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ],
