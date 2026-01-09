@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../core/theme/app_theme.dart';
@@ -47,6 +50,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   List<String> _selectedTopicIds = [];
   String _topicSearchQuery = '';
   String? _imageUrl;
+  bool _isTopicsExpanded = false; // Collapsible topics selector
 
   // Figure cropping
   bool _hasFigure = false;
@@ -300,233 +304,242 @@ class _QuestionEditorState extends State<QuestionEditor> {
         ? '${_paper!['year']} ${_paper!['season']} V${_paper!['variant']}'
         : 'Unknown Paper';
 
-    return Container(
-      color: AppColors.background,
-      child: Column(
-        children: [
-          // Header
-          _buildHeader(paperInfo),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyS, control: true): _saveQuestion,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Container(
+          color: AppColors.background,
+          child: Column(
+            children: [
+              // Header
+              _buildHeader(paperInfo),
 
-          // Form (Split View)
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: Row(
-                children: [
-                  // LEFT COLUMN - Content & Visuals
-                  Expanded(
-                    flex: 3,
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Content
-                          _buildSection(
-                            'Question Content',
-                            TextFormField(
-                              controller: _contentController,
-                              decoration: _inputDecoration('Enter question content...'),
-                              maxLines: 8,
-                              style: const TextStyle(fontSize: 16),
-                              onChanged: (_) => _markChanged(),
-                            ),
+              // Form - Vertical Layout (single scrollable column)
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Question Content
+                        _buildSection(
+                          'Question Content',
+                          TextFormField(
+                            controller: _contentController,
+                            decoration: _inputDecoration('Enter question content...'),
+                            maxLines: 6,
+                            style: const TextStyle(fontSize: 15),
+                            onChanged: (_) => _markChanged(),
                           ),
+                        ),
 
-                          const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
-                          // Figure section
-                          _buildSection(
-                            'Figure & Image',
-                            _buildFigureSection(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  Container(width: 1, color: AppColors.border),
-
-                  // RIGHT COLUMN - Metadata & Answers
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      color: AppColors.surface.withOpacity(0.5),
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
+                        // Two columns for metadata: Question Number + Topics
+                        Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                             // Question number
-                            _buildSection(
-                              'Question Number',
-                              TextFormField(
-                                initialValue: _questionNumber.toString(),
-                                decoration: _inputDecoration('Q#'),
-                                keyboardType: TextInputType.number,
-                                onChanged: (v) {
-                                  _questionNumber = int.tryParse(v) ?? 1;
-                                  _markChanged();
-                                },
-                              ),
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // Topics (Optimized)
-                            _buildSection(
-                              'Topics',
-                              _buildOptimizedTopicSelector(),
-                            ),
-
-                            const SizedBox(height: 24),
-
-                            // Official Answer
-                            _buildSection(
-                              'Official Answer',
-                              TextFormField(
-                                controller: _officialAnswerController,
-                                decoration: _inputDecoration('Enter official answer...'),
-                                maxLines: 6,
-                                onChanged: (_) => _markChanged(),
-                              ),
-                            ),
-
-
-                            const SizedBox(height: 24),
-
-                            // AI Solution (Step-by-Step)
-                            _buildSection(
-                              'AI Solution (Step-by-Step)',
-                              TextFormField(
-                                controller: _aiSolutionController,
-                                decoration: _inputDecoration('AI generated solution...'),
-                                maxLines: 8,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textPrimary.withOpacity(0.9),
+                            // Question Number (small)
+                            SizedBox(
+                              width: 120,
+                              child: _buildSection(
+                                'Q#',
+                                TextFormField(
+                                  initialValue: _questionNumber.toString(),
+                                  decoration: _inputDecoration(''),
+                                  keyboardType: TextInputType.number,
+                                  onChanged: (v) {
+                                    _questionNumber = int.tryParse(v) ?? 1;
+                                    _markChanged();
+                                  },
                                 ),
-                                onChanged: (_) => _markChanged(),
                               ),
                             ),
-
-                            // MCQ Options (Editable)
-                            if (_isMCQ) ...[
-                              const SizedBox(height: 24),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  _buildSection('MCQ Options', const SizedBox.shrink()),
-                                  TextButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        final nextLabel = String.fromCharCode(65 + _options.length); // A, B, C...
-                                        _options.add({'label': nextLabel, 'text': ''});
-                                        _markChanged();
-                                      });
-                                    },
-                                    icon: const Icon(Icons.add, size: 16),
-                                    label: const Text('Add Option'),
-                                  ),
-                                ],
+                            const SizedBox(width: 24),
+                            // Topics (expandable)
+                            Expanded(
+                              child: _buildSection(
+                                'Topics',
+                                _buildOptimizedTopicSelector(),
                               ),
-                              const SizedBox(height: 8),
-                              Column(
-                                children: [
-                                  for (int i = 0; i < _options.length; i++)
-                                    Container(
-                                      margin: const EdgeInsets.only(bottom: 8),
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.background,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                          color: _options[i]['label'] == _correctAnswer
-                                              ? Colors.green
-                                              : AppColors.border,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          // Correct Answer Radio
-                                          Radio<String>(
-                                            value: _options[i]['label'] ?? '',
-                                            groupValue: _correctAnswer,
-                                            activeColor: Colors.green,
-                                            onChanged: (val) {
-                                              setState(() {
-                                                _correctAnswer = val;
-                                                _markChanged();
-                                              });
-                                            },
-                                          ),
-                                          // Label Field
-                                          SizedBox(
-                                            width: 40,
-                                            child: TextFormField(
-                                              initialValue: _options[i]['label'],
-                                              textAlign: TextAlign.center,
-                                              decoration: const InputDecoration(
-                                                border: InputBorder.none,
-                                                isDense: true,
-                                              ),
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
-                                              ),
-                                              onChanged: (val) {
-                                                _options[i]['label'] = val;
-                                                _markChanged();
-                                              },
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          // Text Field
-                                          Expanded(
-                                            child: TextFormField(
-                                              initialValue: _options[i]['text'],
-                                              decoration: const InputDecoration(
-                                                border: InputBorder.none,
-                                                hintText: 'Option text...',
-                                                isDense: true,
-                                              ),
-                                              style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
-                                              maxLines: null,
-                                              onChanged: (val) {
-                                                _options[i]['text'] = val;
-                                                _markChanged();
-                                              },
-                                            ),
-                                          ),
-                                          // Delete Option
-                                          IconButton(
-                                            icon: const Icon(Icons.close, size: 16, color: Colors.grey),
-                                            onPressed: () {
-                                              setState(() {
-                                                if (_correctAnswer == _options[i]['label']) {
-                                                  _correctAnswer = null;
-                                                }
-                                                _options.removeAt(i);
-                                                _markChanged();
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ],
+                            ),
                           ],
                         ),
-                      ),
+
+                        const SizedBox(height: 20),
+
+                        // Figure & Image Section
+                        _buildSection(
+                          'Figure & Image',
+                          _buildFigureSection(),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Official Answer
+                        _buildSection(
+                          'Official Answer',
+                          TextFormField(
+                            controller: _officialAnswerController,
+                            decoration: _inputDecoration('Enter official answer...'),
+                            maxLines: 5,
+                            onChanged: (val) {
+                              _markChanged();
+                              // Sync to MCQ selection if it matches an option label
+                              if (_isMCQ && val.trim().isNotEmpty) {
+                                final upperVal = val.trim().toUpperCase();
+                                final matchingOption = _options.firstWhere(
+                                  (opt) => (opt['label'] as String?)?.toUpperCase() == upperVal,
+                                  orElse: () => {},
+                                );
+                                if (matchingOption.isNotEmpty) {
+                                  setState(() => _correctAnswer = matchingOption['label']);
+                                }
+                              }
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // AI Solution
+                        _buildSection(
+                          'AI Solution (Step-by-Step)',
+                          TextFormField(
+                            controller: _aiSolutionController,
+                            decoration: _inputDecoration('AI generated solution...'),
+                            maxLines: 6,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textPrimary.withOpacity(0.9),
+                            ),
+                            onChanged: (_) => _markChanged(),
+                          ),
+                        ),
+
+                        // MCQ Options (if applicable)
+                        if (_isMCQ) ...[
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildSection('MCQ Options', const SizedBox.shrink()),
+                              TextButton.icon(
+                                onPressed: () {
+                                  setState(() {
+                                    final nextLabel = String.fromCharCode(65 + _options.length);
+                                    _options.add({'label': nextLabel, 'text': ''});
+                                    _markChanged();
+                                  });
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Add Option'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Column(
+                            children: [
+                              for (int i = 0; i < _options.length; i++)
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surface,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: _options[i]['label'] == _correctAnswer
+                                          ? Colors.green
+                                          : AppColors.border,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Radio<String>(
+                                        value: _options[i]['label'] ?? '',
+                                        groupValue: _correctAnswer,
+                                        activeColor: Colors.green,
+                                        onChanged: (val) {
+                                          setState(() {
+                                            _correctAnswer = val;
+                                            // Sync to Official Answer field
+                                            if (val != null && _isMCQ) {
+                                              _officialAnswerController.text = val;
+                                            }
+                                            _markChanged();
+                                          });
+                                        },
+                                      ),
+                                      SizedBox(
+                                        width: 40,
+                                        child: TextFormField(
+                                          initialValue: _options[i]['label'],
+                                          textAlign: TextAlign.center,
+                                          decoration: const InputDecoration(
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                          ),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
+                                          ),
+                                          onChanged: (val) {
+                                            _options[i]['label'] = val;
+                                            _markChanged();
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: _options[i]['text'],
+                                          decoration: const InputDecoration(
+                                            border: InputBorder.none,
+                                            hintText: 'Option text...',
+                                            isDense: true,
+                                          ),
+                                          style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
+                                          maxLines: null,
+                                          onChanged: (val) {
+                                            _options[i]['text'] = val;
+                                            _markChanged();
+                                          },
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                                        onPressed: () {
+                                          setState(() {
+                                            if (_correctAnswer == _options[i]['label']) {
+                                              _correctAnswer = null;
+                                            }
+                                            _options.removeAt(i);
+                                            _markChanged();
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+
+                        // Bottom padding for comfortable scrolling
+                        const SizedBox(height: 40),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -542,20 +555,20 @@ class _QuestionEditorState extends State<QuestionEditor> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Selected Topics Chips (Keep these for quick view/remove)
+        // Selected Topics Chips (Always visible)
         if (_selectedTopicIds.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: _selectedTopicIds.map((id) {
                 final topic = _allTopics.firstWhere((t) => t['id'] == id, orElse: () => {'name': 'Unknown'});
                 return Chip(
-                  label: Text(topic['name'], style: const TextStyle(fontSize: 12)),
+                  label: Text(topic['name'], style: const TextStyle(fontSize: 11)),
                   backgroundColor: AppColors.primary.withOpacity(0.1),
                   labelStyle: const TextStyle(color: AppColors.primary),
-                  deleteIcon: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                  deleteIcon: const Icon(Icons.close, size: 12, color: AppColors.primary),
                   onDeleted: () {
                     setState(() {
                       _selectedTopicIds.remove(id);
@@ -563,64 +576,123 @@ class _QuestionEditorState extends State<QuestionEditor> {
                     });
                   },
                   side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                 );
               }).toList(),
             ),
           ),
 
-        // Selector Container
-        Container(
-          height: 300,
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            children: [
-              // Search Bar
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: TextField(
-                  decoration: _inputDecoration('Search topics...').copyWith(
-                    prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.textSecondary),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        // Collapsible selector toggle
+        InkWell(
+          onTap: () => setState(() => _isTopicsExpanded = !_isTopicsExpanded),
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isTopicsExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _isTopicsExpanded ? 'Hide topic selector' : 'Add topics (${_allTopics.length} available)',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
                   ),
-                  onChanged: (v) => setState(() => _topicSearchQuery = v),
                 ),
-              ),
+                const Spacer(),
+                if (_selectedTopicIds.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_selectedTopicIds.length} selected',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
 
-              // List
-              Expanded(
-                child: ListView.builder(
-                  itemCount: filteredTopics.length,
-                  itemBuilder: (context, index) {
-                    final topic = filteredTopics[index];
-                    final isSelected = _selectedTopicIds.contains(topic['id']);
-                    return CheckboxListTile(
-                      value: isSelected,
-                      title: Text(topic['name'] ?? '', style: const TextStyle(color: AppColors.textPrimary)),
-                      activeColor: AppColors.primary,
-                      checkColor: Colors.white,
-                      dense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      onChanged: (bool? selected) {
-                        setState(() {
-                          if (selected == true) {
-                            _selectedTopicIds.add(topic['id']);
-                          } else {
-                            _selectedTopicIds.remove(topic['id']);
-                          }
-                          _markChanged();
-                        });
-                      },
-                    );
-                  },
+        // Expandable selector (only shown when expanded)
+        AnimatedCrossFade(
+          duration: const Duration(milliseconds: 200),
+          crossFadeState: _isTopicsExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          firstChild: const SizedBox.shrink(),
+          secondChild: Container(
+            margin: const EdgeInsets.only(top: 8),
+            height: 200, // Reduced from 300
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    decoration: _inputDecoration('Search topics...').copyWith(
+                      prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                    onChanged: (v) => setState(() => _topicSearchQuery = v),
+                  ),
                 ),
-              ),
-            ],
+
+                // List
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: filteredTopics.length,
+                    itemBuilder: (context, index) {
+                      final topic = filteredTopics[index];
+                      final isSelected = _selectedTopicIds.contains(topic['id']);
+                      return CheckboxListTile(
+                        value: isSelected,
+                        title: Text(topic['name'] ?? '', style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+                        activeColor: AppColors.primary,
+                        checkColor: Colors.white,
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (bool? selected) {
+                          setState(() {
+                            if (selected == true) {
+                              _selectedTopicIds.add(topic['id']);
+                            } else {
+                              _selectedTopicIds.remove(topic['id']);
+                            }
+                            _markChanged();
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -987,14 +1059,17 @@ class _CropDialog extends StatefulWidget {
 class _CropDialogState extends State<_CropDialog> {
   final _supabase = Supabase.instance.client;
 
-  final _pdfViewerController = PdfViewerController();
-  bool _isLoaded = false;
+  bool _isLoading = true;
   bool _hasError = false;
-  late String _url;
+  String? _imageUrl;
+  String? _errorMessage;
 
   void notifyError(String msg) {
-    setState(() => _hasError = true);
-    debugPrint('PDF Error: $msg');
+    setState(() {
+      _hasError = true;
+      _errorMessage = msg;
+    });
+    debugPrint('❌ Render Error: $msg');
   }
 
   late int _page;
@@ -1006,12 +1081,58 @@ class _CropDialogState extends State<_CropDialog> {
   @override
   void initState() {
     super.initState();
-    _page = widget.page;
+    // Ensure page is at least 1
+    _page = widget.page > 0 ? widget.page : 1;
     _x = widget.x;
     _y = widget.y;
     _width = widget.width;
     _height = widget.height;
-    _url = PdfHelper.getProxiedUrl(widget.pdfUrl);
+    _renderPageAsImage();
+  }
+
+  Future<void> _renderPageAsImage() async {
+    try {
+      debugPrint('🖼️ Rendering page $_page as image...');
+      
+      // Call render-page edge function to convert PDF page to PNG
+      final response = await _supabase.functions.invoke(
+        'render-page',
+        body: {
+          'pdfUrl': widget.pdfUrl,
+          'page': _page,
+        },
+      );
+      
+      if (response.status != 200) {
+        notifyError('Render failed: HTTP ${response.status}');
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      final data = response.data;
+      if (data['error'] != null) {
+        notifyError(data['error'].toString());
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      final imageUrl = data['image_url'] as String?;
+      if (imageUrl == null) {
+        notifyError('No image URL returned');
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      debugPrint('✅ Page rendered: $imageUrl');
+      setState(() {
+        _imageUrl = imageUrl;
+        _isLoading = false;
+      });
+      
+    } catch (e) {
+      notifyError('Failed to render page: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
 
@@ -1120,8 +1241,12 @@ class _CropDialogState extends State<_CropDialog> {
                         children: [
                           IconButton(
                             onPressed: _page > 1 ? () {
-                              setState(() => _page--);
-                              _pdfViewerController.jumpToPage(_page);
+                              setState(() {
+                                _page--;
+                                _isLoading = true;
+                                _imageUrl = null;
+                              });
+                              _renderPageAsImage();
                             } : null,
                             icon: const Icon(Icons.remove),
                             color: Colors.white,
@@ -1145,8 +1270,12 @@ class _CropDialogState extends State<_CropDialog> {
                           ),
                           IconButton(
                             onPressed: () {
-                              setState(() => _page++);
-                              _pdfViewerController.jumpToPage(_page);
+                              setState(() {
+                                _page++;
+                                _isLoading = true;
+                                _imageUrl = null;
+                              });
+                              _renderPageAsImage();
                             },
                             icon: const Icon(Icons.add),
                             color: Colors.white,
@@ -1194,39 +1323,50 @@ class _CropDialogState extends State<_CropDialog> {
       height: h,
       child: Stack(
         children: [
-          // PDF Viewer (Client-side)
-          IgnorePointer(
-            ignoring: true, // Disable interaction so we can drag our crop box
-            child: SfPdfViewer.network(
-              _url,
-              controller: _pdfViewerController,
-              enableDoubleTapZooming: false,
-              enableTextSelection: false,
-              canShowScrollHead: false,
-              pageLayoutMode: PdfPageLayoutMode.single,
-              onDocumentLoaded: (args) {
-                // Jump to initial page once loaded
-                _pdfViewerController.jumpToPage(_page);
-              },
-              onDocumentLoadFailed: (args) {
-                 if (mounted) notifyError(args.error);
-              },
+          // Loading indicator
+          if (_isLoading)
+            const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Rendering page...', style: TextStyle(color: Colors.white70)),
+                ],
+              ),
             ),
-          ),
+
+          // Rendered page image (from pdf.co)
+          if (_imageUrl != null)
+            Positioned.fill(
+              child: Image.network(
+                _imageUrl!,
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Text('Failed to load image', style: TextStyle(color: Colors.red)),
+                  );
+                },
+              ),
+            ),
 
           if (_hasError)
             Positioned.fill(
               child: Container(
                 color: Colors.black.withOpacity(0.8),
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                       Icon(Icons.error_outline, color: Colors.red, size: 48),
-                       SizedBox(height: 16),
-                       Text('Failed to load PDF', style: TextStyle(color: Colors.white, fontSize: 18)),
-                       SizedBox(height: 8),
-                       Text('Check network/CORS settings', style: TextStyle(color: Colors.white70)),
+                       const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                       const SizedBox(height: 16),
+                       const Text('Failed to render page', style: TextStyle(color: Colors.white, fontSize: 18)),
+                       const SizedBox(height: 8),
+                       Text(_errorMessage ?? 'Unknown error', style: const TextStyle(color: Colors.white70)),
                     ],
                   ),
                 ),

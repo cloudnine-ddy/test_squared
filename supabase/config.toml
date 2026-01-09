@@ -391,3 +391,9 @@ entrypoint = "./functions/analyze-paper/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/analyze-paper/*.html" ]
+
+[functions.proxy-pdf]
+enabled = true
+# IMPORTANT: Disable JWT verification so PDF viewer can access without auth token
+verify_jwt = false
+entrypoint = "./functions/proxy-pdf/index.ts"
