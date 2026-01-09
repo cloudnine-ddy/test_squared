@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
+import '../../core/services/pdf_helper.dart';
+import '../../features/past_papers/widgets/pdf_crop_viewer.dart';
 
 /// Full Question Editor - Edit all fields of a question
 class QuestionEditor extends StatefulWidget {
@@ -26,24 +29,25 @@ class QuestionEditor extends StatefulWidget {
 class _QuestionEditorState extends State<QuestionEditor> {
   final _supabase = Supabase.instance.client;
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _isLoading = true;
   bool _isSaving = false;
   bool _hasChanges = false;
-  
+
   // Question data
   Map<String, dynamic>? _question;
   Map<String, dynamic>? _paper;
   List<Map<String, dynamic>> _allTopics = [];
-  
+
   // Form controllers
   late TextEditingController _contentController;
   late TextEditingController _officialAnswerController;
+  late TextEditingController _aiSolutionController;
   int _questionNumber = 1;
   List<String> _selectedTopicIds = [];
   String _topicSearchQuery = '';
   String? _imageUrl;
-  
+
   // Figure cropping
   bool _hasFigure = false;
   int _figurePage = 1;
@@ -51,7 +55,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
   double _figureY = 30;
   double _figureWidth = 40;
   double _figureHeight = 30;
-  
+
   // MCQ fields
   bool _isMCQ = false;
   List<Map<String, dynamic>> _options = [];
@@ -63,6 +67,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
     super.initState();
     _contentController = TextEditingController();
     _officialAnswerController = TextEditingController();
+    _aiSolutionController = TextEditingController();
     _loadQuestion();
   }
 
@@ -70,12 +75,13 @@ class _QuestionEditorState extends State<QuestionEditor> {
   void dispose() {
     _contentController.dispose();
     _officialAnswerController.dispose();
+    _aiSolutionController.dispose();
     super.dispose();
   }
 
   Future<void> _loadQuestion() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Load question
       final questionRes = await _supabase
@@ -83,14 +89,14 @@ class _QuestionEditorState extends State<QuestionEditor> {
           .select()
           .eq('id', widget.questionId)
           .single();
-      
+
       // Load paper
       final paperRes = await _supabase
           .from('papers')
           .select()
           .eq('id', widget.paperId)
           .single();
-      
+
       // Load topics for this subject only
       final subjectId = paperRes['subject_id'];
       final topicsRes = await _supabase
@@ -98,23 +104,23 @@ class _QuestionEditorState extends State<QuestionEditor> {
           .select('id, name')
           .eq('subject_id', subjectId)
           .order('name');
-      
+
       _question = questionRes;
       _paper = paperRes;
       _allTopics = List<Map<String, dynamic>>.from(topicsRes);
-      
+
       // Populate form
       _contentController.text = _question?['content'] ?? '';
       _officialAnswerController.text = _question?['official_answer'] ?? '';
       _questionNumber = _question?['question_number'] ?? 1;
       _imageUrl = _question?['image_url'];
-      
+
       // Topic IDs
       final topicIds = _question?['topic_ids'];
       if (topicIds is List) {
         _selectedTopicIds = topicIds.map((e) => e.toString()).toList();
       }
-      
+
       // Figure data from ai_answer
       final aiAnswer = _question?['ai_answer'];
       if (aiAnswer is Map) {
@@ -128,7 +134,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
           _figureHeight = (loc['height_percent'] as num?)?.toDouble() ?? 30;
         }
       }
-      
+
       // MCQ data
       _isMCQ = _question?['type'] == 'mcq';
       _correctAnswer = _question?['correct_answer']?.toString();
@@ -137,7 +143,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
       if (optionsRaw is List) {
         _options = optionsRaw.map((o) => Map<String, dynamic>.from(o as Map)).toList();
       }
-      
+
+      // AI Solution
+      if (aiAnswer is Map) {
+        _aiSolutionController.text = aiAnswer['text']?.toString() ?? aiAnswer['ai_solution']?.toString() ?? '';
+      }
+
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -151,25 +162,35 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Future<void> _saveQuestion() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (mounted) setState(() => _isSaving = true);
-    
+
     try {
-      // Build ai_answer
-      Map<String, dynamic>? aiAnswer;
+      // Build ai_answer - Merge with existing
+      Map<String, dynamic> aiAnswer = {};
+      if (_question?['ai_answer'] is Map) {
+         aiAnswer = Map<String, dynamic>.from(_question!['ai_answer']);
+      }
+
       if (_hasFigure) {
-        aiAnswer = {
-          'has_figure': true,
-          'figure_location': {
+        aiAnswer['has_figure'] = true;
+        aiAnswer['figure_location'] = {
             'page': _figurePage,
             'x_percent': _figureX,
             'y_percent': _figureY,
             'width_percent': _figureWidth,
             'height_percent': _figureHeight,
-          },
         };
+      } else {
+        aiAnswer['has_figure'] = false;
       }
-      
+
+      // Save AI Solution
+      if (_aiSolutionController.text.isNotEmpty) {
+        aiAnswer['text'] = _aiSolutionController.text.trim();
+        aiAnswer['ai_solution'] = _aiSolutionController.text.trim();
+      }
+
       // Prepare update data
       final updateData = {
         'content': _contentController.text.trim(),
@@ -180,19 +201,19 @@ class _QuestionEditorState extends State<QuestionEditor> {
         'options': _isMCQ ? _options : null,
         'correct_answer': _isMCQ ? _correctAnswer : null,
       };
-      
+
       print('[QuestionEditor] Updating question ${widget.questionId}');
       print('[QuestionEditor] Update data: $updateData');
-      
+
       // Update question
       final response = await _supabase
           .from('questions')
           .update(updateData)
           .eq('id', widget.questionId)
           .select();
-      
+
       print('[QuestionEditor] Update response: $response');
-      
+
       if (!mounted) return;
       ToastService.showSuccess('Question saved!');
       setState(() {
@@ -206,7 +227,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       print('  Message: ${e.message}');
       print('  Details: ${e.details}');
       print('  Hint: ${e.hint}');
-      
+
       if (mounted) {
         ToastService.showError('Database error: ${e.message}\nDetails: ${e.details ?? "None"}');
         setState(() => _isSaving = false);
@@ -215,7 +236,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       // General error logging
       print('[QuestionEditor] General error: $e');
       print('[QuestionEditor] Stack trace: $stackTrace');
-      
+
       if (mounted) {
         ToastService.showError('Failed to save: $e');
         setState(() => _isSaving = false);
@@ -225,9 +246,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Future<void> _cropFigure() async {
     if (_paper == null) return;
-    
+
     if (mounted) setState(() => _isSaving = true);
-    
+
     try {
       final response = await _supabase.functions.invoke(
         'crop-figure',
@@ -243,9 +264,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
           },
         },
       );
-      
+
       if (!mounted) return;
-      
+
       if (response.data?['image_url'] != null) {
         // Add timestamp to bust browser cache
         final imageUrl = '${response.data['image_url']}?t=${DateTime.now().millisecondsSinceEpoch}';
@@ -285,7 +306,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
         children: [
           // Header
           _buildHeader(paperInfo),
-          
+
           // Form (Split View)
           Expanded(
             child: Form(
@@ -311,10 +332,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               onChanged: (_) => _markChanged(),
                             ),
                           ),
-                          
+
                           const SizedBox(height: 24),
-                          
-                          // Figure section 
+
+                          // Figure section
                           _buildSection(
                             'Figure & Image',
                             _buildFigureSection(),
@@ -323,9 +344,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       ),
                     ),
                   ),
-                  
+
                   Container(width: 1, color: AppColors.border),
-                  
+
                   // RIGHT COLUMN - Metadata & Answers
                   Expanded(
                     flex: 2,
@@ -349,7 +370,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                                 },
                               ),
                             ),
-                            
+
                             const SizedBox(height: 24),
 
                             // Topics (Optimized)
@@ -357,9 +378,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               'Topics',
                               _buildOptimizedTopicSelector(),
                             ),
-                            
+
                             const SizedBox(height: 24),
-                            
+
                             // Official Answer
                             _buildSection(
                               'Official Answer',
@@ -371,58 +392,129 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               ),
                             ),
 
-                             // MCQ Options (read-only display)
-                            if (_isMCQ && _options.isNotEmpty) ...[
+
+                            const SizedBox(height: 24),
+
+                            // AI Solution (Step-by-Step)
+                            _buildSection(
+                              'AI Solution (Step-by-Step)',
+                              TextFormField(
+                                controller: _aiSolutionController,
+                                decoration: _inputDecoration('AI generated solution...'),
+                                maxLines: 8,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textPrimary.withOpacity(0.9),
+                                ),
+                                onChanged: (_) => _markChanged(),
+                              ),
+                            ),
+
+                            // MCQ Options (Editable)
+                            if (_isMCQ) ...[
                               const SizedBox(height: 24),
-                              _buildSection(
-                                'MCQ Options',
-                                Column(
-                                  children: [
-                                    for (int i = 0; i < _options.length; i++)
-                                      Container(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildSection('MCQ Options', const SizedBox.shrink()),
+                                  TextButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        final nextLabel = String.fromCharCode(65 + _options.length); // A, B, C...
+                                        _options.add({'label': nextLabel, 'text': ''});
+                                        _markChanged();
+                                      });
+                                    },
+                                    icon: const Icon(Icons.add, size: 16),
+                                    label: const Text('Add Option'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Column(
+                                children: [
+                                  for (int i = 0; i < _options.length; i++)
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 8),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.background,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
                                           color: _options[i]['label'] == _correctAnswer
-                                              ? Colors.green.withOpacity(0.1)
-                                              : AppColors.background,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: _options[i]['label'] == _correctAnswer
-                                                ? Colors.green
-                                                : AppColors.border,
-                                          ),
+                                              ? Colors.green
+                                              : AppColors.border,
                                         ),
-                                        child: Row(
-                                          children: [
-                                            Text(
-                                              _options[i]['label'] ?? '',
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // Correct Answer Radio
+                                          Radio<String>(
+                                            value: _options[i]['label'] ?? '',
+                                            groupValue: _correctAnswer,
+                                            activeColor: Colors.green,
+                                            onChanged: (val) {
+                                              setState(() {
+                                                _correctAnswer = val;
+                                                _markChanged();
+                                              });
+                                            },
+                                          ),
+                                          // Label Field
+                                          SizedBox(
+                                            width: 40,
+                                            child: TextFormField(
+                                              initialValue: _options[i]['label'],
+                                              textAlign: TextAlign.center,
+                                              decoration: const InputDecoration(
+                                                border: InputBorder.none,
+                                                isDense: true,
+                                              ),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
                                               ),
+                                              onChanged: (val) {
+                                                _options[i]['label'] = val;
+                                                _markChanged();
+                                              },
                                             ),
-                                            const SizedBox(width: 12),
-                                            Expanded(
-                                              child: Text(
-                                                _options[i]['text'] ?? '',
-                                                style: TextStyle(
-                                                  color: AppColors.textPrimary.withOpacity(0.8),
-                                                ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          // Text Field
+                                          Expanded(
+                                            child: TextFormField(
+                                              initialValue: _options[i]['text'],
+                                              decoration: const InputDecoration(
+                                                border: InputBorder.none,
+                                                hintText: 'Option text...',
+                                                isDense: true,
                                               ),
+                                              style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
+                                              maxLines: null,
+                                              onChanged: (val) {
+                                                _options[i]['text'] = val;
+                                                _markChanged();
+                                              },
                                             ),
-                                          ],
-                                        ),
-                                      ),
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 8),
-                                      child: Text(
-                                        'Note: Edit answer text in the field above to update correct answer logic.',
-                                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic),
+                                          ),
+                                          // Delete Option
+                                          IconButton(
+                                            icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                                            onPressed: () {
+                                              setState(() {
+                                                if (_correctAnswer == _options[i]['label']) {
+                                                  _correctAnswer = null;
+                                                }
+                                                _options.removeAt(i);
+                                                _markChanged();
+                                              });
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ],
-                                ),
+                                ],
                               ),
                             ],
                           ],
@@ -446,7 +538,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       final query = _topicSearchQuery.toLowerCase();
       return name.contains(query);
     }).toList();
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -476,7 +568,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               }).toList(),
             ),
           ),
-          
+
         // Selector Container
         Container(
           height: 300,
@@ -498,7 +590,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                   onChanged: (v) => setState(() => _topicSearchQuery = v),
                 ),
               ),
-              
+
               // List
               Expanded(
                 child: ListView.builder(
@@ -571,10 +663,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
               ),
             ],
           ),
-          
+
           if (_hasFigure) ...[
             const SizedBox(height: 16),
-            
+
             // Current image preview
             if (_imageUrl != null) ...[
               Container(
@@ -599,8 +691,21 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 ),
               ),
               const SizedBox(height: 16),
+            ] else if (_paper != null && _paper!['pdf_url'] != null) ...[
+              // Client-side PDF Crop Preview
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: PdfCropViewer(
+                  pdfUrl: _paper!['pdf_url'],
+                  pageNumber: _figurePage,
+                  x: _figureX,
+                  y: _figureY,
+                  width: _figureWidth,
+                  height: _figureHeight,
+                ),
+              ),
             ],
-            
+
             // Crop controls
             Row(
               children: [
@@ -636,9 +741,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 })),
               ],
             ),
-            
+
             const SizedBox(height: 16),
-            
+
             // Crop button - opens dialog
             SizedBox(
               width: double.infinity,
@@ -881,15 +986,22 @@ class _CropDialog extends StatefulWidget {
 
 class _CropDialogState extends State<_CropDialog> {
   final _supabase = Supabase.instance.client;
-  
+
+  final _pdfViewerController = PdfViewerController();
+  bool _isLoaded = false;
+  bool _hasError = false;
+  late String _url;
+
+  void notifyError(String msg) {
+    setState(() => _hasError = true);
+    debugPrint('PDF Error: $msg');
+  }
+
   late int _page;
   late double _x;
   late double _y;
   late double _width;
   late double _height;
-  
-  String? _pageImageUrl;
-  bool _isLoadingPage = false;
 
   @override
   void initState() {
@@ -899,33 +1011,9 @@ class _CropDialogState extends State<_CropDialog> {
     _y = widget.y;
     _width = widget.width;
     _height = widget.height;
-    _loadPage();
+    _url = PdfHelper.getProxiedUrl(widget.pdfUrl);
   }
 
-  Future<void> _loadPage() async {
-    setState(() => _isLoadingPage = true);
-    
-    try {
-      final response = await _supabase.functions.invoke(
-        'render-page',
-        body: {
-          'pdfUrl': widget.pdfUrl,
-          'page': _page,
-        },
-      );
-      
-      if (response.data?['image_url'] != null) {
-        setState(() {
-          _pageImageUrl = response.data['image_url'];
-          _isLoadingPage = false;
-        });
-      } else {
-        setState(() => _isLoadingPage = false);
-      }
-    } catch (e) {
-      setState(() => _isLoadingPage = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -979,7 +1067,7 @@ class _CropDialogState extends State<_CropDialog> {
               ],
             ),
           ),
-          
+
           // Main content
           Expanded(
             child: Row(
@@ -993,33 +1081,19 @@ class _CropDialogState extends State<_CropDialog> {
                       color: Colors.black,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: _isLoadingPage
-                        ? const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 12),
-                                Text(
-                                  'Loading page...',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
-                              ],
-                            ),
-                          )
-                        : LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Center(
-                                child: _buildPreviewWithCrop(
-                                  constraints.maxWidth * 0.9,
-                                  constraints.maxHeight * 0.9,
-                                ),
-                              );
-                            },
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Center(
+                          child: _buildPreviewWithCrop(
+                            constraints.maxWidth * 0.9,
+                            constraints.maxHeight * 0.9,
                           ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-                
+
                 // Controls
                 Container(
                   width: 280,
@@ -1047,7 +1121,7 @@ class _CropDialogState extends State<_CropDialog> {
                           IconButton(
                             onPressed: _page > 1 ? () {
                               setState(() => _page--);
-                              _loadPage();
+                              _pdfViewerController.jumpToPage(_page);
                             } : null,
                             icon: const Icon(Icons.remove),
                             color: Colors.white,
@@ -1072,16 +1146,16 @@ class _CropDialogState extends State<_CropDialog> {
                           IconButton(
                             onPressed: () {
                               setState(() => _page++);
-                              _loadPage();
+                              _pdfViewerController.jumpToPage(_page);
                             },
                             icon: const Icon(Icons.add),
                             color: Colors.white,
                           ),
                         ],
                       ),
-                      
+
                       const SizedBox(height: 24),
-                      
+
                       // Position
                       _buildSlider('X Position', _x, (v) => setState(() => _x = v)),
                       _buildSlider('Y Position', _y, (v) => setState(() => _y = v)),
@@ -1103,7 +1177,7 @@ class _CropDialogState extends State<_CropDialog> {
     const aspectRatio = 595 / 842;
     double w = maxW;
     double h = maxH;
-    
+
     if (w / h > aspectRatio) {
       w = h * aspectRatio;
     } else {
@@ -1120,32 +1194,45 @@ class _CropDialogState extends State<_CropDialog> {
       height: h,
       child: Stack(
         children: [
-          // Page image
-          if (_pageImageUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                _pageImageUrl!,
-                width: w,
-                height: h,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.white,
-                  child: const Center(child: Icon(Icons.error)),
+          // PDF Viewer (Client-side)
+          IgnorePointer(
+            ignoring: true, // Disable interaction so we can drag our crop box
+            child: SfPdfViewer.network(
+              _url,
+              controller: _pdfViewerController,
+              enableDoubleTapZooming: false,
+              enableTextSelection: false,
+              canShowScrollHead: false,
+              pageLayoutMode: PdfPageLayoutMode.single,
+              onDocumentLoaded: (args) {
+                // Jump to initial page once loaded
+                _pdfViewerController.jumpToPage(_page);
+              },
+              onDocumentLoadFailed: (args) {
+                 if (mounted) notifyError(args.error);
+              },
+            ),
+          ),
+
+          if (_hasError)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.8),
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                       Icon(Icons.error_outline, color: Colors.red, size: 48),
+                       SizedBox(height: 16),
+                       Text('Failed to load PDF', style: TextStyle(color: Colors.white, fontSize: 18)),
+                       SizedBox(height: 8),
+                       Text('Check network/CORS settings', style: TextStyle(color: Colors.white70)),
+                    ],
+                  ),
                 ),
               ),
-            )
-          else
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Center(
-                child: Text('Page preview', style: TextStyle(color: Colors.grey)),
-              ),
             ),
-          
+
           // Dark overlay on non-crop areas
           Positioned.fill(
             child: CustomPaint(
@@ -1154,7 +1241,7 @@ class _CropDialogState extends State<_CropDialog> {
               ),
             ),
           ),
-          
+
           // Crop box border (draggable to move)
           Positioned(
             left: cropLeft,
@@ -1183,7 +1270,7 @@ class _CropDialogState extends State<_CropDialog> {
               ),
             ),
           ),
-          
+
           // Corner resize handles
           // Top-left
           _buildResizeHandle(cropLeft - 6, cropTop - 6, w, h, 'topLeft'),
@@ -1197,7 +1284,7 @@ class _CropDialogState extends State<_CropDialog> {
       ),
     );
   }
-  
+
   Widget _buildResizeHandle(double left, double top, double containerW, double containerH, String corner) {
     return Positioned(
       left: left,
@@ -1207,7 +1294,7 @@ class _CropDialogState extends State<_CropDialog> {
           setState(() {
             final dx = (d.delta.dx / containerW) * 100;
             final dy = (d.delta.dy / containerH) * 100;
-            
+
             switch (corner) {
               case 'topLeft':
                 _x = (_x + dx).clamp(0, _x + _width - 5);
@@ -1287,7 +1374,7 @@ class _CropOverlayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()..color = Colors.black.withValues(alpha: 0.5);
-    
+
     // Top
     canvas.drawRect(
       Rect.fromLTRB(0, 0, size.width, cropRect.top),

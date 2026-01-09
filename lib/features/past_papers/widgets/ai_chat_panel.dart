@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
+import '../data/past_paper_repository.dart'; // Added import
 import 'chat_message.dart';
 import 'generated_question_card.dart';
 
@@ -29,17 +30,32 @@ class _AIChatPanelState extends State<AIChatPanel> {
   String? _userAnswer;
   int? _userScore;
   int _generatedQuestionCount = 0;
+  String? _pdfUrl; // Added to store PDF URL
 
   @override
   void initState() {
     super.initState();
     _loadUserAttempt();
+    _loadQuestionDetails(); // Load PDF URL
     // Welcome message
     _messages.add({
       'message': 'Hi! I\'m your AI study assistant. I can help explain this question, give hints, or check your understanding. How can I help you today?',
       'isAI': true,
       'timestamp': DateTime.now(),
     });
+  }
+
+  Future<void> _loadQuestionDetails() async {
+    try {
+      final question = await PastPaperRepository().getQuestionById(widget.questionId);
+      if (question?.pdfUrl != null && mounted) {
+        setState(() {
+          _pdfUrl = question!.pdfUrl;
+        });
+      }
+    } catch (e) {
+      print('Error loading question details: $e');
+    }
   }
 
   Future<void> _loadUserAttempt() async {
@@ -343,6 +359,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
               ? GeneratedQuestionCard(
                   questionData: msg['generated_question'],
                   questionIndex: msg['questionIndex'] ?? 1,
+                  pdfUrl: _pdfUrl,
                 )
               : null,
         );

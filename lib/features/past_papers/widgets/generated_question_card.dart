@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
+import 'pdf_crop_viewer.dart';
 
 class GeneratedQuestionCard extends StatefulWidget {
   final Map<String, dynamic> questionData;
   final int questionIndex;
+  final String? pdfUrl;
 
   const GeneratedQuestionCard({
     super.key,
     required this.questionData,
     this.questionIndex = 1,
+    this.pdfUrl,
   });
 
   @override
@@ -192,13 +195,6 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
 
                       const SizedBox(height: 24),
 
-                      // Show Answer Button (Functional in Preview?)
-                      // User requested "Show Answer" in preview too?
-                      // Screenshot has "Show Answer" (eye icon).
-                      // I'll add a simple TextButton placeholder or functional toggle inside dialog?
-                      // Functional requires Stateful dialog.
-                      // For now, I'll just show the Save button as primary action.
-
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton.icon(
@@ -262,172 +258,193 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
           child: SingleChildScrollView(
             physics: const NeverScrollableScrollPhysics(),
             child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'AI Generated Question #${widget.questionIndex}',
-                  style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (!_isSaved)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange, width: 0.5),
-                  ),
-                  child: const Text(
-                    'Preview',
-                    style: TextStyle(color: Colors.deepOrange, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Row
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'AI Generated Question #${widget.questionIndex}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (!_isSaved)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange, width: 0.5),
+                        ),
+                        child: const Text(
+                          'Preview',
+                          style: TextStyle(color: Colors.deepOrange, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
 
-              if (!_isSaved) ...[
-                const SizedBox(width: 8),
-                InkWell(
-                  onTap: _handleExpandPreview,
-                  child: const Icon(Icons.fullscreen, color: Colors.deepOrange, size: 20),
+                    if (!_isSaved) ...[
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: _handleExpandPreview,
+                        child: const Icon(Icons.fullscreen, color: Colors.deepOrange, size: 20),
+                      ),
+                    ],
+                    const Spacer(),
+                    if (marks > 0)
+                      Text(
+                        '$marks marks',
+                        style: const TextStyle(
+                          color: Color(0xFF8B6F47),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-              const Spacer(),
-              if (marks > 0)
-                Text(
-                  '$marks marks',
-                  style: const TextStyle(
-                    color: Color(0xFF8B6F47),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 12),
+
+                // Question Content
+                MarkdownBody(
+                  data: content,
+                  styleSheet: MarkdownStyleSheet(
+                    p: const TextStyle(
+                      color: Color(0xFF2D2D2D),
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                    strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
-          // Question Content
-          MarkdownBody(
-            data: content,
-            styleSheet: MarkdownStyleSheet(
-              p: const TextStyle(
-                color: Color(0xFF2D2D2D),
-                fontSize: 15,
-                height: 1.5,
-              ),
-              strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-            ),
-          ),
-          const SizedBox(height: 20),
+                // Dynamic Figure Rendering (Client-Side Crop)
+                if (widget.pdfUrl != null &&
+                    widget.questionData['ai_answer'] != null &&
+                    widget.questionData['ai_answer']['figure_location'] != null) ...[
+                   Builder(
+                     builder: (context) {
+                       final loc = widget.questionData['ai_answer']['figure_location'];
+                       return Padding(
+                         padding: const EdgeInsets.only(bottom: 16.0),
+                         child: PdfCropViewer(
+                           pdfUrl: widget.pdfUrl!,
+                           pageNumber: loc['page'] ?? 1,
+                           x: (loc['x_percent'] ?? 0).toDouble(),
+                           y: (loc['y_percent'] ?? 0).toDouble(),
+                           width: (loc['width_percent'] ?? 100).toDouble(),
+                           height: (loc['height_percent'] ?? 100).toDouble(),
+                         ),
+                       );
+                     }
+                   ),
+                ],
 
-          // Answer Section
-          if (_showAnswer) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'AI Explanation:',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
-                  ),
-                  const SizedBox(height: 6),
-                  MarkdownBody(data: explanation ?? 'No explanation available.'),
+                // Answer Section
+                if (_showAnswer) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'AI Explanation:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                        ),
+                        const SizedBox(height: 6),
+                        MarkdownBody(data: explanation ?? 'No explanation available.'),
 
-                  const SizedBox(height: 12),
-                  const Divider(height: 16),
-                  const Text(
-                    'Note: AI generated questions do not have verified official answer keys.',
-                    style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
+                        const SizedBox(height: 12),
+                        const Divider(height: 16),
+                        const Text(
+                          'Note: AI generated questions do not have verified official answer keys.',
+                          style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
 
-          // Footer Actions
-          Row(
-            children: [
-               TextButton.icon(
-                onPressed: () => setState(() => _showAnswer = !_showAnswer),
-                icon: Icon(_showAnswer ? Icons.visibility_off : Icons.visibility, size: 16),
-                label: Text(
-                  _showAnswer ? 'Hide Answer' : 'Show Answer',
-                  style: const TextStyle(fontSize: 13),
+                // Footer Actions
+                Row(
+                  children: [
+                     TextButton.icon(
+                      onPressed: () => setState(() => _showAnswer = !_showAnswer),
+                      icon: Icon(_showAnswer ? Icons.visibility_off : Icons.visibility, size: 16),
+                      label: Text(
+                        _showAnswer ? 'Hide Answer' : 'Show Answer',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                    ),
+                  ],
                 ),
-                style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
-              ),
-            ],
-          ),
 
-          const Divider(height: 24),
+                const Divider(height: 24),
 
-          // Recommendation UI (Last section)
-          // Recommendation UI (Last section)
-          if (_isSaved && _showAnswer) ...[
-             Row(
-               children: [
-                 const Expanded(child: Text('Do you recommend this question to someone else?', style: TextStyle(fontSize: 12, color: Colors.grey))),
-                 const SizedBox(width: 8),
-                 IconButton(
-                   icon: Icon(_isRecommended == true ? Icons.thumb_up : Icons.thumb_up_outlined, size: 18),
-                   color: _isRecommended == true ? Colors.green : Colors.grey,
-                   onPressed: () => setState(() => _isRecommended = true),
-                   padding: EdgeInsets.zero,
-                   constraints: const BoxConstraints(),
-                 ),
-                 const SizedBox(width: 12),
-                 IconButton(
-                   icon: Icon(_isRecommended == false ? Icons.thumb_down : Icons.thumb_down_outlined, size: 18),
-                   color: _isRecommended == false ? Colors.red : Colors.grey,
-                   onPressed: () => setState(() => _isRecommended = false),
-                   padding: EdgeInsets.zero,
-                   constraints: const BoxConstraints(),
-                 ),
-               ],
-             ),
-             const SizedBox(height: 12),
-          ],
+                // Recommendation UI (Last section)
+                if (_isSaved && _showAnswer) ...[
+                   Row(
+                     children: [
+                       const Expanded(child: Text('Do you recommend this question to someone else?', style: TextStyle(fontSize: 12, color: Colors.grey))),
+                       const SizedBox(width: 8),
+                       IconButton(
+                         icon: Icon(_isRecommended == true ? Icons.thumb_up : Icons.thumb_up_outlined, size: 18),
+                         color: _isRecommended == true ? Colors.green : Colors.grey,
+                         onPressed: () => setState(() => _isRecommended = true),
+                         padding: EdgeInsets.zero,
+                         constraints: const BoxConstraints(),
+                       ),
+                       const SizedBox(width: 12),
+                       IconButton(
+                         icon: Icon(_isRecommended == false ? Icons.thumb_down : Icons.thumb_down_outlined, size: 18),
+                         color: _isRecommended == false ? Colors.red : Colors.grey,
+                         onPressed: () => setState(() => _isRecommended = false),
+                         padding: EdgeInsets.zero,
+                         constraints: const BoxConstraints(),
+                       ),
+                     ],
+                   ),
+                   const SizedBox(height: 12),
+                ],
 
-          // Save Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isSavings ? null : (_isSaved ? null : _handleSaveQuestion),
-              icon: _isSaving
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(_isSaved ? Icons.check : Icons.bookmark_add, size: 18),
-              label: Text(_isSaved ? 'Saved to Collection' : 'Save to Collection'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _isSaved ? Colors.green : const Color(0xFFE8DCC8),
-                foregroundColor: _isSaved ? Colors.white : const Color(0xFF5D4037),
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ),
-        ],
-      ),
+                // Save Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSavings ? null : (_isSaved ? null : _handleSaveQuestion),
+                    icon: _isSaving
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(_isSaved ? Icons.check : Icons.bookmark_add, size: 18),
+                    label: Text(_isSaved ? 'Saved to Collection' : 'Save to Collection'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isSaved ? Colors.green : const Color(0xFFE8DCC8),
+                      foregroundColor: _isSaved ? Colors.white : const Color(0xFF5D4037),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 
   bool get _isSavings => _isSaving;

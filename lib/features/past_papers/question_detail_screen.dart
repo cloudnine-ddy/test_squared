@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import 'widgets/question_image_header.dart';
 import 'widgets/question_action_bar.dart';
+import 'widgets/pdf_crop_viewer.dart';
 import 'widgets/answer_reveal_sheet.dart';
 import 'widgets/formatted_question_text.dart';
 import '../bookmarks/widgets/bookmark_button.dart';
@@ -966,12 +967,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               ),
 
               // Figure Card (MOVED AFTER QUESTION TEXT, with zoom)
-              if (_question!.hasFigure)
+              if (_question!.hasFigure || (_question!.pdfUrl != null && _question!.aiAnswerRaw?['figure_location'] != null))
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     child: GestureDetector(
-                      onTap: () => _showFullFigure(),
+                      onTap: _question!.hasFigure ? () => _showFullFigure() : null, // Only zoom static images for now
                       child: Container(
                         constraints: BoxConstraints(
                           maxHeight: 300, // Limit height
@@ -1017,30 +1018,46 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                     ),
                                   ),
                                   const Spacer(),
-                                  Icon(Icons.zoom_in, color: Colors.white.withValues(alpha: 0.7), size: 18),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Tap to zoom',
-                                    style: TextStyle(
-                                      color: AppColors.textPrimary.withValues(alpha: 0.7),
-                                      fontSize: 12,
+                                  if (_question!.hasFigure) ...[
+                                    Icon(Icons.zoom_in, color: Colors.white.withValues(alpha: 0.7), size: 18),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Tap to zoom',
+                                      style: TextStyle(
+                                        color: AppColors.textPrimary.withValues(alpha: 0.7),
+                                        fontSize: 12,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
                               ),
                             ),
-                            // Figure image (tap for fullscreen zoom)
+                            // Figure image (Static or Dynamic)
                             Flexible(
                               child: ClipRRect(
                                 borderRadius: const BorderRadius.only(
                                   bottomLeft: Radius.circular(16),
                                   bottomRight: Radius.circular(16),
                                 ),
-                                child: Image.network(
-                                  _question!.imageUrl!,
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                ),
+                                child: _question!.hasFigure
+                                  ? Image.network(
+                                      _question!.imageUrl!,
+                                      fit: BoxFit.contain,
+                                      width: double.infinity,
+                                    )
+                                  : Builder(
+                                      builder: (context) {
+                                        final loc = _question!.aiAnswerRaw!['figure_location'];
+                                        return PdfCropViewer(
+                                           pdfUrl: _question!.pdfUrl!,
+                                           pageNumber: loc['page'] ?? 1,
+                                           x: (loc['x_percent'] ?? 0).toDouble(),
+                                           y: (loc['y_percent'] ?? 0).toDouble(),
+                                           width: (loc['width_percent'] ?? 100).toDouble(),
+                                           height: (loc['height_percent'] ?? 100).toDouble(),
+                                        );
+                                      }
+                                    ),
                               ),
                             ),
                           ],

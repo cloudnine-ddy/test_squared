@@ -17,19 +17,19 @@ class QuestionManagerView extends StatefulWidget {
 
 class _QuestionManagerViewState extends State<QuestionManagerView> {
   final _supabase = Supabase.instance.client;
-  
+
   bool _isLoading = true;
-  
+
   // Data
   List<Map<String, dynamic>> _subjects = [];
   Map<String, List<Map<String, dynamic>>> _papersBySubject = {};
   Map<String, List<Map<String, dynamic>>> _questionsByPaper = {};
-  
+
   // Selection state
   String? _selectedSubjectId;
   String? _selectedPaperId;
   String? _selectedQuestionId;
-  
+
   // Expansion state
   Set<String> _expandedSubjects = {};
   Set<String> _expandedPapers = {};
@@ -42,42 +42,42 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // Load subjects
       final subjectsRes = await _supabase
           .from('subjects')
           .select('id, name, icon_url')
           .order('name');
-      
+
       _subjects = List<Map<String, dynamic>>.from(subjectsRes);
-      
+
       // Load all papers with their questions count
       final papersRes = await _supabase
           .from('papers')
           .select('id, subject_id, year, season, variant, pdf_url')
           .order('year', ascending: false);
-      
+
       _papersBySubject = {};
       for (final paper in papersRes) {
         final subjectId = paper['subject_id']?.toString() ?? '';
         _papersBySubject[subjectId] ??= [];
         _papersBySubject[subjectId]!.add(paper);
       }
-      
+
       // Load all questions
       final questionsRes = await _supabase
           .from('questions')
           .select('id, paper_id, question_number, content, image_url, ai_answer')
           .order('question_number');
-      
+
       _questionsByPaper = {};
       for (final q in questionsRes) {
         final paperId = q['paper_id']?.toString() ?? '';
         _questionsByPaper[paperId] ??= [];
         _questionsByPaper[paperId]!.add(q);
       }
-      
+
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -123,28 +123,26 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
         ],
       ),
     );
-    
+
     if (confirm != true) return;
-    
+
     try {
       print('Deleting paper: $paperId');
-      
-      // Delete questions first
-      final questionsResult = await _supabase
-          .from('questions')
-          .delete()
-          .eq('paper_id', paperId)
-          .select();
-      print('Deleted questions: ${questionsResult.length}');
-      
-      // Then delete paper
-      final paperResult = await _supabase
-          .from('papers')
-          .delete()
-          .eq('id', paperId)
-          .select();
-      print('Deleted papers: ${paperResult.length}');
-      
+
+      if (mounted) {
+        ToastService.showInfo('Deleting paper... this may take a moment.');
+      }
+
+      // Call Edge Function to handle cascading delete (Storage + DB)
+      final response = await _supabase.functions.invoke(
+        'delete-paper',
+        body: {'paperId': paperId},
+      );
+
+      print('Edge function response: ${response.data}');
+
+      if (!mounted) return;
+
       // Clear from local state
       setState(() {
         _papersBySubject.forEach((_, papers) {
@@ -157,7 +155,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           _selectedPaperId = null;
         }
       });
-      
+
       ToastService.showSuccess('Paper deleted!');
     } catch (e) {
       print('Delete error: $e');
@@ -187,13 +185,13 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
         ],
       ),
     );
-    
+
     if (confirm != true) return;
-    
+
     try {
       await _supabase.from('questions').delete().eq('id', questionId);
       ToastService.showSuccess('Question deleted!');
-      if (_selectedQuestionId == questionId) {
+      if (mounted && _selectedQuestionId == questionId) {
         setState(() => _selectedQuestionId = null);
       }
       _loadData();
@@ -217,14 +215,14 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
 
   void _navigateRelative(int offset) {
     if (_selectedPaperId == null || _selectedQuestionId == null) return;
-    
+
     final questions = _questionsByPaper[_selectedPaperId] ?? [];
     // Sort by question number
     questions.sort((a, b) => (a['question_number'] as int).compareTo(b['question_number'] as int));
-    
+
     final currentIndex = questions.indexWhere((q) => q['id'] == _selectedQuestionId);
     if (currentIndex == -1) return;
-    
+
     final newIndex = currentIndex + offset;
     if (newIndex >= 0 && newIndex < questions.length) {
       _navigateToQuestion(questions[newIndex]['id']);
@@ -272,24 +270,24 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                         onChanged: (v) {
                           setState(() {
                             _selectedSubjectId = v;
-                            _selectedPaperId = null; 
+                            _selectedPaperId = null;
                           });
                         },
                       ),
                     ],
                   ),
                 ),
-                
+
                 // Paper List
                 Expanded(
-                  child: _isLoading 
+                  child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : _buildPaperList(),
                 ),
               ],
             ),
           ),
-          
+
           // RIGHT MAIN CONTENT (Editor)
           Expanded(
             child: _selectedQuestionId != null && _selectedPaperId != null
@@ -401,6 +399,17 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
             '${questions.length} Questions',
             style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7), fontSize: 12),
           ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
+                onPressed: () => _deletePaper(paperId, '${paper['year']} ${paper['season']} V${paper['variant']}'),
+                tooltip: 'Delete Paper',
+              ),
+              const Icon(Icons.expand_more, color: AppColors.textSecondary),
+            ],
+          ),
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -410,7 +419,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                 children: questions.map((q) {
                   final isSelected = _selectedQuestionId == q['id'];
                   final hasImage = q['image_url'] != null;
-                  
+
                   return InkWell(
                     onTap: () => _navigateToQuestion(q['id']),
                     borderRadius: BorderRadius.circular(4),

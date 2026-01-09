@@ -86,7 +86,7 @@ class PastPaperRepository {
     try {
       final response = await _supabase
           .from('questions')
-          .select('*, papers(year, season, variant, paper_type)')
+          .select('*, papers(year, season, variant, paper_type, pdf_url)')
           .eq('id', questionId)
           .single();
 
@@ -107,7 +107,7 @@ class PastPaperRepository {
       // Join with papers table to get year/season info
       final response = await _supabase
           .from('questions')
-          .select('*, papers(year, season, variant)')
+          .select('*, papers(year, season, variant, pdf_url)')
           .contains('topic_ids', [topicId])
           .order('question_number');
 
@@ -454,7 +454,7 @@ class PastPaperRepository {
     try {
       final response = await _supabase
           .from('questions')
-          .select('*, papers(year, season, variant, paper_type)')
+          .select('*, papers(year, season, variant, paper_type, pdf_url)')
           .eq('paper_id', paperId)
           .order('question_number', ascending: true);
 
