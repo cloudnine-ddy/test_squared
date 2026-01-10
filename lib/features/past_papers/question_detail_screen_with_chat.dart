@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/providers/auth_provider.dart';
 import '../../core/theme/app_colors.dart';
+import '../../shared/wired/wired_widgets.dart';
 import 'widgets/ai_chat_panel.dart';
 import 'question_detail_screen.dart';
 
@@ -32,7 +33,7 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
     );
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFFDFBF7), // Sketchy Beige
       body: LayoutBuilder(
         builder: (context, constraints) {
           // On narrow screens (mobile), don't show split
@@ -61,45 +62,61 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
               if (_showChat)
                 Expanded(
                   flex: 4,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(color: AppColors.border, width: 1),
-                      ),
-                    ),
-                    child: Column(
+                  child: Stack(
                       children: [
-                        // Chat toggle header
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            border: Border(
-                              bottom: BorderSide(color: AppColors.border, width: 1),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Spacer(),
-                              IconButton(
-                                onPressed: () {
-                                  setState(() => _showChat = false);
-                                },
-                                icon: Icon(Icons.close, color: AppColors.textSecondary),
-                                tooltip: 'Hide AI Assistant',
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Chat panel
-                        Expanded(
-                          child: AIChatPanel(
-                            questionId: widget.questionId,
-                            isPremium: isPremium,
-                          ),
-                        ),
+                         // Divider Line
+                         Positioned(
+                           left: 0, 
+                           top: 0, 
+                           bottom: 0, 
+                           width: 2,
+                           child: CustomPaint(
+                             painter: WiredDividerPainter(
+                               axis: Axis.vertical, 
+                               color: AppColors.border, 
+                               thickness: 2, 
+                               seed: 123
+                             ),
+                           ),
+                         ),
+                         // Content
+                         Container(
+                           margin: const EdgeInsets.only(left: 2),
+                           child: Column(
+                             children: [
+                               // Chat toggle header
+                               Container(
+                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                 decoration: BoxDecoration(
+                                   color: AppColors.surface,
+                                   border: Border(
+                                     bottom: BorderSide(color: AppColors.border, width: 1),
+                                   ),
+                                 ),
+                                 child: Row(
+                                   children: [
+                                     const Spacer(),
+                                     IconButton(
+                                       onPressed: () {
+                                         setState(() => _showChat = false);
+                                       },
+                                       icon: Icon(Icons.close, color: AppColors.textSecondary),
+                                       tooltip: 'Hide AI Assistant',
+                                     ),
+                                   ],
+                                 ),
+                               ),
+                               // Chat panel
+                               Expanded(
+                                 child: AIChatPanel(
+                                   questionId: widget.questionId,
+                                   isPremium: isPremium,
+                                 ),
+                               ),
+                             ],
+                           ),
+                         ),
                       ],
-                    ),
                   ),
                 ),
             ],
@@ -112,11 +129,16 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
               onPressed: () {
                 setState(() => _showChat = true);
               },
-              backgroundColor: AppColors.primary,
+              backgroundColor: const Color(0xFF2D3E50), // Navy
               icon: const Icon(Icons.psychology, color: Colors.white),
               label: const Text(
                 'AI Assistant',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontFamily: 'PatrickHand',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             )
           : null,

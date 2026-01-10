@@ -484,7 +484,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                           style: _patrickHand(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: _primaryColor,
+                            color: const Color(0xFFEF6C00), // Orange 800 for contrast
                           ),
                         ),
                       ],
@@ -492,18 +492,26 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                     const SizedBox(height: 6),
                     // Progress bar with sketchy look
                     Container(
-                      height: 8,
+                      height: 10,
                       decoration: BoxDecoration(
-                        color: _primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: _primaryColor.withValues(alpha: 0.5),
+                          width: 1.5,
+                        ),
                       ),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
-                        widthFactor: progressPercentage / 100,
+                        widthFactor: (progressPercentage / 100).clamp(0.0, 1.0),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: _primaryColor.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(4),
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFFD54F), Color(0xFFFFA726)], // Amber to Orange
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(4.5),
                           ),
                         ),
                       ),

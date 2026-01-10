@@ -6,11 +6,10 @@ import 'models/question_model.dart';
 import 'widgets/question_card.dart';
 import 'widgets/skeleton_card.dart';
 import 'widgets/multiple_choice_feed_card.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/theme/app_colors.dart';
+import '../../shared/wired/wired_widgets.dart';
 import '../progress/data/progress_repository.dart';
 
-/// Topic detail screen with dark theme, search, and marks filter
+/// Topic detail screen with sketchy hand-drawn aesthetic
 class TopicDetailScreen extends StatefulWidget {
   final String topicId;
 
@@ -24,11 +23,28 @@ class TopicDetailScreen extends StatefulWidget {
 }
 
 class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTickerProviderStateMixin {
+  // Sketchy Theme Colors
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+  static const Color _backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+    );
+  }
+
   List<QuestionModel> _allQuestions = [];
-  Map<String, Map<String, dynamic>> _attemptsByQuestionId = {}; // questionId -> attempt data
+  Map<String, Map<String, dynamic>> _attemptsByQuestionId = {};
   bool _isLoading = true;
   String _searchQuery = '';
-  String _marksFilter = 'all'; // all, 1-2, 3-4, 5+
+  String _marksFilter = 'all';
   final _searchController = TextEditingController();
   late TabController _tabController;
   final _progressRepo = ProgressRepository();
@@ -138,15 +154,12 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? Theme.of(context).scaffoldBackgroundColor
-          : AppColors.background,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).appBarTheme.backgroundColor
-            : AppColors.sidebar,
+        backgroundColor: _backgroundColor,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: _primaryColor),
           onPressed: () {
             if (GoRouter.of(context).canPop()) {
               GoRouter.of(context).pop();
@@ -157,19 +170,23 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
         ),
         title: Text(
           'Questions',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).colorScheme.onSurface
-                : AppColors.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.bold
+          style: _patrickHand(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: _primaryColor.withValues(alpha: 0.2),
+            height: 1,
+          ),
+        ),
       ),
       body: Column(
         children: [
-          // Modern filter bar with search and tabs
+          // Sketchy filter bar with search and tabs
           _buildModernFilterBar(),
 
           // TabBarView with questions lists
@@ -184,14 +201,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
   Widget _buildModernFilterBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).cardTheme.color
-            : AppColors.sidebar,
+        color: _backgroundColor,
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).dividerColor
-                : Colors.white.withValues(alpha: 0.1),
+            color: _primaryColor.withValues(alpha: 0.1),
           ),
         ),
       ),
@@ -202,121 +215,87 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
               children: [
-                // Search Field
+                // Search Field with WiredCard
                 Expanded(
                   flex: 2,
-                  child: TextField(
-                    controller: _searchController,
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).colorScheme.onSurface
-                          : AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Search questions...',
-                      hintStyle: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
-                            : AppColors.textPrimary.withValues(alpha: 0.5),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                            : Colors.white.withValues(alpha: 0.7),
-                        size: 20
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.white54, size: 20),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).scaffoldBackgroundColor
-                          : AppColors.surface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).dividerColor
-                              : AppColors.border,
+                  child: WiredCard(
+                    backgroundColor: Colors.white,
+                    borderColor: _primaryColor.withValues(alpha: 0.3),
+                    borderWidth: 1.5,
+                    padding: const EdgeInsets.all(0),
+                    child: TextField(
+                      controller: _searchController,
+                      style: _patrickHand(fontSize: 18),
+                      decoration: InputDecoration(
+                        hintText: 'Search questions...',
+                        hintStyle: _patrickHand(
+                          color: _primaryColor.withValues(alpha: 0.5),
+                          fontSize: 18,
                         ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).dividerColor
-                              : AppColors.border,
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: _primaryColor.withValues(alpha: 0.6),
+                          size: 20,
                         ),
+                        suffixIcon: _searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: _primaryColor.withValues(alpha: 0.4),
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _searchQuery = '';
+                                  });
+                                },
+                              )
+                            : null,
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        isDense: true,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.blue, width: 2),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                      isDense: true,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
                     ),
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Marks Filter Dropdown
-                Container(
+                // Marks Filter Dropdown with WiredCard
+                WiredCard(
+                  backgroundColor: Colors.white,
+                  borderColor: _primaryColor.withValues(alpha: 0.3),
+                  borderWidth: 1.5,
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).cardTheme.color
-                        : AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).dividerColor
-                          : AppColors.border,
-                    ),
-                  ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       value: _marksFilter,
                       icon: Icon(
                         Icons.arrow_drop_down,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface
-                            : AppColors.textPrimary,
-                        size: 20
+                        color: _primaryColor,
+                        size: 20,
                       ),
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface
-                            : AppColors.textPrimary,
-                        fontSize: 14
-                      ),
-                      dropdownColor: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).cardTheme.color
-                          : AppColors.surface,
+                      style: _patrickHand(fontSize: 16),
+                      dropdownColor: Colors.white,
                       isDense: true,
                       items: [
                         DropdownMenuItem(value: 'all', child: Row(
                           children: [
-                            Icon(Icons.filter_alt, size: 16, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text('All Marks'),
+                            Icon(Icons.filter_alt, size: 16, color: _primaryColor),
+                            const SizedBox(width: 8),
+                            Text('All Marks', style: _patrickHand(fontSize: 16)),
                           ],
                         )),
-                        DropdownMenuItem(value: '1-2', child: Text('1-2 marks')),
-                        DropdownMenuItem(value: '3-4', child: Text('3-4 marks')),
-                        DropdownMenuItem(value: '5+', child: Text('5+ marks')),
+                        DropdownMenuItem(value: '1-2', child: Text('1-2 marks', style: _patrickHand(fontSize: 16))),
+                        DropdownMenuItem(value: '3-4', child: Text('3-4 marks', style: _patrickHand(fontSize: 16))),
+                        DropdownMenuItem(value: '5+', child: Text('5+ marks', style: _patrickHand(fontSize: 16))),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -329,50 +308,90 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
               ],
             ),
           ),
-          // Modern Tab Selector
+          // Sketchy Tab Selector
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).cardTheme.color
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicatorPadding: const EdgeInsets.all(4),
-              labelColor: Colors.white,
-              unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)
-                  : AppColors.textSecondary,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
-              dividerColor: Colors.transparent,
-              onTap: (_) => setState(() {}),
-              tabs: [
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.edit_document, size: 18),
-                      SizedBox(width: 8),
-                      Text('Structured'),
-                    ],
+            child: Row(
+              children: [
+                // Structured Tab
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      _tabController.animateTo(0);
+                      setState(() {});
+                    },
+                    child: WiredCard(
+                      backgroundColor: _tabController.index == 0
+                          ? _primaryColor
+                          : Colors.white,
+                      borderColor: _primaryColor,
+                      borderWidth: 1.5,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.edit_document,
+                            size: 18,
+                            color: _tabController.index == 0
+                                ? Colors.white
+                                : _primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Structured',
+                            style: _patrickHand(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _tabController.index == 0
+                                  ? Colors.white
+                                  : _primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                Tab(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.quiz, size: 18),
-                      SizedBox(width: 8),
-                      Text('MCQ'),
-                    ],
+                const SizedBox(width: 12),
+                // MCQ Tab
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      _tabController.animateTo(1);
+                      setState(() {});
+                    },
+                    child: WiredCard(
+                      backgroundColor: _tabController.index == 1
+                          ? _primaryColor
+                          : Colors.white,
+                      borderColor: _primaryColor,
+                      borderWidth: 1.5,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.quiz,
+                            size: 18,
+                            color: _tabController.index == 1
+                                ? Colors.white
+                                : _primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'MCQ',
+                            style: _patrickHand(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _tabController.index == 1
+                                  ? Colors.white
+                                  : _primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -396,21 +415,27 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+            CustomPaint(
+              painter: WiredBorderPainter(
+                color: _primaryColor.withValues(alpha: 0.2),
+                strokeWidth: 1.5,
               ),
-              child: Icon(Icons.quiz_outlined, color: AppColors.primary, size: 48),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                child: Icon(
+                  Icons.quiz_outlined,
+                  color: _primaryColor.withValues(alpha: 0.5),
+                  size: 48,
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
               'No questions found for this topic',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
+              style: _patrickHand(
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
+                color: _primaryColor.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -435,25 +460,27 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+            CustomPaint(
+              painter: WiredBorderPainter(
+                color: _primaryColor.withValues(alpha: 0.2),
+                strokeWidth: 1.5,
               ),
-              child: Icon(
-                type == 'mcq' ? Icons.quiz_outlined : Icons.edit_document,
-                color: AppColors.primary,
-                size: 48,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                child: Icon(
+                  type == 'mcq' ? Icons.quiz_outlined : Icons.edit_document,
+                  color: _primaryColor.withValues(alpha: 0.5),
+                  size: 48,
+                ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
               'No $typeName questions found',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 18,
+              style: _patrickHand(
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
+                color: _primaryColor.withValues(alpha: 0.7),
               ),
             ),
             if (_searchQuery.isNotEmpty || _marksFilter != 'all') ...[
@@ -466,10 +493,10 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
                     _marksFilter = 'all';
                   });
                 },
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('Clear filters'),
+                icon: Icon(Icons.refresh, size: 18, color: _primaryColor),
+                label: Text('Clear filters', style: _patrickHand(color: _primaryColor)),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+                  foregroundColor: _primaryColor,
                 ),
               ),
             ],

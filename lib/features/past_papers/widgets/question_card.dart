@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/question_model.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/theme/app_colors.dart';
 import 'topic_tags.dart';
 import '../../progress/utils/question_status_helper.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
-/// Tappable question card that navigates to detail page
+/// Tappable question card that navigates to detail page with sketchy style
 class QuestionCard extends StatelessWidget {
   final QuestionModel question;
   final Map<String, dynamic>? latestAttempt;
@@ -21,6 +20,24 @@ class QuestionCard extends StatelessWidget {
     this.onReturn,
   });
 
+  // Sketchy Theme Colors
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Get status color and icon from helper
@@ -28,255 +45,209 @@ class QuestionCard extends StatelessWidget {
     final statusIcon = QuestionStatusHelper.getStatusIcon(latestAttempt);
     final hasAttempt = latestAttempt != null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).cardTheme.color
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasAttempt
-              ? statusColor.withValues(alpha: 0.5)
-              : (Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).dividerColor
-                  : AppColors.border.withValues(alpha: 0.5)),
-          width: hasAttempt ? 2 : 1,
-        ),
-        // Add subtle glow for attempted questions
-        boxShadow: hasAttempt ? [
-          BoxShadow(
-            color: statusColor.withValues(alpha: 0.15),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ] : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () async {
-            // Navigate to question detail and refresh on return
-            final uri = Uri(
-              path: '/question/${question.id}',
-              queryParameters: topicId != null ? {'topicId': topicId} : null,
-            );
-            await context.push(uri.toString());
-            // Trigger refresh when coming back
-            onReturn?.call();
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Question content - The hero element
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Question number indicator
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '${question.questionNumber}',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () async {
+          // Navigate to question detail and refresh on return
+          final uri = Uri(
+            path: '/question/${question.id}',
+            queryParameters: topicId != null ? {'topicId': topicId} : null,
+          );
+          await context.push(uri.toString());
+          // Trigger refresh when coming back
+          onReturn?.call();
+        },
+        child: WiredCard(
+          backgroundColor: Colors.white,
+          borderColor: hasAttempt ? statusColor.withValues(alpha: 0.8) : _primaryColor.withValues(alpha: 0.3),
+          borderWidth: hasAttempt ? 2.0 : 1.5,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Question content - The hero element
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Question number indicator
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    child: Text(
+                      '${question.questionNumber}',
+                      style: _patrickHand(
+                        color: _primaryColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    // Question text
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ),
+                  const SizedBox(width: 8),
+                  // Question text
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          question.content,
+                          style: _patrickHand(
+                            color: _primaryColor,
+                            fontSize: 16,
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Metadata footer - Subtle, condensed
+              Row(
+                children: [
+                  // Type indicator
+                  Icon(
+                    question.isMCQ ? Icons.radio_button_checked : Icons.edit,
+                    size: 16,
+                    color: _primaryColor.withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    question.isMCQ ? 'MCQ' : 'Written',
+                    style: _patrickHand(
+                      color: _primaryColor.withValues(alpha: 0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+
+                  // Divider dot
+                  if (question.hasPaperInfo || question.marks != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Paper info
+                  if (question.hasPaperInfo) ...[
+                    Text(
+                      question.paperLabel,
+                      style: _patrickHand(
+                        color: _primaryColor.withValues(alpha: 0.6),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+
+                  // Divider dot
+                  if (question.hasPaperInfo && question.marks != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
+                  // Marks
+                  if (question.marks != null) ...[
+                    Icon(Icons.star, size: 14, color: Colors.amber),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${question.marks} ${question.marks == 1 ? 'mark' : 'marks'}',
+                      style: _patrickHand(
+                        color: _primaryColor.withValues(alpha: 0.6),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+
+                  const Spacer(),
+
+                  // Status badge (if attempted)
+                  if (hasAttempt) ...[
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: statusColor.withValues(alpha: 0.5),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Icon(statusIcon, size: 16, color: statusColor),
+                          const SizedBox(width: 4),
                           Text(
-                            question.content,
-                            style: TextStyle(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? Theme.of(context).colorScheme.onSurface
-                                  : AppColors.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500,
-                              height: 1.4,
+                            _getScoreText(),
+                            style: _patrickHand(
+                              color: statusColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                   ],
-                ),
 
-                const SizedBox(height: 12),
-
-                // Metadata footer - Subtle, condensed
-                Row(
-                  children: [
-                    // Type indicator
-                    Icon(
-                      question.isMCQ ? Icons.radio_button_checked : Icons.edit,
-                      size: 14,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                          : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      question.isMCQ ? 'MCQ' : 'Written',
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                            : AppColors.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-
-                    // Divider dot
-                    if (question.hasPaperInfo || question.marks != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
-                              : AppColors.textSecondary.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-
-                    // Paper info
-                    if (question.hasPaperInfo) ...[
-                      Text(
-                        question.paperLabel,
-                        style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                              : AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-
-                    // Divider dot
-                    if (question.hasPaperInfo && question.marks != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
-                              : AppColors.textSecondary.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-
-                    // Marks
-                    if (question.marks != null) ...[
-                      Icon(Icons.star, size: 13, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${question.marks} ${question.marks == 1 ? 'mark' : 'marks'}',
-                        style: TextStyle(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                              : AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-
-                    const Spacer(),
-
-                    // Status badge (if attempted)
-                    if (hasAttempt) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: statusColor.withValues(alpha: 0.3),
-                            width: 1,
+                  // Right side indicators
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (question.hasFigure)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Icon(
+                            Icons.image,
+                            size: 18,
+                            color: Colors.green.withValues(alpha: 0.7),
                           ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(statusIcon, size: 14, color: statusColor),
-                            const SizedBox(width: 4),
-                            Text(
-                              _getScoreText(),
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
+                      if (question.hasAiSolution)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Icon(
+                            Icons.auto_awesome,
+                            size: 18,
+                            color: Colors.amber.withValues(alpha: 0.8),
+                          ),
                         ),
+                      Icon(
+                        Icons.arrow_forward,
+                        size: 20,
+                        color: _primaryColor.withValues(alpha: 0.4),
                       ),
-                      const SizedBox(width: 8),
                     ],
-
-                    // Right side indicators
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (question.hasFigure)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Icon(
-                              Icons.image,
-                              size: 16,
-                              color: Colors.green.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        if (question.hasAiSolution)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Icon(
-                              Icons.auto_awesome,
-                              size: 16,
-                              color: Colors.amber.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        Icon(
-                          Icons.chevron_right,
-                          size: 18,
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
-                              : AppColors.textSecondary.withValues(alpha: 0.5),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                // Topic tags (if present)
-                if (question.topicIds.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  TopicTags(topicIds: question.topicIds),
+                  ),
                 ],
+              ),
+
+              // Topic tags (if present)
+              if (question.topicIds.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                TopicTags(topicIds: question.topicIds),
               ],
-            ),
+            ],
           ),
         ),
       ),

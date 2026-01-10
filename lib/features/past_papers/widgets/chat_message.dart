@@ -1,6 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/wired/wired_widgets.dart'; // Sketchy widgets
+
+const _primaryColor = Color(0xFF2D3E50);
+
+TextStyle _patrickHand({
+  double fontSize = 16,
+  FontWeight fontWeight = FontWeight.normal,
+  Color? color,
+  double? height,
+}) {
+  return TextStyle(
+    fontFamily: 'PatrickHand',
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    height: height,
+  );
+}
 
 /// Individual chat message bubble
 class ChatMessage extends StatelessWidget {
@@ -33,7 +51,7 @@ class ChatMessage extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: _primaryColor,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
@@ -47,49 +65,34 @@ class ChatMessage extends StatelessWidget {
 
           // Message bubble
           Flexible(
-            child: Container(
+            child: WiredCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isAI
-                    ? (Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).cardTheme.color
-                        : const Color(0xFFE8DCC8))
-                    : AppColors.primary, // Navy for user
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(isAI ? 4 : 16),
-                  topRight: Radius.circular(isAI ? 16 : 4),
-                  bottomLeft: const Radius.circular(16),
-                  bottomRight: const Radius.circular(16),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.shadow.withValues(alpha: 0.08),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-                border: Theme.of(context).brightness == Brightness.dark
-                    ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
-                    : null,
-              ),
+              // AI: White/Beige fill, Dark border. User: Dark fill, Dark border (or Light border?). 
+              // User bubbles commonly solid color.
+              // AI: White/Beige fill, Dark border. User: Dark fill, Dark border (or Light border?). 
+              // User bubbles commonly solid color.
+              backgroundColor: isAI ? Colors.white : _primaryColor,
+              borderColor: _primaryColor, 
+              borderWidth: 1,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   MarkdownBody(
                     data: message,
                     styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(
-                        color: isAI
-                            ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary)
-                            : Colors.white,
-                        fontSize: 14,
-                        height: 1.5,
+                      p: _patrickHand(
+                        color: isAI ? AppColors.textPrimary : Colors.white,
+                        fontSize: 16,
+                        height: 1.3,
                       ),
-                      strong: TextStyle(
-                        color: isAI
-                            ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : AppColors.textPrimary)
-                            : Colors.white,
+                      strong: _patrickHand(
+                        color: isAI ? AppColors.textPrimary : Colors.white,
                         fontWeight: FontWeight.bold,
+                        fontSize: 16, // Ensure bold font size matches
+                      ),
+                      // Add more styles specific to markdown if needed (lists, code blocks etc)
+                      listBullet: _patrickHand(
+                         color: isAI ? AppColors.textPrimary : Colors.white,
                       ),
                     ),
                   ),
@@ -100,13 +103,11 @@ class ChatMessage extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(timestamp),
-                    style: TextStyle(
+                    style: _patrickHand(
                       color: isAI
-                          ? (Theme.of(context).brightness == Brightness.dark
-                              ? Colors.white.withValues(alpha: 0.5)
-                              : AppColors.textSecondary.withValues(alpha: 0.6))
+                          ? AppColors.textSecondary.withValues(alpha: 0.6)
                           : Colors.white.withValues(alpha: 0.7),
-                      fontSize: 11,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -180,7 +181,7 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppColors.primary,
+              color: _primaryColor,
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
@@ -192,22 +193,10 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
           const SizedBox(width: 8),
 
           // Typing dots
-          Container(
+          WiredCard(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).cardTheme.color
-                  : const Color(0xFFE8DCC8),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(4),
-                topRight: Radius.circular(16),
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-              border: Theme.of(context).brightness == Brightness.dark
-                  ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
-                  : null,
-            ),
+            backgroundColor: Colors.white,
+            borderColor: _primaryColor,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: List.generate(3, (index) {
@@ -226,9 +215,7 @@ class _TypingIndicatorState extends State<TypingIndicator> with SingleTickerProv
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : AppColors.textSecondary,
+                            color: _primaryColor,
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),

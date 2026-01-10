@@ -57,6 +57,10 @@ final goRouter = GoRouter(
       builder: (context, state) => const DashboardScreen(),
     ),
     GoRoute(
+      path: '/dashboard-preview',
+      builder: (context, state) => const DashboardScreen(previewMode: true),
+    ),
+    GoRoute(
       path: '/admin',
       builder: (context, state) => const AdminShell(),
     ),

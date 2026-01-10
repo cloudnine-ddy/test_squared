@@ -21,16 +21,19 @@ import '../progress/data/progress_repository.dart';
 import '../progress/models/question_attempt_model.dart';
 import '../auth/providers/auth_provider.dart';
 import '../../core/services/access_control_service.dart';
+import '../../shared/wired/wired_widgets.dart';
 
 /// Full-page question detail view with figure and answer reveals
 class QuestionDetailScreen extends ConsumerStatefulWidget {
   final String questionId;
   final String? topicId; // Context for navigation
+  final bool previewMode; // Admin preview mode - disables progress tracking and submission
 
   const QuestionDetailScreen({
     super.key,
     required this.questionId,
     this.topicId,
+    this.previewMode = false,
   });
 
   @override
@@ -73,6 +76,25 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   final _notesRepo = NotesRepository();
   final _progressRepo = ProgressRepository();
 
+  // Sketchy Theme Constants
+  static const _primaryColor = Color(0xFF2D3E50);
+  static const _backgroundColor = Color(0xFFFDFBF7);
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -80,8 +102,11 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     _tabController.addListener(_onTabChanged);
     _questionStartTime = DateTime.now(); // Start tracking time
     _loadQuestion();
-    _loadBookmarkAndNoteStatus();
-    _loadPreviousAttempt(); // Load previous attempt if exists
+    // Skip user-specific features in preview mode
+    if (!widget.previewMode) {
+      _loadBookmarkAndNoteStatus();
+      _loadPreviousAttempt(); // Load previous attempt if exists
+    }
   }
 
   void _onTabChanged() {
@@ -158,6 +183,28 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     } catch (e) {
       // Silently fail - not critical
       print('Error loading bookmark/note status: $e');
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    try {
+      if (_isBookmarked) {
+        await _bookmarkRepo.removeBookmark(widget.questionId);
+      } else {
+        await _bookmarkRepo.addBookmark(widget.questionId);
+      }
+      
+      // Update UI immediately
+      setState(() {
+        _isBookmarked = !_isBookmarked;
+      });
+      
+      // Optional: Show toast/snack
+    } catch (e) {
+      print('Error toggling bookmark: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating bookmark')),
+      );
     }
   }
 
@@ -251,6 +298,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Future<void> _recordAttempt() async {
+    // Skip recording in preview mode
+    if (widget.previewMode) return;
     if (_question == null || _aiFeedback == null || _questionStartTime == null) return;
 
     try {
@@ -528,9 +577,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.background,
+        backgroundColor: _backgroundColor,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -549,9 +596,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               const SizedBox(height: 20),
               Text(
                 'Loading question...',
-                style: TextStyle(
+                style: _patrickHand(
                   color: AppColors.textPrimary.withValues(alpha: 0.5),
-                  fontSize: 14,
+                  fontSize: 16,
                 ),
               ),
             ],
@@ -562,16 +609,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
     if (_question == null) {
       return Scaffold(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.background,
+        backgroundColor: _backgroundColor,
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.error_outline, color: Colors.red.withValues(alpha: 0.5), size: 48),
               const SizedBox(height: 16),
-              const Text('Question not found', style: TextStyle(color: AppColors.textSecondary)),
+              Text('Question not found', style: _patrickHand(color: AppColors.textSecondary, fontSize: 18)),
             ],
           ),
         ),
@@ -579,60 +624,42 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     }
 
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? Theme.of(context).scaffoldBackgroundColor
-          : AppColors.background,
+      backgroundColor: _backgroundColor,
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Theme.of(context).cardTheme.color
-              : AppColors.surface, // Ensure it matches the dark theme surface
+          color: Colors.white,
           border: Border(
             top: BorderSide(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).dividerColor
-                  : AppColors.border.withValues(alpha: 0.5),
+              color: _primaryColor.withValues(alpha: 0.2),
+              width: 1.5,
             ),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.2),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
-            ),
-          ],
         ),
-        child: SafeArea(
+        height: 80, 
+        child: SafeArea( 
           child: Row(
             children: [
               // Previous Button
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _prevQuestionId == null ? null : () {
+                child: WiredButton(
+                  onPressed: _prevQuestionId == null ? () {} : () { // WiredButton doesn't support null callback for disable style automatically same way
                      final uri = Uri(
                        path: '/question/$_prevQuestionId',
                        queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
                      );
                      context.pushReplacement(uri.toString());
                   },
-                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                  label: const Text('Previous'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).cardTheme.color
-                        : AppColors.surface,
-                    foregroundColor: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).colorScheme.onSurface
-                        : AppColors.textPrimary,
-                    disabledBackgroundColor: Theme.of(context).brightness == Brightness.dark
-                        ? (Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface).withValues(alpha: 0.5)
-                        : AppColors.surface.withValues(alpha: 0.5),
-                    disabledForegroundColor: AppColors.textSecondary.withValues(alpha: 0.3),
-                    elevation: 0,
-                    side: BorderSide(color: _prevQuestionId == null ? Colors.transparent : AppColors.border),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: _prevQuestionId == null ? Colors.grey.shade100 : Colors.white,
+                  filled: true,
+                  borderColor: _prevQuestionId == null ? Colors.grey.shade300 : _primaryColor,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                       Icon(Icons.arrow_back_rounded, size: 18, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
+                       const SizedBox(width: 8),
+                       Text('Previous', style: _patrickHand(color: _prevQuestionId == null ? Colors.grey : _primaryColor)),
+                    ],
                   ),
                 ),
               ),
@@ -641,7 +668,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               Expanded(
                 child: Directionality(
                   textDirection: TextDirection.rtl, // To put icon on right
-                  child: ElevatedButton.icon(
+                  child: WiredButton(
                     onPressed: _nextQuestionId == null
                         ? () {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -659,23 +686,27 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                            );
                            context.pushReplacement(uri.toString());
                         },
-                    icon: Icon(
-                      _nextQuestionId == null ? Icons.check_circle_outline : Icons.arrow_back_rounded,
-                      size: 18
-                    ),
-                    label: Text(_nextQuestionId == null ? 'Completed' : 'Next'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _nextQuestionId == null ? AppColors.surface : AppColors.primary,
-                      foregroundColor: _nextQuestionId == null ? AppColors.textSecondary : Colors.white,
-                      elevation: 0,
-                      side: _nextQuestionId == null ? const BorderSide(color: AppColors.border) : BorderSide.none,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+                    backgroundColor: _nextQuestionId == null ? Colors.white : _primaryColor,
+                    filled: true,
+                    borderColor: _primaryColor,
+                    child: Row(
+                         mainAxisAlignment: MainAxisAlignment.center,
+                         children: [
+                            Icon(
+                              _nextQuestionId == null ? Icons.check_circle_outline : Icons.arrow_back_rounded,
+                              size: 18,
+                              color: _nextQuestionId == null ? _primaryColor : Colors.white
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _nextQuestionId == null ? 'Completed' : 'Next',
+                              style: _patrickHand(color: _nextQuestionId == null ? _primaryColor : Colors.white),
+                            ),
+                         ],
+                      ),
                   ),
                 ),
               ),
-
             ],
           ),
         ),
@@ -721,11 +752,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           // Main content
           CustomScrollView(
             slivers: [
-              // Simple App Bar (no figure)
+              // Sketchy App Bar
               SliverAppBar(
-                backgroundColor: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).scaffoldBackgroundColor
-                    : AppColors.background,
+                backgroundColor: _backgroundColor,
                 floating: false,
                 pinned: true,
                 elevation: 0,
@@ -739,226 +768,146 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         GoRouter.of(context).go('/dashboard');
                       }
                     },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).cardTheme.color
-                            : AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).dividerColor
-                              : Colors.white.withValues(alpha: 0.1),
+                    child: WiredCard(
+                      padding: EdgeInsets.zero,
+                      borderColor: _primaryColor.withValues(alpha: 0.3),
+                      child: Center(
+                        child: Icon(
+                          Icons.arrow_back_ios_new,
+                          color: _primaryColor,
+                          size: 18
                         ),
-                      ),
-                      child: Icon(
-                        Icons.arrow_back_ios_new,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).colorScheme.onSurface
-                            : AppColors.textSecondary,
-                        size: 18
                       ),
                     ),
                   ),
                 ),
                 actions: [
-                  // Note button with indicator
+                  // Note button
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          gradient: _hasNote
-                              ? const LinearGradient(
-                                  colors: [Color(0xFF2979FF), Color(0xFF2962FF)], // Brighter Blue
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                              : LinearGradient(
-                                  colors: [
-                                    const Color(0xFF384050), // Much Lighter Grey
-                                    const Color(0xFF2B3240)
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: _hasNote
-                                ? Colors.white.withValues(alpha: 0.3)
-                                : Colors.white.withValues(alpha: 0.1),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            if (_hasNote)
-                              BoxShadow(
-                                color: Colors.blueAccent.withValues(alpha: 0.4),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                          ],
-                        ),
-                        child: IconButton(
-                          icon: Icon(
-                            _hasNote ? Icons.note_alt_rounded : Icons.note_add_outlined,
-                            color: _hasNote ? Colors.white : Colors.white,
-                            size: 22,
-                          ),
-                          onPressed: _showNoteEditor,
-                          tooltip: 'Add note',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          style: IconButton.styleFrom(
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ),
-                      if (_hasNote)
+                       Container(
+                         width: 44,
+                         height: 44,
+                         child: WiredButton(
+                           onPressed: _showNoteEditor,
+                           backgroundColor: _hasNote ? Colors.blue : Colors.white,
+                           filled: true,
+                           borderColor: _primaryColor,
+                           padding: EdgeInsets.zero, // Minimal padding for icon
+                           child: Icon(
+                              _hasNote ? Icons.note_alt_rounded : Icons.note_add_outlined,
+                              color: _hasNote ? Colors.white : _primaryColor,
+                              size: 20,
+                           ),
+                         ),
+                       ),
+                       if (_hasNote)
                         Positioned(
                           right: -2,
                           top: -2,
                           child: Container(
-                            padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF1E232F), // Match bg to create cutout effect
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: Colors.amber, 
                               shape: BoxShape.circle,
-                            ),
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: Colors.amber, // Keep amber dot for attention
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 1.5),
-                              ),
+                              border: Border.all(color: Colors.white, width: 1.5),
                             ),
                           ),
                         ),
                     ],
                   ),
                   const SizedBox(width: 12),
+                  // Bookmark button - Assuming BookmarkButton handles its own style or is generic enough.
+                  // If BookmarkButton needs update, we might need a wrapper or it might look okay.
+                  // For now keeping it as is or wrapping in a container if needed.
+                  // Actually, better to wrap it in a pseudo-wired style if it's just an icon button internal.
+                  // Let's assume BookmarkButton is robust enough or just leave it for now.
                   // Bookmark button
-                  BookmarkButton(
-                    questionId: widget.questionId,
-                    initialIsBookmarked: _isBookmarked,
-                    onChanged: _loadBookmarkAndNoteStatus,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    child: WiredButton(
+                      onPressed: _toggleBookmark, 
+                      padding: EdgeInsets.zero,
+                      backgroundColor: _isBookmarked ? _primaryColor : Colors.white,
+                      filled: true,
+                      borderColor: _primaryColor,
+                       child: Icon(
+                        _isBookmarked ? Icons.bookmark_added_rounded : Icons.bookmark_outline_rounded,
+                        color: _isBookmarked ? Colors.white : _primaryColor, 
+                        size: 20
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   if (_question?.marks != null)
                     Container(
                       margin: const EdgeInsets.only(right: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFFFFB300), // Amber 600
-                            Color(0xFFFFCA28), // Amber 400
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                           BoxShadow(
-                            color: Colors.amber.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star_rounded, color: Color(0xFF232832), size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_question!.marks} marks',
-                            style: const TextStyle(
-                              color: Color(0xFF232832), // Dark text on bright background
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
+                      child: WiredCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        backgroundColor: const Color(0xFFFFB300).withValues(alpha: 0.2), // Light Amber
+                        borderColor: const Color(0xFFFFB300),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded, color: Color(0xFF232832), size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              '${_question!.marks} marks',
+                              style: _patrickHand(
+                                color: const Color(0xFF232832),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                 ],
               ),
 
-              // Question Header Card (MOVED BEFORE FIGURE)
+              // Question Header Card
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).cardTheme.color
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).dividerColor
-                            : AppColors.border,
-                        width: 1
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.shadow.withValues(alpha: 0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
+                  child: WiredCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Question number badge
                         Row(
                           children: [
-                            Container(
+                            WiredCard(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                              backgroundColor: _primaryColor,
+                              borderColor: _primaryColor,
                               child: Text(
                                 'Question ${_question!.questionNumber}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
+                                style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold),
                               ),
                             ),
                             const Spacer(),
                             if (_question!.hasPaperInfo)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _question!.paperLabel,
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 12,
-                                  ),
+                              Text(
+                                _question!.paperLabel,
+                                style: _patrickHand(
+                                  color: _primaryColor.withValues(alpha: 0.6),
+                                  fontSize: 12,
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        // Question content
-                        FormattedQuestionText(
-                          content: _question!.content,
-                          fontSize: 16,
-                          textColor: Theme.of(context).brightness == Brightness.dark
-                              ? Theme.of(context).colorScheme.onSurface
-                              : AppColors.textPrimary,
+                        const SizedBox(height: 16),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0), // Add padding around text
+                          child: FormattedQuestionText(
+                            content: _question!.content,
+                            fontSize: 18,
+                            textColor: _primaryColor,
+                          ),
                         ),
                       ],
                     ),
@@ -966,79 +915,45 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ),
               ),
 
-              // Figure Card (MOVED AFTER QUESTION TEXT, with zoom)
+              // Figure Card
               if (_question!.hasFigure || (_question!.pdfUrl != null && _question!.aiAnswerRaw?['figure_location'] != null))
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                     child: GestureDetector(
-                      onTap: _question!.hasFigure ? () => _showFullFigure() : null, // Only zoom static images for now
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxHeight: 300, // Limit height
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.6),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
+                      onTap: _question!.hasFigure ? () => _showFullFigure() : null,
+                      child: WiredCard(
+                        padding: const EdgeInsets.all(16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             // Figure label
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.03),
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  topRight: Radius.circular(16),
+                            Row(
+                              children: [
+                                Icon(Icons.image_outlined, color: _primaryColor, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Figure',
+                                  style: _patrickHand(fontSize: 14, fontWeight: FontWeight.bold),
                                 ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.image_outlined, color: Colors.blue.withValues(alpha: 0.7), size: 18),
-                                  const SizedBox(width: 8),
+                                const Spacer(),
+                                if (_question!.hasFigure) ...[
+                                  Icon(Icons.zoom_in, color: _primaryColor.withValues(alpha: 0.5), size: 18),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Figure',
-                                    style: TextStyle(
-                                      color: Theme.of(context).brightness == Brightness.dark
-                                          ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                                          : AppColors.textPrimary.withValues(alpha: 0.7),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                    'Tap to zoom',
+                                    style: _patrickHand(color: _primaryColor.withValues(alpha: 0.5), fontSize: 12),
                                   ),
-                                  const Spacer(),
-                                  if (_question!.hasFigure) ...[
-                                    Icon(Icons.zoom_in, color: Colors.white.withValues(alpha: 0.7), size: 18),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Tap to zoom',
-                                      style: TextStyle(
-                                        color: AppColors.textPrimary.withValues(alpha: 0.7),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
                                 ],
-                              ),
+                              ],
                             ),
-                            // Figure image (Static or Dynamic)
-                            Flexible(
-                              child: ClipRRect(
-                                borderRadius: const BorderRadius.only(
-                                  bottomLeft: Radius.circular(16),
-                                  bottomRight: Radius.circular(16),
-                                ),
+                            const SizedBox(height: 12),
+                            // Figure image
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 250),
                                 child: _question!.hasFigure
                                   ? Image.network(
                                       _question!.imageUrl!,
@@ -1084,9 +999,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ),
               ),
 
-              // Extra space at bottom
+              // Extra space at bottom - removed based on feedback
               const SliverToBoxAdapter(
-                child: SizedBox(height: 40),
+                child: SizedBox(height: 10), // Reduced from 40
               ),
             ],
           ),
@@ -1114,71 +1029,35 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Widget _buildTabbedCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).cardTheme.color
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Theme.of(context).dividerColor
-              : AppColors.border,
-          width: 1
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadow.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return WiredCard(
+      height: 600, // Fixed height for tab view
       child: Column(
         children: [
-          // Tab Bar
-          Container(
+          const SizedBox(height: 0), // Removed gap between border and tabs
+        // Tab Headers
+        // Tab Headers
+        Container(
+            height: 50,
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.15),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              border: Border(
+                bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
+              ),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelColor: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).colorScheme.onSurface
-                  : AppColors.textPrimary,
-              unselectedLabelColor: Theme.of(context).brightness == Brightness.dark
-                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7)
-                  : AppColors.textSecondary,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
-              dividerColor: Colors.transparent,
-              tabs: [
-                Tab(
-                  icon: Icon(
-                    _answerSubmitted ? Icons.check_circle : Icons.edit_note,
-                    size: 20,
-                    color: _answerSubmitted ? Colors.green : null,
-                  ),
-                  text: 'Your Answer',
-                ),
-                const Tab(
-                  icon: Icon(Icons.verified_outlined, size: 20),
-                  text: 'Official',
-                ),
-                const Tab(
-                  icon: Icon(Icons.auto_awesome, size: 20),
-                  text: 'AI Explanation',
-                ),
+            child: Row(
+              children: [
+                _buildTabItem(0, 'Your Answer', _answerSubmitted ? Icons.check_circle : Icons.edit_note,
+                    activeColor: _answerSubmitted ? Colors.green : null),
+                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)),
+                _buildTabItem(1, 'Official', Icons.verified_outlined),
+                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)),
+                _buildTabItem(2, 'AI Explanation', Icons.auto_awesome),
+                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)), // Extra divider for balance
               ],
             ),
           ),
 
           // Tab Content
-          SizedBox(
-            height: 450, // Increased height to show retry button
+          Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
@@ -1193,7 +1072,45 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     );
   }
 
+  Widget _buildTabItem(int index, String label, IconData icon, {Color? activeColor}) {
+    return Expanded(
+      child: AnimatedBuilder(
+        animation: _tabController,
+        builder: (context, _) {
+          final isSelected = _tabController.index == index;
+          return Material(
+            color: isSelected ? _primaryColor.withValues(alpha: 0.05) : Colors.transparent,
+            child: InkWell(
+              onTap: () => _tabController.animateTo(index),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: isSelected ? (activeColor ?? _primaryColor) : _primaryColor.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: _patrickHand(
+                      fontSize: 14,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? (activeColor ?? _primaryColor) : _primaryColor.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildAnswerTab() {
+    final isPremium = ref.watch(isPremiumProvider); // Check premium status
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1201,16 +1118,11 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         children: [
           // Score badge if submitted
           if (_aiFeedback != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: (_aiFeedback!['isCorrect'] ?? false)
-                      ? [Colors.green.withValues(alpha: 0.2), Colors.green.withValues(alpha: 0.1)]
-                      : [Colors.orange.withValues(alpha: 0.2), Colors.orange.withValues(alpha: 0.1)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
+            WiredCard(
+              backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.orange.withValues(alpha: 0.1),
+              borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
               child: Row(
                 children: [
                   Icon(
@@ -1221,25 +1133,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   Expanded(
                     child: Text(
                       'Score: ${_aiFeedback!['score']}%',
-                      style: TextStyle(
+                      style: _patrickHand(
                         color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 18,
                       ),
                     ),
                   ),
-                  if (_answerSubmitted)
-                    TextButton.icon(
-                      onPressed: () {
-                        setState(() {
-                          _answerSubmitted = false;
-                          _aiFeedback = null;
-                        });
-                      },
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Retry'),
-                      style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
-                    ),
+                  // Removed top Retry button as per request
                 ],
               ),
             ),
@@ -1251,88 +1152,67 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             // MCQ Answer Options
             ...(_question!.options!.map((option) {
               final isSelected = _selectedMcqAnswer == option['label'];
-              final isCorrect = _answerSubmitted && option['label'] == _question!.effectiveCorrectAnswer;
-              final isWrong = _answerSubmitted && isSelected && !isCorrect;
+              final isCorrectTarget = option['label'] == _question!.effectiveCorrectAnswer;
+              
+              // Only mark as correct if selected AND correct. Don't spoil others.
+              final isCorrect = _answerSubmitted && isSelected && isCorrectTarget;
+              final isWrong = _answerSubmitted && isSelected && !isCorrectTarget;
+
+              Color borderColor = _primaryColor.withValues(alpha: 0.2);
+              if (isSelected) borderColor = Colors.blue;
+              if (isCorrect) borderColor = Colors.green;
+              if (isWrong) borderColor = Colors.red;
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 12), // Reduced to 12
                 child: GestureDetector(
                   onTap: _answerSubmitted ? null : () {
-                    setState(() {
-                      _selectedMcqAnswer = option['label'];
-                    });
+                     setState(() {
+                       _selectedMcqAnswer = option['label'];
+                     });
                   },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isCorrect
-                          ? Colors.green.withValues(alpha: 0.2)
-                          : isWrong
-                              ? Colors.red.withValues(alpha: 0.2)
-                              : isSelected
-                                    ? AppColors.primary.withValues(alpha: 0.15)
-                                    : Theme.of(context).brightness == Brightness.dark
-                                        ? Colors.white.withValues(alpha: 0.05) // Distinct surface for options
-                                        : AppColors.background,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isCorrect
-                              ? Colors.green
-                              : isWrong
-                                  ? Colors.red
-                                  : isSelected
-                                      ? Colors.blue
-                                      : Theme.of(context).brightness == Brightness.dark
-                                          ? Colors.white.withValues(alpha: 0.1) // Subtle border
-                                          : Colors.white.withValues(alpha: 0.1),
-                          width: isSelected || isCorrect || isWrong ? 2 : 1,
-                        ),
-                    ),
+                  child: WiredCard(
+                    borderColor: isSelected ? borderColor : _primaryColor.withValues(alpha: 0.3),
+                    backgroundColor: isSelected ? Colors.blue.withValues(alpha: 0.05) : Colors.white,
+                    borderWidth: isSelected ? 2.5 : 1.5,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Tighter padding
                     child: Row(
                       children: [
+                        // Option Label (A, B, C...)
                         Container(
-                          width: 36,
-                          height: 36,
+                          width: 38, // Reduced to 38
+                          height: 38,
                           decoration: BoxDecoration(
-                            color: isCorrect
-                                ? Colors.green
-                                : isWrong
-                                    ? Colors.red
-                                    : isSelected
-                                    ? Colors.blue
-                                    : Theme.of(context).brightness == Brightness.dark
-                                        ? Colors.white.withValues(alpha: 0.1)
-                                        : Colors.white.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(18),
+                            color: isSelected ? borderColor.withValues(alpha: 0.1) : Colors.transparent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? borderColor : _primaryColor.withValues(alpha: 0.3),
+                              width: 2,
+                            ),
                           ),
                           child: Center(
                             child: isCorrect
-                                ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                ? const Icon(Icons.check, color: Colors.green, size: 22)
                                 : isWrong
-                                    ? const Icon(Icons.close, color: Colors.white, size: 20)
+                                    ? const Icon(Icons.close, color: Colors.red, size: 22)
                                     : Text(
                                         option['label'] ?? '',
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? Colors.white
-                                              : (Theme.of(context).brightness == Brightness.dark
-                                                  ? Colors.white.withValues(alpha: 0.9)
-                                                  : AppColors.textSecondary),
+                                        style: _patrickHand(
+                                          color: isSelected ? Colors.blue : _primaryColor,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                          fontSize: 17, // Reduced to 17
                                         ),
                                       ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Text(
                             option['text'] ?? '',
-                            style: TextStyle(
-                              color: Theme.of(context).brightness == Brightness.dark
-                                  ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.9)
-                                  : AppColors.textPrimary.withValues(alpha: 0.9),
-                              fontSize: 15,
+                            style: _patrickHand(
+                              color: _primaryColor,
+                              fontSize: 16,
+                              height: 1.3,
                             ),
                           ),
                         ),
@@ -1342,48 +1222,48 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ),
               );
             })),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             // Check MCQ button + Retry
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: (_answerSubmitted || _selectedMcqAnswer == null)
-                        ? null
-                        : () {
-                            _checkMcqAnswer();
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      disabledBackgroundColor: _answerSubmitted
-                          ? Colors.green.withValues(alpha: 0.5)
-                          : Colors.blue.withValues(alpha: 0.6),
-                    ),
-                    child: Text(
+                  child: WiredButton(
+                  onPressed: (_answerSubmitted || _selectedMcqAnswer == null) ? null : _checkMcqAnswer,
+                  backgroundColor: (_answerSubmitted || _selectedMcqAnswer == null) ? Colors.grey.shade200 : Colors.blue,
+                  filled: true,
+                  borderColor: (_answerSubmitted || _selectedMcqAnswer == null) ? Colors.grey.shade400 : Colors.blue,
+                  padding: const EdgeInsets.symmetric(vertical: 14), // Reduced button padding
+                  child: Center(
+                      child: Text(
                       _answerSubmitted ? 'Submitted ✓' : 'Submit Answer',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      style: _patrickHand(
+                          color: (_answerSubmitted || _selectedMcqAnswer == null) ? Colors.grey : Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 if (_answerSubmitted) ...[
                   const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () {
+                  WiredButton(
+                     onPressed: () {
                       setState(() {
                         _answerSubmitted = false;
                         _selectedMcqAnswer = null;
                       });
                     },
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Retry'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    backgroundColor: Colors.orange,
+                    filled: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), // Consistent reduced padding
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                         const Icon(Icons.refresh, size: 18, color: Colors.white),
+                         const SizedBox(width: 6),
+                         Text('Retry', style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
                     ),
                   ),
                 ],
@@ -1391,48 +1271,20 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ] else ...[
             // Text input for written questions
-            TextField(
-              controller: _studentAnswerController,
-              maxLines: 5,
-              enabled: !_answerSubmitted && !_isCheckingAnswer,
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface
-                    : AppColors.textPrimary,
-                fontSize: 15
-              ),
-              decoration: InputDecoration(
-                hintText: 'Type your answer here...',
-                hintStyle: TextStyle(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5)
-                      : AppColors.textSecondary
-                ),
-                filled: true,
-                fillColor: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).scaffoldBackgroundColor
-                    : AppColors.background,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).dividerColor
-                        : AppColors.border,
-                    width: 1.5
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).dividerColor
-                        : AppColors.border,
-                    width: 1.5
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+            WiredCard(
+              padding: EdgeInsets.zero,
+              child: TextField(
+                controller: _studentAnswerController,
+                maxLines: 5,
+                enabled: !_answerSubmitted && !_isCheckingAnswer,
+                style: _patrickHand(fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: 'Type your answer here...',
+                  hintStyle: _patrickHand(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.all(16),
                 ),
               ),
             ),
@@ -1440,31 +1292,23 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             // Check button for written
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: (_answerSubmitted || _isCheckingAnswer)
-                    ? null
-                    : () {
-                        if (_studentAnswerController.text.trim().isNotEmpty) {
-                          _checkAnswer();
-                        }
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  disabledBackgroundColor: Colors.blue.withValues(alpha: 0.6),
-                ),
+              child: WiredButton(
+                onPressed: (_answerSubmitted || _isCheckingAnswer) ? null : _checkAnswer,
+                backgroundColor: (_answerSubmitted || _isCheckingAnswer) ? Colors.grey.shade300 : Colors.blue,
+                filled: true,
+                borderColor: (_answerSubmitted || _isCheckingAnswer) ? Colors.grey.shade400 : Colors.blue,
                 child: _isCheckingAnswer
                     ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : Text(
+                    : Center(
+                        child: Text(
                         _answerSubmitted ? 'Answer Checked ✓' : 'Check My Answer',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                        style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                       ),
+                    ),
               ),
             ),
           ],
@@ -1472,11 +1316,41 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           // Feedback
           if (_aiFeedback != null) ...[
             const SizedBox(height: 20),
-            Text(
-              _aiFeedback!['feedback'] ?? '',
-              style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), height: 1.5),
+            WiredCard(
+              backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.red.withValues(alpha: 0.1),
+              borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle_outline : Icons.cancel_outlined,
+                      color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      isPremium 
+                        ? (_aiFeedback!['feedback'] ?? '') // Show full feedback if premium
+                        : ((_aiFeedback!['isCorrect'] ?? false) ? 'Correct!' : 'Incorrect.'), // Concise if not premium
+                      style: _patrickHand(
+                        height: 1.4,
+                        fontSize: 17,
+                        color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green.shade700 : Colors.red.shade700,
+                        fontWeight: FontWeight.w600
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            if ((_aiFeedback!['hints'] as List?)?.isNotEmpty ?? false) ...[
+            // Show hints only if premium
+            if (isPremium && ((_aiFeedback!['hints'] as List?)?.isNotEmpty ?? false)) ...[
               const SizedBox(height: 12),
               _buildFeedbackList('Hints', (_aiFeedback!['hints'] as List).cast<String>(), Colors.amber, Icons.lightbulb_outline),
             ],
@@ -1497,9 +1371,20 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.auto_awesome_outlined, color: Colors.white24, size: 48),
-            const SizedBox(height: 12),
-            Text('AI explanation not available', style: TextStyle(color: Colors.white38)),
+            WiredCard(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                   const Icon(Icons.auto_awesome_outlined, color: Colors.grey, size: 48),
+                   const SizedBox(height: 12),
+                   Text(
+                    'AI explanation not available',
+                    style: _patrickHand(color: Colors.grey, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       );
@@ -1519,12 +1404,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 children: [
                   Row(
                     children: [
-                      Container(
+                      WiredCard(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        backgroundColor: Colors.purple.withValues(alpha: 0.2),
+                        borderColor: Colors.purple,
                         child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
                       ),
                       const SizedBox(width: 12),
@@ -1539,7 +1422,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   const SizedBox(height: 16),
                   Text(
                     _question!.aiAnswer ?? 'AI explanation not available for this question yet.',
-                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+                    style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
                   ),
                 ],
               ),
@@ -1548,159 +1431,90 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
           // Premium upgrade overlay
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.surface.withValues(alpha: 0.7),
-                    AppColors.surface.withValues(alpha: 0.9),
-                  ],
-                ),
-              ),
-              child: Center(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 32),
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.surface,
-                        const Color(0xFF1A1D28),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: Colors.amber.withValues(alpha: 0.6),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.amber.withValues(alpha: 0.2),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.amber.withValues(alpha: 0.6),
-                              Colors.orange.withValues(alpha: 0.2),
-                            ],
-                          ),
-                          border: Border.all(
-                            color: Colors.amber.withValues(alpha: 0.7),
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.amber.withValues(alpha: 0.6),
-                              blurRadius: 20,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome,
-                          size: 32,
-                          color: Colors.amber,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Premium Feature',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Upgrade to access AI step-by-step solutions',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFFB800), Color(0xFFFF8800)],
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.amber.withValues(alpha: 0.6),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
+            child: Stack(
+              children: [
+                // Transparent blocking layer
+                Container(color: Colors.transparent), 
+                
+                // Centered floating card
+                Center(
+                  child: WiredCard(
+                    width: 320,
+                    // Auto height
+                    backgroundColor: const Color(0xFF2D3E50), // Navy background
+                    borderColor: Colors.amber,
+                    borderWidth: 2,
+                    child: Padding(
+                       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                       child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                               Container(
+                                width: 48, 
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.amber, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 24, 
+                                  color: Colors.amber,
+                                ),
                               ),
-                            ],
-                          ),
-                          child: ElevatedButton(
-                            onPressed: () {
-                              // Show full premium dialog
-                              AccessControlService.checkPremium(
-                                context,
-                                ref,
-                                featureName: 'AI Solution',
-                                highlights: [
-                                  'Step-by-step AI explanations',
-                                  'Understand complex problems',
-                                  'Learn optimal solving methods',
-                                  'Improve faster with guidance',
-                                ],
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              shadowColor: Colors.transparent,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Premium Content',
+                                style: _patrickHand(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.workspace_premium, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Upgrade to Premium',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Text(
+                                  'Unlock detailed AI explanations.',
+                                  textAlign: TextAlign.center,
+                                  style: _patrickHand(
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    fontSize: 14,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 16), 
+                              WiredButton(
+                                onPressed: () {
+                                  AccessControlService.checkPremium(
+                                    context,
+                                    ref,
+                                    featureName: 'AI Solution',
+                                    highlights: ['Step-by-step AI explanations'],
+                                  );
+                                },
+                                backgroundColor: Colors.amber,
+                                filled: true,
+                                borderColor: Colors.amber.shade700,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10), 
+                                child: Text(
+                                  'Unlock Premium',
+                                  style: _patrickHand(
+                                    color: const Color(0xFF2D3E50),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
+                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ),
+              ),
         ],
       );
     }
@@ -1713,12 +1527,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         children: [
           Row(
             children: [
-              Container(
+              WiredCard(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                backgroundColor: Colors.purple.withValues(alpha: 0.2),
+                borderColor: Colors.purple,
                 child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
               ),
               const SizedBox(width: 12),
@@ -1733,7 +1545,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           const SizedBox(height: 16),
           Text(
             _question!.aiSolution,
-            style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+            style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
           ),
         ],
       ),
@@ -1770,12 +1582,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 children: [
                   Row(
                     children: [
-                      Container(
+                      WiredCard(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        backgroundColor: Colors.green.withValues(alpha: 0.2),
+                        borderColor: Colors.green,
                         child: const Icon(Icons.verified, color: Colors.green, size: 20),
                       ),
                       const SizedBox(width: 12),
@@ -1790,7 +1600,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   const SizedBox(height: 16),
                   Text(
                     _question!.officialAnswer,
-                    style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+                    style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
                   ),
                 ],
               ),
@@ -1799,108 +1609,75 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
           // Login prompt overlay
           Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.surface.withValues(alpha: 0.7),
-                    AppColors.surface.withValues(alpha: 0.9),
-                  ],
-                ),
-              ),
-              child: Center(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 32),
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: AppColors.background.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: Colors.blue.withValues(alpha: 0.6),
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
+            child: Stack(
+              children: [
+                // Transparent blocking layer
+                Container(color: Colors.transparent),
+                
+                // Centered floating card
+                Center(
+                  child: WiredCard(
+                   width: 320,
+                   backgroundColor: AppColors.background,
+                   borderColor: Colors.blue,
+                   borderWidth: 2,
+                   padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 64,
-                        height: 64,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              Colors.blue.withValues(alpha: 0.6),
-                              Colors.cyan.withValues(alpha: 0.2),
-                            ],
-                          ),
-                          border: Border.all(
-                            color: Colors.blue.withValues(alpha: 0.7),
-                            width: 2,
-                          ),
+                          border: Border.all(color: Colors.blue, width: 2),
                         ),
                         child: const Icon(
                           Icons.lock_outline,
-                          size: 32,
+                          size: 24,
                           color: Colors.blue,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
+                      const SizedBox(height: 16),
+                      Text(
                         'Login to View Answer',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: _patrickHand(
                           color: AppColors.textPrimary,
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Create a free account to access official answers',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                          height: 1.5,
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Create a free account to access official answers',
+                          textAlign: TextAlign.center,
+                          style: _patrickHand(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () => context.go('/login'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Login / Sign Up',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                      const SizedBox(height: 20),
+                      WiredButton(
+                        onPressed: () => context.go('/login'),
+                        backgroundColor: Colors.blue,
+                        filled: true,
+                        borderColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+                        child: Text(
+                          'Login / Register',
+                          style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ],
+                   ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -1915,12 +1692,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         children: [
           Row(
             children: [
-              Container(
+              WiredCard(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
+                backgroundColor: Colors.green.withValues(alpha: 0.2),
+                borderColor: Colors.green,
                 child: const Icon(Icons.verified, color: Colors.green, size: 20),
               ),
               const SizedBox(width: 12),
@@ -1935,7 +1710,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           const SizedBox(height: 16),
           Text(
             _question!.officialAnswer,
-            style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 15, height: 1.6),
+            style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
           ),
         ],
       ),
@@ -2597,30 +2372,22 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   /// Build attempt status badge
+  /// Build attempt status badge
   Widget _buildAttemptStatusBadge() {
     final attemptedAt = DateTime.parse(_previousAttempt!['attempted_at']);
     final timeAgo = _formatTimeAgo(attemptedAt);
     final score = _previousAttempt!['score'] as int?;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: _isViewingPreviousAnswer
-              ? [Colors.blue.shade50, Colors.blue.shade100]
-              : [Colors.green.shade50, Colors.green.shade100],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isViewingPreviousAnswer
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20), // Fix overlap with margin
+      child: WiredCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        backgroundColor: _isViewingPreviousAnswer
+              ? Colors.blue.withValues(alpha: 0.1)
+              : Colors.green.withValues(alpha: 0.1),
+      borderColor: _isViewingPreviousAnswer
               ? Colors.blue.shade300
               : Colors.green.shade300,
-          width: 1.5,
-        ),
-      ),
       child: Row(
         children: [
           Icon(
@@ -2639,25 +2406,26 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   _isViewingPreviousAnswer
                       ? 'Viewing Previous Answer'
                       : 'Answer Saved',
-                  style: TextStyle(
+                  style: _patrickHand( // Using Patrick Hand
                     color: _isViewingPreviousAnswer
                         ? Colors.blue.shade900
                         : Colors.green.shade900,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 16, // Slightly larger for handwritten style
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Attempted $timeAgo${score != null ? " • Score: $score%" : ""}',
-                  style: TextStyle(
+                  style: _patrickHand( // Using Patrick Hand
                     color: Colors.grey.shade700,
-                    fontSize: 12,
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
           ),
+
           if (_isViewingPreviousAnswer)
             ElevatedButton.icon(
               onPressed: _retryQuestion,
@@ -2674,8 +2442,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   String _formatTimeAgo(DateTime dateTime) {
     final difference = DateTime.now().difference(dateTime);

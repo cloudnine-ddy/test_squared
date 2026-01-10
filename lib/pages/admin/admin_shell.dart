@@ -15,6 +15,7 @@ enum AdminSection {
   dashboard,
   uploadPaper,
   questionManager,
+  questionPreview, // NEW: Admin preview of student question view
   // Add future sections here:
   // userManagement,
   // settings,
@@ -100,6 +101,12 @@ class _AdminShellState extends State<AdminShell> {
         return const UploadPaperView();
       case AdminSection.questionManager:
         return const QuestionManagerView();
+      case AdminSection.questionPreview:
+        // Navigate to full student dashboard preview
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) context.go('/dashboard-preview');
+        });
+        return const Center(child: CircularProgressIndicator());
       // Add future cases here:
     }
   }
@@ -112,6 +119,8 @@ class _AdminShellState extends State<AdminShell> {
         return 'Upload Papers';
       case AdminSection.questionManager:
         return 'Question Manager';
+      case AdminSection.questionPreview:
+        return 'Question Preview';
       // Add future cases here
     }
   }
@@ -124,6 +133,8 @@ class _AdminShellState extends State<AdminShell> {
         return Icons.upload_file;
       case AdminSection.questionManager:
         return Icons.account_tree;
+      case AdminSection.questionPreview:
+        return Icons.visibility;
       // Add future cases here
     }
   }
@@ -236,6 +247,7 @@ class _AdminShellState extends State<AdminShell> {
                 _buildNavItem(AdminSection.dashboard),
                 _buildNavItem(AdminSection.uploadPaper),
                 _buildNavItem(AdminSection.questionManager),
+                _buildNavItem(AdminSection.questionPreview),
                 // Add more navigation items here as needed
                 // _buildNavItem(AdminSection.analytics),
               ],

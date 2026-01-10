@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
+import '../../features/past_papers/question_detail_screen.dart';
 import 'question_editor.dart';
 import 'pdf_preview_dialog.dart';
 
@@ -540,6 +541,16 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                                 ],
                               ),
                               const Spacer(),
+                              // Preview button
+                              IconButton(
+                                onPressed: () => _showStudentPreview(_selectedQuestionId!),
+                                icon: const Icon(Icons.visibility, color: Colors.cyan),
+                                tooltip: 'Preview as Student',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.cyan.withValues(alpha: 0.1),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
                               // Navigation buttons
                               Container(
                                 decoration: BoxDecoration(
@@ -819,5 +830,98 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     final preview = content.length > 50 ? '${content.substring(0, 50)}...' : content;
     
     return 'Q${q['question_number']}\n${hasImage ? '✓ Has image' : '○ No image'}\n${preview.isEmpty ? 'No content' : preview}';
+  }
+
+  /// Show question preview as student would see it
+  void _showStudentPreview(String questionId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.85,
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDFBF7), // Match student view background
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Header with close button
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.cyan.withValues(alpha: 0.1),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(16),
+                    topRight: Radius.circular(16),
+                  ),
+                  border: Border(
+                    bottom: BorderSide(color: Colors.cyan.withValues(alpha: 0.2)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility, color: Colors.cyan, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Student Preview',
+                      style: TextStyle(
+                        color: Colors.cyan.shade700,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.cyan.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Preview Mode',
+                        style: TextStyle(
+                          color: Colors.cyan.shade600,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      tooltip: 'Close Preview',
+                    ),
+                  ],
+                ),
+              ),
+              // Question content
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(16),
+                    bottomRight: Radius.circular(16),
+                  ),
+                  child: QuestionDetailScreen(
+                    questionId: questionId,
+                    previewMode: true,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

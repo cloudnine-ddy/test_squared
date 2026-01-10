@@ -208,16 +208,23 @@ class WiredDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size(double.infinity, thickness),
-      painter: _WiredLinePainter(color: color, thickness: thickness),
+      painter: WiredDividerPainter(color: color, thickness: thickness),
     );
   }
 }
 
-class _WiredLinePainter extends CustomPainter {
+class WiredDividerPainter extends CustomPainter {
   final Color color;
   final double thickness;
+  final int seed;
+  final Axis axis;
 
-  _WiredLinePainter({required this.color, required this.thickness});
+  WiredDividerPainter({
+    required this.color, 
+    required this.thickness,
+    this.seed = 42,
+    this.axis = Axis.horizontal,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -227,16 +234,25 @@ class _WiredLinePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final random = math.Random(42);
+    final random = math.Random(seed);
     final path = Path();
     
-    path.moveTo(0, size.height / 2);
-    
-    double x = 0;
-    while (x < size.width) {
-      x += 5 + random.nextDouble() * 3;
-      final y = size.height / 2 + (random.nextDouble() - 0.5) * 2;
-      path.lineTo(x.clamp(0, size.width), y);
+    if (axis == Axis.horizontal) {
+      path.moveTo(0, size.height / 2);
+      double x = 0;
+      while (x < size.width) {
+        x += 5 + random.nextDouble() * 3;
+        final y = size.height / 2 + (random.nextDouble() - 0.5) * 2;
+        path.lineTo(x.clamp(0, size.width), y);
+      }
+    } else {
+      path.moveTo(size.width / 2, 0);
+      double y = 0;
+      while (y < size.height) {
+        y += 5 + random.nextDouble() * 3;
+        final x = size.width / 2 + (random.nextDouble() - 0.5) * 2;
+        path.lineTo(x, y.clamp(0, size.height));
+      }
     }
 
     canvas.drawPath(path, paint);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/past_paper_repository.dart'; // Added import
+import '../../../shared/wired/wired_widgets.dart'; // Sketchy widgets
 import 'chat_message.dart';
 import 'generated_question_card.dart';
 
@@ -30,7 +31,26 @@ class _AIChatPanelState extends State<AIChatPanel> {
   String? _userAnswer;
   int? _userScore;
   int _generatedQuestionCount = 0;
-  String? _pdfUrl; // Added to store PDF URL
+  String? _pdfUrl;
+
+  // Sketchy Theme Constants
+  static const _primaryColor = Color(0xFF2D3E50);
+  static const _backgroundColor = Color(0xFFFDFBF7);
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
 
   @override
   void initState() {
@@ -200,18 +220,11 @@ class _AIChatPanelState extends State<AIChatPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Container( // Main panel container
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).cardTheme.color
-            : AppColors.surface,
+        color: _backgroundColor,
         border: Border(
-          left: BorderSide(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Theme.of(context).dividerColor
-                : AppColors.border,
-            width: 1
-          ),
+           left: BorderSide(color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
         ),
       ),
       child: Column(
@@ -243,14 +256,10 @@ class _AIChatPanelState extends State<AIChatPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.background,
+        color: Colors.white,
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.transparent
-                : AppColors.border,
+            color: _primaryColor.withValues(alpha: 0.1),
             width: 1
           ),
         ),
@@ -260,12 +269,12 @@ class _AIChatPanelState extends State<AIChatPanel> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: _primaryColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.psychology,
-              color: AppColors.primary,
+              color: _primaryColor,
               size: 20,
             ),
           ),
@@ -276,12 +285,9 @@ class _AIChatPanelState extends State<AIChatPanel> {
               children: [
                 Text(
                   'AI Study Assistant',
-                  style: TextStyle(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).colorScheme.onSurface
-                        : AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  style: _patrickHand(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
                   ),
                 ),
                 Row(
@@ -292,13 +298,14 @@ class _AIChatPanelState extends State<AIChatPanel> {
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: Colors.white, width: 1), // sketchy dot
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'Online',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
+                      style: _patrickHand(
+                        color: Colors.grey,
                         fontSize: 12,
                       ),
                     ),
@@ -308,28 +315,25 @@ class _AIChatPanelState extends State<AIChatPanel> {
             ),
           ),
           if (!widget.isPremium)
-            Container(
+            WiredCard(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD700).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFFD700), width: 1),
-              ),
+              backgroundColor: const Color(0xFFFFD700).withValues(alpha: 0.2),
+              borderColor: const Color(0xFFFFD700),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.workspace_premium,
-                    color: const Color(0xFFD4AF37),
+                    color: Color(0xFFD4AF37),
                     size: 14,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Premium',
-                    style: TextStyle(
+                    style: _patrickHand(
                       color: const Color(0xFFD4AF37),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -387,13 +391,11 @@ class _AIChatPanelState extends State<AIChatPanel> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD700).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(60),
-              ),
-              child: Icon(
+            WiredCard(
+              padding: const EdgeInsets.all(24),
+               backgroundColor: const Color(0xFFFFD700).withValues(alpha: 0.1),
+               borderColor: const Color(0xFFFFD700),
+               child: Icon(
                 Icons.workspace_premium,
                 color: const Color(0xFFD4AF37),
                 size: 48,
@@ -402,9 +404,9 @@ class _AIChatPanelState extends State<AIChatPanel> {
             const SizedBox(height: 24),
             Text(
               'Unlock AI Assistant',
-              style: TextStyle(
+              style: _patrickHand(
                 color: AppColors.textPrimary,
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -412,35 +414,32 @@ class _AIChatPanelState extends State<AIChatPanel> {
             Text(
               'Get instant help, hints, and explanations\nfor any question with Premium',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: _patrickHand(
                 color: AppColors.textSecondary,
-                fontSize: 14,
+                fontSize: 16,
                 height: 1.5,
               ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
+            WiredButton(
               onPressed: () {
                 // TODO: Navigate to premium upgrade
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD4AF37),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              backgroundColor: const Color(0xFFD4AF37),
+              filled: true,
+              borderColor: const Color(0xFFB8860B),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.star, size: 20),
+                  const Icon(Icons.star, size: 20, color: Colors.white),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Upgrade to Premium',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                    style: _patrickHand(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -461,28 +460,16 @@ class _AIChatPanelState extends State<AIChatPanel> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.background,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.transparent
-                : AppColors.border,
-            width: 1
-          ),
-        ),
-      ),
+      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Quick Prompts',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            style: _patrickHand(
+              color: Colors.grey,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
@@ -492,34 +479,17 @@ class _AIChatPanelState extends State<AIChatPanel> {
             children: prompts.map((prompt) {
               return InkWell(
                 onTap: () => _sendQuickPrompt(prompt.$2),
-                borderRadius: BorderRadius.circular(20),
-                  child: Container(
+                child: WiredCard(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Theme.of(context).cardTheme.color
-                          : AppColors.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Theme.of(context).dividerColor
-                            : AppColors.border,
-                        width: 1
-                      ),
-                    ),
+                    borderColor: _primaryColor.withValues(alpha: 0.3),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(prompt.$1, style: const TextStyle(fontSize: 14)),
+                        Text(prompt.$1, style: const TextStyle(fontSize: 14)), // Emoji can be standard font
                         const SizedBox(width: 6),
                         Text(
                           prompt.$2,
-                          style: TextStyle(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? Theme.of(context).colorScheme.onSurface
-                                : AppColors.textPrimary,
-                            fontSize: 13,
-                          ),
+                          style: _patrickHand(fontSize: 14),
                         ),
                       ],
                     ),
@@ -536,14 +506,10 @@ class _AIChatPanelState extends State<AIChatPanel> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Theme.of(context).scaffoldBackgroundColor
-            : AppColors.background,
+        color: _backgroundColor,
         border: Border(
           top: BorderSide(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.transparent
-                : AppColors.border,
+            color: _primaryColor.withValues(alpha: 0.1),
             width: 1
           ),
         ),
@@ -551,68 +517,34 @@ class _AIChatPanelState extends State<AIChatPanel> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _messageController,
-              enabled: widget.isPremium,
-              decoration: InputDecoration(
-                hintText: widget.isPremium
-                    ? 'Ask anything about this question...'
-                    : 'Upgrade to Premium to chat',
-                hintStyle: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
+            child: WiredCard(
+              padding: EdgeInsets.zero,
+              child: TextField(
+                controller: _messageController,
+                enabled: widget.isPremium,
+                decoration: InputDecoration(
+                  hintText: widget.isPremium
+                      ? 'Ask anything about this question...'
+                      : 'Upgrade to Premium to chat',
+                  hintStyle: _patrickHand(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  border: InputBorder.none,
                 ),
-                filled: true,
-                fillColor: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).cardTheme.color
-                    : Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).dividerColor
-                        : AppColors.border,
-                    width: 1
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Theme.of(context).dividerColor
-                        : AppColors.border,
-                    width: 1
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
+                style: _patrickHand(fontSize: 16),
+                maxLines: null,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _sendMessage(),
               ),
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Theme.of(context).colorScheme.onSurface
-                    : AppColors.textPrimary,
-                fontSize: 14,
-              ),
-              maxLines: null,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendMessage(),
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: widget.isPremium ? AppColors.primary : AppColors.border,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: IconButton(
-              onPressed: widget.isPremium ? _sendMessage : null,
-              icon: const Icon(Icons.send, size: 20),
-              color: Colors.white,
-              padding: const EdgeInsets.all(12),
-            ),
+          WiredButton(
+            onPressed: widget.isPremium ? () => _sendMessage() : () {},
+            backgroundColor: widget.isPremium ? _primaryColor : Colors.grey,
+            filled: true,
+            child: const Icon(Icons.send, size: 20, color: Colors.white),
           ),
         ],
       ),
@@ -623,50 +555,26 @@ class _AIChatPanelState extends State<AIChatPanel> {
      return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      color: Theme.of(context).brightness == Brightness.dark
-          ? Theme.of(context).scaffoldBackgroundColor
-          : AppColors.background,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF6A1B9A), Color(0xFF8E24AA)], // Purple gradient
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8E24AA).withOpacity(0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
+      color: Colors.white, // Background for the section
+      child: WiredButton(
+        onPressed: () => _sendQuickPrompt('Generate similar question'),
+        backgroundColor: Colors.deepPurple,
+        filled: true,
+        borderColor: Colors.deepPurple.shade900,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+             const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+             const SizedBox(width: 8),
+             Text(
+               'Generate Similar Question',
+               style: _patrickHand(
+                 color: Colors.white,
+                 fontSize: 16,
+                 fontWeight: FontWeight.bold,
+               ),
+             ),
           ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => _sendQuickPrompt('Generate similar question'),
-            borderRadius: BorderRadius.circular(16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Generate Similar Question',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
