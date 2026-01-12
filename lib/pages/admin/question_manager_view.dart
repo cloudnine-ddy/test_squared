@@ -10,7 +10,7 @@ import 'pdf_preview_dialog.dart';
 
 /// Question Manager - Organized hierarchical view of all questions
 /// Navigation: Exam Type → Subject → Year → Paper → Questions
-/// 
+///
 /// Enhanced UX Features:
 /// - Keyboard shortcuts (Ctrl+S save, ↑/↓ navigate, Ctrl+G jump to question)
 /// - Progress tracking with color-coded status
@@ -215,9 +215,9 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           .select('image_url')
           .eq('id', questionId)
           .single();
-      
+
       final imageUrl = questionData['image_url'] as String?;
-      
+
       // 2. Delete image from Storage if exists
       if (imageUrl != null && imageUrl.isNotEmpty) {
         try {
@@ -234,7 +234,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           // Continue with DB deletion anyway
         }
       }
-      
+
       // 3. Delete from database
       await _supabase.from('questions').delete().eq('id', questionId);
       ToastService.showSuccess('Question deleted!');
@@ -244,6 +244,48 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
       _loadData();
     } catch (e) {
       ToastService.showError('Delete failed: $e');
+    }
+  }
+
+  Future<void> _createNewQuestion(String paperId) async {
+    setState(() => _isLoading = true);
+    try {
+      // 1. Find the next question number
+      final existingQuestions = _questionsByPaper[paperId] ?? [];
+      int maxNum = 0;
+      for (final q in existingQuestions) {
+        final num = q['question_number'] as int? ?? 0;
+        if (num > maxNum) maxNum = num;
+      }
+      final nextNum = maxNum + 1;
+
+      // 2. Insert new placeholder question
+      // We insert minimal required fields. The DB will handle ID generation.
+      final res = await _supabase.from('questions').insert({
+        'paper_id': paperId,
+        'question_number': nextNum,
+        'content': 'New Question $nextNum', // Placeholder content
+        'type': 'mcq', // Default to MCQ
+        'marks': 1,
+        'topic_ids': [], // Required array field
+        'official_answer': '', // Required text field
+        'options': [], // Required for MCQ constraint
+        'ai_answer': {'has_figure': false}, // Basic JSON to prevent null errors
+      }).select().single();
+
+      final newQuestionId = res['id'] as String;
+
+      // 3. Refresh and Navigate
+      await _loadData(); // Reloads all questions including the new one
+
+      if (mounted) {
+        _navigateToQuestion(newQuestionId); // Open editor for the new question
+        ToastService.showSuccess('Created Question $nextNum');
+      }
+
+    } catch (e) {
+      ToastService.showError('Failed to create question: $e');
+      setState(() => _isLoading = false); // Ensure loading is cleared on error
     }
   }
 
@@ -299,17 +341,17 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
   // Get progress stats for current paper
   Map<String, int> _getProgressStats() {
     if (_selectedPaperId == null) return {'total': 0, 'withImage': 0, 'edited': 0};
-    
+
     final questions = _questionsByPaper[_selectedPaperId] ?? [];
     int withImage = 0;
     int edited = 0;
-    
+
     for (final q in questions) {
       if (q['image_url'] != null) withImage++;
       final content = q['content']?.toString() ?? '';
       if (content.isNotEmpty) edited++;
     }
-    
+
     return {
       'total': questions.length,
       'withImage': withImage,
@@ -322,7 +364,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final isCtrl = HardwareKeyboard.instance.isControlPressed;
-    
+
     // Ctrl+S - Save (handled by editor)
     // We just show a toast here as a fallback
     if (isCtrl && event.logicalKey == LogicalKeyboardKey.keyS) {
@@ -353,7 +395,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
   @override
   Widget build(BuildContext context) {
     final stats = _getProgressStats();
-    
+
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
@@ -412,7 +454,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                             });
                           },
                         ),
-                        
+
                         // Quick Jump (progress tracking removed per user request)
                         if (_selectedPaperId != null) ...[
                           const SizedBox(height: 12),
@@ -464,7 +506,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                       ? const Center(child: CircularProgressIndicator())
                       : _buildPaperList(),
                   ),
-                  
+
                   // Keyboard shortcuts hint
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -757,6 +799,12 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Add Question Button
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.primary),
+                onPressed: () => _createNewQuestion(paperId),
+                tooltip: 'Add Question',
+              ),
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20, color: Colors.grey),
                 onPressed: () => _deletePaper(paperId, '${paper['year']} ${paper['season']} V${paper['variant']}'),
@@ -785,12 +833,12 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: isSelected 
-                              ? AppColors.primary 
+                          color: isSelected
+                              ? AppColors.primary
                               : (hasImage ? Colors.green.withValues(alpha: 0.15) : AppColors.surface),
                           border: Border.all(
-                            color: isSelected 
-                                ? AppColors.primary 
+                            color: isSelected
+                                ? AppColors.primary
                                 : (hasImage ? Colors.green : AppColors.border),
                             width: isSelected ? 2 : 1,
                           ),
@@ -828,7 +876,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     final hasImage = q['image_url'] != null;
     final content = q['content']?.toString() ?? '';
     final preview = content.length > 50 ? '${content.substring(0, 50)}...' : content;
-    
+
     return 'Q${q['question_number']}\n${hasImage ? '✓ Has image' : '○ No image'}\n${preview.isEmpty ? 'No content' : preview}';
   }
 
