@@ -65,9 +65,10 @@ class TopicTags extends StatelessWidget {
           Text(
             topic.name,
             style: TextStyle(
+              fontFamily: 'PatrickHand', // Sketchy font
               color: topic.color,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontSize: 13, // Slightly larger for handwritten font
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],

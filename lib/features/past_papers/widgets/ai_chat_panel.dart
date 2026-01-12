@@ -10,11 +10,13 @@ import 'generated_question_card.dart';
 class AIChatPanel extends StatefulWidget {
   final String questionId;
   final bool isPremium;
+  final VoidCallback? onClose; // Added callback
 
   const AIChatPanel({
     super.key,
     required this.questionId,
     required this.isPremium,
+    this.onClose,
   });
 
   @override
@@ -260,7 +262,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
         border: Border(
           bottom: BorderSide(
             color: _primaryColor.withValues(alpha: 0.1),
-            width: 1
+            width: 1,
           ),
         ),
       ),
@@ -286,8 +288,8 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 Text(
                   'AI Study Assistant',
                   style: _patrickHand(
-                    fontWeight: FontWeight.bold,
                     fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Row(
@@ -298,15 +300,14 @@ class _AIChatPanelState extends State<AIChatPanel> {
                       decoration: BoxDecoration(
                         color: Colors.green,
                         borderRadius: BorderRadius.circular(3),
-                        border: Border.all(color: Colors.white, width: 1), // sketchy dot
                       ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'Online',
                       style: _patrickHand(
-                        color: Colors.grey,
-                        fontSize: 12,
+                        fontSize: 12, 
+                        color: Colors.green,
                       ),
                     ),
                   ],
@@ -339,6 +340,16 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 ],
               ),
             ),
+          if (widget.onClose != null) ...[
+            const SizedBox(width: 12),
+            WiredButton(
+              onPressed: widget.onClose,
+              backgroundColor: Colors.transparent,
+              borderColor: AppColors.textSecondary.withValues(alpha: 0.4),
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+            ),
+          ],
         ],
       ),
     );
@@ -460,7 +471,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: Colors.white,
+      color: _backgroundColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -554,26 +565,26 @@ class _AIChatPanelState extends State<AIChatPanel> {
   Widget _buildGenerateButton() {
      return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      color: Colors.white, // Background for the section
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      color: _backgroundColor, // Match background
       child: WiredButton(
         onPressed: () => _sendQuickPrompt('Generate similar question'),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.amber[50],
         filled: true,
-        borderColor: Colors.deepPurple.shade900,
+        borderColor: Colors.amber[600]!,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-             const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-             const SizedBox(width: 8),
-             Text(
-               'Generate Similar Question',
-               style: _patrickHand(
-                 color: Colors.white,
-                 fontSize: 16,
-                 fontWeight: FontWeight.bold,
-               ),
-             ),
+            Icon(Icons.auto_awesome, color: Colors.orange[600], size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Generate Similar Question',
+              style: _patrickHand(
+                color: Colors.orange[700],
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
       ),

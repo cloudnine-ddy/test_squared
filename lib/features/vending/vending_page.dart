@@ -96,26 +96,26 @@ class VendingPage extends StatelessWidget {
                               children: [
                                 // Left Content
                                 Expanded(
-                                  flex: 5,
+                                  flex: 6,
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Frictionless\nStudying.',
+                                        'Experience\nFrictionless Studying.',
                                         style: _patrickHand(
-                                          fontSize: 72,
+                                          fontSize: 64,
                                           fontWeight: FontWeight.bold,
                                           color: _primaryColor,
-                                          height: 1.0,
+                                          height: 1.1,
                                         ),
                                       ),
                                       const SizedBox(height: 24),
                                       Text(
-                                        'Unlock your potential with smart, adaptive learning.',
+                                        'Stop juggling tabs. Stop guessing. Get questions, answers, and AI-powered explanations all on a single page.',
                                         style: _patrickHand(
-                                          fontSize: 24,
+                                          fontSize: 22,
                                           color: _primaryColor.withValues(alpha: 0.8),
-                                          height: 1.2,
+                                          height: 1.4,
                                         ),
                                       ),
                                       const SizedBox(height: 40),
@@ -156,13 +156,15 @@ class VendingPage extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 48),
+                                const SizedBox(width: 32),
                                 // Right Content (Image)
                                 Expanded(
-                                  flex: 6,
-                                  child: Center(
+                                  flex: 5,
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
                                     child: Container(
-                                      constraints: const BoxConstraints(maxHeight: 400), // Reduced size
+                                      constraints: const BoxConstraints(maxHeight: 400),
+                                      margin: const EdgeInsets.only(right: 20),
                                       child: Image.asset(
                                         'lib/core/assets/images/landing_hero_tablet.png',
                                         fit: BoxFit.contain,
@@ -177,10 +179,10 @@ class VendingPage extends StatelessWidget {
                             return Column(
                               children: [
                                 Text(
-                                  'Frictionless\nStudying.',
+                                  'Experience\nFrictionless Studying.',
                                   textAlign: TextAlign.center,
                                   style: _patrickHand(
-                                    fontSize: 48,
+                                    fontSize: 42,
                                     fontWeight: FontWeight.bold,
                                     color: _primaryColor,
                                     height: 1.0,
@@ -188,12 +190,12 @@ class VendingPage extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'Unlock your potential with smart, adaptive learning.',
+                                  'Stop juggling tabs. Stop guessing. Get questions, answers, and AI-powered explanations all on a single page.',
                                   textAlign: TextAlign.center,
                                   style: _patrickHand(
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     color: _primaryColor.withValues(alpha: 0.8),
-                                    height: 1.2,
+                                    height: 1.4,
                                   ),
                                 ),
                                 const SizedBox(height: 32),
@@ -300,13 +302,18 @@ class VendingPage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // Content Placeholder
+                        // Content - Demo GIF
                         Expanded(
-                          child: Center(
-                            child: Icon(
-                              Icons.dashboard_customize_outlined,
-                              size: 64,
-                              color: Colors.grey[300],
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(20),
+                              bottomRight: Radius.circular(20),
+                            ),
+                            child: Image.asset(
+                              'lib/core/assets/images/demo_general.gif',
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                              width: double.infinity,
                             ),
                           ),
                         ),
@@ -319,20 +326,82 @@ class VendingPage extends StatelessWidget {
             
             const SizedBox(height: 100),
 
-            // 6. Features Section
-            _buildFeaturesSection(context),
+            // Section Divider
+            _buildSectionDivider(),
+
+            // NEW: Problem Section - "Why is studying so hard?"
+            _buildProblemSection(context),
 
             const SizedBox(height: 100),
 
-             // 7. Testimonials
+            // Section Divider
+            _buildSectionDivider(),
+
+            // NEW: Solution Section - "How We Fix It"
+            _buildSolutionSection(context),
+
+            const SizedBox(height: 100),
+
+            // Section Divider
+            _buildSectionDivider(),
+
+            // NEW: Killer Feature Section - "Prepare for the Future"
+            _buildKillerFeatureSection(context),
+
+            const SizedBox(height: 100),
+
+             // 7. Testimonials (no divider before - has its own background)
             _buildTestimonialsSection(context),
 
             const SizedBox(height: 100),
 
-            // 8. Footer
+            // 8. CTA Section
+            _buildCtaSection(context),
+
+            const SizedBox(height: 100),
+
+            // 9. Footer
             _buildFooter(context),
           ],
         ),
+      ),
+    );
+  }
+
+  // Sketchy section divider
+  Widget _buildSectionDivider() {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 600),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      margin: const EdgeInsets.only(bottom: 60),
+      child: Row(
+        children: [
+          Expanded(
+            child: WiredDivider(
+              color: _primaryColor.withValues(alpha: 0.25),
+              thickness: 2,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Transform.rotate(
+              angle: 0.1,
+              child: Text(
+                '✦',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: _primaryColor.withValues(alpha: 0.4),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: WiredDivider(
+              color: _primaryColor.withValues(alpha: 0.25),
+              thickness: 2,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -426,91 +495,311 @@ class VendingPage extends StatelessWidget {
   }
 
   Widget _buildTestimonialsSection(BuildContext context) {
+    final testimonials = [
+      {
+        'name': 'Sarah J.',
+        'role': 'A-Level Student',
+        'quote': 'The AI marking is a lifesaver. It feels like having a tutor available 24/7! My grades improved dramatically.',
+        'color': const Color(0xFFFFF59D), // Yellow
+        'rotation': -0.03,
+        'offsetX': 0.0,
+        'offsetY': 0.0,
+      },
+      {
+        'name': 'Michael T.',
+        'role': 'IGCSE Student',
+        'quote': 'I used to hate past papers. Now I actually enjoy practicing because I can see my progress!',
+        'color': const Color(0xFFB2EBF2), // Cyan
+        'rotation': 0.025,
+        'offsetX': 20.0,
+        'offsetY': -15.0,
+      },
+      {
+        'name': 'Aisha K.',
+        'role': 'SPM Candidate',
+        'quote': 'Topic filtering saved me so much time. No more wasting hours on random questions I\'m not ready for!',
+        'color': const Color(0xFFF8BBD9), // Pink
+        'rotation': -0.015,
+        'offsetX': -10.0,
+        'offsetY': 10.0,
+      },
+      {
+        'name': 'David L.',
+        'role': 'A-Level Student',
+        'quote': 'Finally, a site that explains WHY an answer is correct. This is a total game changer for understanding concepts.',
+        'color': const Color(0xFFC8E6C9), // Green
+        'rotation': 0.035,
+        'offsetX': 15.0,
+        'offsetY': -20.0,
+      },
+      {
+        'name': 'Emma W.',
+        'role': 'IGCSE Student',
+        'quote': 'The AI-generated questions are scary accurate. Felt like cheating when I saw similar ones in my actual exam!',
+        'color': const Color(0xFFFFCCBC), // Orange
+        'rotation': -0.02,
+        'offsetX': -15.0,
+        'offsetY': 5.0,
+      },
+    ];
+
     return Container(
-      color: _primaryColor.withValues(alpha: 0.03), // Subtle background
+      color: _primaryColor.withValues(alpha: 0.03),
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 24),
       child: Column(
         children: [
+          // Title
           Text(
-            'Students ❤️ Test²',
-            style: _patrickHand(fontSize: 48, fontWeight: FontWeight.bold),
+            'What Students Are Saying',
+            style: _patrickHand(fontSize: 52, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '💬 Real feedback from real students',
+            style: _patrickHand(
+              fontSize: 18,
+              color: _primaryColor.withValues(alpha: 0.6),
+            ),
           ),
           const SizedBox(height: 60),
-          Wrap(
-            spacing: 40,
-            runSpacing: 40,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildTestimonial(
-                'Sarah J.', 
-                'Straight As in A-Levels!', 
-                'The AI marking is a lifesaver. It feels like having a private tutor 24/7.',
-                Colors.orange[100]!,
-              ),
-              _buildTestimonial(
-                'Michael T.', 
-                'IGCSE Prep Made Easy', 
-                'I used to hate doing past papers. TestSquared actually makes it fun to practice.',
-                Colors.blue[100]!,
-              ),
-            ],
+          
+          // Scattered Sticky Notes
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 900;
+              
+              if (isWide) {
+                // Wide: 2-row scattered layout
+                return Column(
+                  children: [
+                    // Row 1: 3 notes
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildStickyNote(testimonials[0]),
+                        const SizedBox(width: 30),
+                        Transform.translate(
+                          offset: const Offset(0, 30),
+                          child: _buildStickyNote(testimonials[1]),
+                        ),
+                        const SizedBox(width: 30),
+                        Transform.translate(
+                          offset: const Offset(0, -10),
+                          child: _buildStickyNote(testimonials[2]),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                    // Row 2: 2 notes (offset)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Transform.translate(
+                          offset: const Offset(50, 0),
+                          child: _buildStickyNote(testimonials[3]),
+                        ),
+                        const SizedBox(width: 60),
+                        Transform.translate(
+                          offset: const Offset(-30, 20),
+                          child: _buildStickyNote(testimonials[4]),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              } else {
+                // Mobile: stacked with offsets
+                return Column(
+                  children: testimonials.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final t = entry.value;
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: 24,
+                        left: index.isEven ? 0 : 20,
+                        right: index.isEven ? 20 : 0,
+                      ),
+                      child: _buildStickyNote(t),
+                    );
+                  }).toList(),
+                );
+              }
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTestimonial(String name, String headline, String quote, Color avatarColor) {
+  Widget _buildStickyNote(Map<String, dynamic> testimonial) {
+    final color = testimonial['color'] as Color;
+    final rotation = testimonial['rotation'] as double;
+    
+    return Transform.rotate(
+      angle: rotation,
+      child: WiredCard(
+        backgroundColor: color,
+        borderColor: _primaryColor.withValues(alpha: 0.4),
+        borderWidth: 2,
+        padding: const EdgeInsets.all(24),
+        child: SizedBox(
+          width: 260,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Quote icon
+              Icon(
+                Icons.format_quote,
+                color: _primaryColor.withValues(alpha: 0.3),
+                size: 28,
+              ),
+              const SizedBox(height: 8),
+              // Quote text
+              Text(
+                testimonial['quote'] as String,
+                style: _patrickHand(
+                  fontSize: 17,
+                  height: 1.5,
+                  color: _primaryColor,
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Sketchy divider
+              WiredDivider(
+                color: _primaryColor.withValues(alpha: 0.3),
+                thickness: 1.5,
+              ),
+              const SizedBox(height: 16),
+              // Name and Role
+              Row(
+                children: [
+                  // Avatar circle
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _primaryColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _primaryColor.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        (testimonial['name'] as String)[0],
+                        style: _patrickHand(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        testimonial['name'] as String,
+                        style: _patrickHand(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryColor,
+                        ),
+                      ),
+                      Text(
+                        testimonial['role'] as String,
+                        style: _patrickHand(
+                          fontSize: 14,
+                          color: _primaryColor.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCtaSection(BuildContext context) {
     return Container(
-      width: 350,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          WiredCard(
-            borderColor: _primaryColor,
-            backgroundColor: Colors.white,
-            padding: const EdgeInsets.fromLTRB(32, 48, 32, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  headline,
-                  style: _patrickHand(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '"$quote"',
-                  style: _patrickHand(fontSize: 18, height: 1.5),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  '- $name',
-                  style: _patrickHand(fontSize: 16, color: Colors.grey[600], fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: -24,
-            left: 32,
-            child: Container(
-              width: 48,
-              height: 48,
+      constraints: const BoxConstraints(maxWidth: 800),
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      child: WiredCard(
+        backgroundColor: _primaryColor.withValues(alpha: 0.05),
+        borderColor: _primaryColor.withValues(alpha: 0.4),
+        borderWidth: 2,
+        padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 40),
+        child: Column(
+          children: [
+            // Icon
+            Container(
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: avatarColor,
+                color: _primaryColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
-                border: Border.all(color: _primaryColor, width: 2),
               ),
-              child: Center(
-                child: Text(
-                  name[0],
-                  style: _patrickHand(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
+              child: Icon(
+                Icons.rocket_launch_outlined,
+                color: _primaryColor,
+                size: 40,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            // Headline
+            Text(
+              'Ready to stop wasting time?',
+              textAlign: TextAlign.center,
+              style: _patrickHand(
+                fontSize: 52,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Join thousands of students who are studying smarter, not harder.',
+              textAlign: TextAlign.center,
+              style: _patrickHand(
+                fontSize: 18,
+                color: _primaryColor.withValues(alpha: 0.7),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 32),
+            // CTA Button
+            WiredButton(
+              onPressed: () => context.push('/dashboard'),
+              filled: true,
+              backgroundColor: _primaryColor,
+              borderColor: _primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Start Your Frictionless Study Session',
+                    style: _patrickHand(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -660,4 +949,556 @@ class VendingPage extends StatelessWidget {
 
     // _buildSketchyHeroGraphic removed as it's now integrated
 
+  // =============================================
+  // NEW SECTIONS: Problem, Solution, Killer Feature
+  // =============================================
+
+  Widget _buildProblemSection(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1200),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Section Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.psychology_outlined, color: _primaryColor.withValues(alpha: 0.6), size: 36),
+              const SizedBox(width: 12),
+              Text(
+                'Why is studying so hard?',
+                style: _patrickHand(
+                  fontSize: 52,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'We understand your frustrations.',
+            style: _patrickHand(
+              fontSize: 20,
+              color: _primaryColor.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 48),
+
+          // Problem Cards
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 800;
+              final problems = [
+                {
+                  'icon': Icons.tab_unselected,
+                  'title': 'The Tab Fatigue',
+                  'description': 'Traditional sites force you to open one tab for questions and another for answers. It breaks your flow.',
+                  'color': Colors.red,
+                },
+                {
+                  'icon': Icons.help_outline,
+                  'title': 'The "Why" Gap',
+                  'description': 'Seeing the answer isn\'t enough. If you don\'t understand WHY, you waste hours figuring it out.',
+                  'color': Colors.orange,
+                },
+                {
+                  'icon': Icons.block,
+                  'title': 'The Knowledge Trap',
+                  'description': 'Attempting questions on topics you haven\'t learned yet is frustrating and leads to giving up.',
+                  'color': Colors.purple,
+                },
+              ];
+
+              if (isWide) {
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: problems.map((p) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: _buildProblemCard(p),
+                      ),
+                    )).toList(),
+                  ),
+                );
+              } else {
+                return Column(
+                  children: problems.map((p) => Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: _buildProblemCard(p),
+                  )).toList(),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProblemCard(Map<String, dynamic> problem) {
+    final color = problem['color'] as Color;
+    return WiredCard(
+      backgroundColor: color.withValues(alpha: 0.05),
+      borderColor: color.withValues(alpha: 0.4),
+      borderWidth: 1.5,
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(problem['icon'] as IconData, color: color, size: 28),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            problem['title'] as String,
+            style: _patrickHand(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            problem['description'] as String,
+            style: _patrickHand(
+              fontSize: 17,
+              color: _primaryColor.withValues(alpha: 0.8),
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSolutionSection(BuildContext context) {
+    final solutions = [
+      {
+        'number': '1',
+        'title': 'Everything in One View',
+        'description': 'No more switching tabs. See the question, toggle the answer, and read a detailed AI explanation instantly. We remove the friction so you can focus on learning.',
+        'icon': Icons.view_agenda_outlined,
+        'color': Colors.blue,
+      },
+      {
+        'number': '2',
+        'title': 'Topic-Based Filtering',
+        'description': 'Don\'t test yourself on what you haven\'t learned. Select only the topics you have studied and get relevant questions immediately.',
+        'icon': Icons.filter_list,
+        'color': Colors.green,
+      },
+      {
+        'number': '3',
+        'title': 'Progressive Difficulty',
+        'description': 'We categorize questions from Easy to Hard. Build your confidence with the basics before tackling the complex application questions.',
+        'icon': Icons.trending_up,
+        'color': Colors.orange,
+      },
+    ];
+
+    return Container(
+      color: _primaryColor.withValues(alpha: 0.03),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            children: [
+              // Section Header
+              Text(
+                'How We Fix It',
+                style: _patrickHand(
+                  fontSize: 52,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 60),
+
+              // Timeline-style alternating layout
+              ...solutions.asMap().entries.map((entry) {
+                final index = entry.key;
+                final solution = entry.value;
+                final isEven = index % 2 == 0;
+                
+                return _buildSolutionStep(
+                  solution: solution,
+                  isLeft: isEven,
+                  isLast: index == solutions.length - 1,
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSolutionStep({
+    required Map<String, dynamic> solution,
+    required bool isLeft,
+    required bool isLast,
+  }) {
+    final color = solution['color'] as Color;
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 700;
+        
+        // Mobile: always stack vertically
+        if (!isWide) {
+          return Column(
+            children: [
+              _buildSolutionStepContent(solution),
+              if (!isLast) ...[
+                const SizedBox(height: 16),
+                // Connecting doodle arrow
+                Transform.rotate(
+                  angle: 0.1,
+                  child: Icon(
+                    Icons.arrow_downward,
+                    color: _primaryColor.withValues(alpha: 0.3),
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ],
+          );
+        }
+        
+        // Desktop: alternating left-right layout
+        return Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left side
+                Expanded(
+                  child: isLeft 
+                    ? _buildSolutionStepContent(solution)
+                    : const SizedBox(),
+                ),
+                // Center - Number bubble with connecting line
+                SizedBox(
+                  width: 80,
+                  child: Column(
+                    children: [
+                      // Number bubble
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: color,
+                            width: 3,
+                            strokeAlign: BorderSide.strokeAlignOutside,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            solution['number'] as String,
+                            style: _patrickHand(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Connecting sketchy line (except for last item)
+                      if (!isLast)
+                        CustomPaint(
+                          size: const Size(4, 100),
+                          painter: _SketchyLinePainter(color: _primaryColor.withValues(alpha: 0.3)),
+                        ),
+                    ],
+                  ),
+                ),
+                // Right side
+                Expanded(
+                  child: !isLeft 
+                    ? _buildSolutionStepContent(solution)
+                    : const SizedBox(),
+                ),
+              ],
+            ),
+            if (!isLast) const SizedBox(height: 20),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSolutionStepContent(Map<String, dynamic> solution) {
+    final color = solution['color'] as Color;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.2),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Icon + Title row
+          Row(
+            children: [
+              Icon(
+                solution['icon'] as IconData,
+                color: color,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  solution['title'] as String,
+                  style: _patrickHand(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Description
+          Text(
+            solution['description'] as String,
+            style: _patrickHand(
+              fontSize: 17,
+              color: _primaryColor.withValues(alpha: 0.8),
+              height: 1.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKillerFeatureSection(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1100),
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 750;
+          
+          return Column(
+            children: [
+              // Headline with sparkle
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.amber[400]!, Colors.orange[400]!],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Prepare for the Future,',
+                        style: _patrickHand(
+                          fontSize: 40,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [Colors.amber[600]!, Colors.orange[600]!],
+                        ).createShader(bounds),
+                        child: Text(
+                          'Not Just the Past.',
+                          style: _patrickHand(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 48),
+
+              // Before / After comparison cards
+              if (isWide)
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Before - The Problem
+                      Expanded(child: _buildComparisonCard(
+                        title: 'The Problem',
+                        emoji: '😓',
+                        description: 'Application-type questions are rare—appearing only once or twice a year. Once you finish them, you have nothing left to practice.',
+                        isNegative: true,
+                      )),
+                      const SizedBox(width: 24),
+                      // Arrow
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _primaryColor.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.arrow_forward, color: _primaryColor, size: 24),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 24),
+                      // After - Our Solution
+                      Expanded(child: _buildComparisonCard(
+                        title: 'Our Solution',
+                        emoji: '🚀',
+                        description: 'Our AI analyzes past trends to generate NEW, unlimited application questions. Practice for what might come out this year!',
+                        isNegative: false,
+                      )),
+                    ],
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    _buildComparisonCard(
+                      title: 'The Problem',
+                      emoji: '😓',
+                      description: 'Application-type questions are rare—appearing only once or twice a year. Once you finish them, you have nothing left to practice.',
+                      isNegative: true,
+                    ),
+                    const SizedBox(height: 16),
+                    Icon(Icons.arrow_downward, color: _primaryColor.withValues(alpha: 0.5), size: 32),
+                    const SizedBox(height: 16),
+                    _buildComparisonCard(
+                      title: 'Our Solution',
+                      emoji: '🚀',
+                      description: 'Our AI analyzes past trends to generate NEW, unlimited application questions. Practice for what might come out this year!',
+                      isNegative: false,
+                    ),
+                  ],
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildComparisonCard({
+    required String title,
+    required String emoji,
+    required String description,
+    required bool isNegative,
+  }) {
+    final color = isNegative ? Colors.red : Colors.green;
+    return WiredCard(
+      backgroundColor: color.withValues(alpha: 0.05),
+      borderColor: color.withValues(alpha: 0.4),
+      borderWidth: 2,
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Emoji + Title
+          Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 32)),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: _patrickHand(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: color.shade700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Description
+          Text(
+            description,
+            style: _patrickHand(
+              fontSize: 18,
+              color: _primaryColor.withValues(alpha: 0.8),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Visual indicator
+          Row(
+            children: List.generate(
+              isNegative ? 2 : 5,
+              (i) => Container(
+                width: 24,
+                height: 6,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+}
+
+// Custom painter for sketchy dashed line
+class _SketchyLinePainter extends CustomPainter {
+  final Color color;
+  
+  _SketchyLinePainter({required this.color});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    
+    // Draw sketchy dashed line with slight wobble
+    double y = 0;
+    while (y < size.height) {
+      final wobble = (y % 20 < 10) ? 1.0 : -1.0;
+      canvas.drawLine(
+        Offset(size.width / 2 + wobble, y),
+        Offset(size.width / 2 - wobble, y + 8),
+        paint,
+      );
+      y += 15; // Gap between dashes
+    }
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

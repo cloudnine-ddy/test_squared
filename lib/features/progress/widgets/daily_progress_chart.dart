@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/wired/wired_widgets.dart';
 
 /// Widget to display daily question solving progress as a smooth line chart
 class DailyProgressChart extends StatelessWidget {
@@ -16,29 +17,30 @@ class DailyProgressChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    const primaryColor = Color(0xFF2D3E50);
+
+    return WiredCard(
+      backgroundColor: const Color(0xFFFDFBF7), // Creamy paper
+      borderColor: primaryColor.withValues(alpha: 0.5),
+      borderWidth: 1.5,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAE4D9).withValues(alpha: 0.5), // Matches the beige paper look
-        borderRadius: BorderRadius.circular(20),
-        // No border or shadow as per typical clean paper look, but can add if needed
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.trending_up,
-                color: Colors.black87,
+                color: primaryColor,
                 size: 24,
               ),
               const SizedBox(width: 8),
               const Text(
                 'Daily Progress',
                 style: TextStyle(
-                  color: Colors.black87,
-                  fontSize: 18,
+                  fontFamily: 'PatrickHand',
+                  color: primaryColor,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -48,8 +50,9 @@ class DailyProgressChart extends StatelessWidget {
           Text(
             'Questions solved in the last $daysToShow days',
             style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.6),
-              fontSize: 13,
+              fontFamily: 'PatrickHand',
+              color: primaryColor.withValues(alpha: 0.6),
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 24),
@@ -57,7 +60,7 @@ class DailyProgressChart extends StatelessWidget {
             height: 200,
             child: dailyStats.isEmpty
                 ? _buildEmptyState()
-                : _buildChart(),
+                : _buildChart(primaryColor),
           ),
         ],
       ),
@@ -69,17 +72,27 @@ class DailyProgressChart extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.show_chart,
-            size: 48,
-            color: Colors.black.withValues(alpha: 0.1),
+          CustomPaint(
+            painter: WiredBorderPainter(
+              color: Colors.grey.withValues(alpha: 0.3),
+              strokeWidth: 1,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Icon(
+                Icons.show_chart,
+                size: 32,
+                color: Colors.grey.withValues(alpha: 0.3),
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             'No activity yet',
             style: TextStyle(
+              fontFamily: 'PatrickHand',
               color: Colors.black.withValues(alpha: 0.4),
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -88,13 +101,12 @@ class DailyProgressChart extends StatelessWidget {
     );
   }
 
-  Widget _buildChart() {
+  Widget _buildChart(Color primaryColor) {
     // Prepare data
     final now = DateTime.now();
     final chartData = <DateTime, int>{};
 
     for (int i = 0; i < daysToShow; i++) {
-        // Use days from today backwards (e.g., 6, 5, 4, 3, 2, 1, 0 days ago)
       final date = now.subtract(Duration(days: (daysToShow - 1) - i));
       chartData[DateTime(date.year, date.month, date.day)] = 0;
     }
@@ -112,24 +124,31 @@ class DailyProgressChart extends StatelessWidget {
     final sortedEntries = chartData.entries.toList()
       ..sort((a, b) => a.key.compareTo(b.key));
 
-    final maxY = sortedEntries.map((e) => e.value).reduce((a, b) => a > b ? a : b).toDouble();
-    // Ensure we have some height even if max is 0
+    final maxY = sortedEntries.map((e) => e.value).fold(0, (a, b) => a > b ? a : b).toDouble();
     final adjustedMaxY = maxY == 0 ? 5.0 : maxY * 1.2;
 
     List<FlSpot> spots = [];
     for (int i = 0; i < sortedEntries.length; i++) {
-      spots.add(FlSpot(i.toDouble(), sortedEntries[i].value.toDouble()));
+        spots.add(FlSpot(i.toDouble(), sortedEntries[i].value.toDouble()));
     }
 
     return LineChart(
       LineChartData(
         gridData: FlGridData(
           show: true,
-          drawVerticalLine: false,
+          drawVerticalLine: true,
           horizontalInterval: adjustedMaxY / 4,
+          verticalInterval: 1,
           getDrawingHorizontalLine: (value) {
             return FlLine(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: primaryColor.withValues(alpha: 0.1),
+              strokeWidth: 1,
+              dashArray: [5, 5],
+            );
+          },
+          getDrawingVerticalLine: (value) {
+            return FlLine(
+              color: primaryColor.withValues(alpha: 0.05),
               strokeWidth: 1,
             );
           },
@@ -152,8 +171,9 @@ class DailyProgressChart extends StatelessWidget {
                   child: Text(
                     '${date.day}',
                     style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      fontWeight: FontWeight.w500,
+                      fontFamily: 'PatrickHand',
+                      color: primaryColor.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
                   ),
@@ -163,14 +183,15 @@ class DailyProgressChart extends StatelessWidget {
           ),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
-              showTitles: true, // Show Y axis labels? Maybe hide for cleaner look or keep subtle.
+              showTitles: true,
               interval: (adjustedMaxY / 4).ceilToDouble(),
               getTitlesWidget: (value, meta) {
                   if (value == 0 || value > maxY) return const SizedBox();
                   return Text(
                     value.toInt().toString(),
                     style: TextStyle(
-                      color: Colors.black.withValues(alpha: 0.3),
+                      fontFamily: 'PatrickHand',
+                      color: primaryColor.withValues(alpha: 0.4),
                       fontSize: 10,
                     ),
                   );
@@ -182,7 +203,7 @@ class DailyProgressChart extends StatelessWidget {
         lineTouchData: LineTouchData(
           handleBuiltInTouches: true,
           touchTooltipData: LineTouchTooltipData(
-            getTooltipColor: (_) => const Color(0xFF1E2B3D),
+            getTooltipColor: (_) => primaryColor,
             tooltipRoundedRadius: 8,
             getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
               return touchedBarSpots.map((barSpot) {
@@ -198,6 +219,7 @@ class DailyProgressChart extends StatelessWidget {
                 return LineTooltipItem(
                   '$dateStr\n',
                   const TextStyle(
+                    fontFamily: 'PatrickHand',
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -206,6 +228,7 @@ class DailyProgressChart extends StatelessWidget {
                     TextSpan(
                       text: '$count question${count != 1 ? 's' : ''}',
                       style: TextStyle(
+                        fontFamily: 'PatrickHand',
                         color: Colors.white.withValues(alpha: 0.8),
                         fontWeight: FontWeight.normal,
                         fontSize: 12,
@@ -226,17 +249,17 @@ class DailyProgressChart extends StatelessWidget {
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            color: const Color(0xFF4A6572), // Muted dark blue/grey line
-            barWidth: 3,
+            color: primaryColor,
+            barWidth: 2.5,
             isStrokeCapRound: true,
             dotData: FlDotData(
               show: true,
               getDotPainter: (spot, percent, barData, index) {
                 return FlDotCirclePainter(
-                  radius: 4,
+                  radius: 3,
                   color: Colors.white,
                   strokeWidth: 2,
-                  strokeColor: const Color(0xFF2196F3), // Bright blue accent for dots
+                  strokeColor: primaryColor,
                 );
               },
             ),
@@ -244,8 +267,8 @@ class DailyProgressChart extends StatelessWidget {
               show: true,
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF2196F3).withValues(alpha: 0.2),
-                  const Color(0xFF2196F3).withValues(alpha: 0.0),
+                  primaryColor.withValues(alpha: 0.1),
+                  primaryColor.withValues(alpha: 0.0),
                 ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
