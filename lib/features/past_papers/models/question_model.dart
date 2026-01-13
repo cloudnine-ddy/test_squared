@@ -1,3 +1,5 @@
+import 'question_blocks.dart';
+
 class QuestionModel {
   final String id;
   final String? paperId;
@@ -14,6 +16,9 @@ class QuestionModel {
   // MCQ-specific fields
   final String type; // 'mcq' or 'structured'
   final List<Map<String, String>>? options; // [{label: 'A', text: '...'}]
+  
+  // Structured question fields
+  final List<ExamContentBlock>? structureData; // JSONB blocks for structured questions
   final String? correctAnswer; // 'A', 'B', 'C', or 'D'
 
   // Paper info (joined from papers table)
@@ -43,14 +48,24 @@ class QuestionModel {
     this.paperVariant,
     this.paperType,
     this.pdfUrl,
+    this.structureData,
   });
 
   // Helper getters
-  bool get hasAiSolution => aiSolution.isNotEmpty;
-  bool get hasOfficialAnswer => officialAnswer.isNotEmpty;
+  bool get hasAiSolution => aiSolution.isNotEmpty || (structureData?.any((b) => b is QuestionPartBlock && (b as QuestionPartBlock).aiAnswer != null) ?? false);
+  
+  bool get hasOfficialAnswer {
+      if (officialAnswer.isNotEmpty) return true;
+      if (isStructured && structureData != null) {
+          return structureData!.any((b) => b is QuestionPartBlock && (b as QuestionPartBlock).officialAnswer != null);
+      }
+      return false;
+  }
+
   bool get hasFigure => imageUrl != null && imageUrl!.isNotEmpty;
   bool get hasPaperInfo => paperYear != null && paperSeason != null;
   bool get isMCQ => type == 'mcq';
+  bool get isStructured => type == 'structured' && structureData != null && structureData!.isNotEmpty;
   bool get hasOptions => options != null && options!.isNotEmpty;
   bool get hasExplanation => explanationRaw != null || (aiAnswerRaw != null && aiAnswerRaw!.containsKey('explanation')); // Check both location
 
@@ -106,6 +121,24 @@ class QuestionModel {
       }
     }
     return null;
+  }
+
+
+  /// Returns the official answer text to display (aggregates structured parts if needed)
+  String get formattedOfficialAnswer {
+    if (officialAnswer.isNotEmpty) return officialAnswer;
+    
+    if (isStructured && structureData != null) {
+        final buffer = StringBuffer();
+        for (final block in structureData!) {
+            if (block is QuestionPartBlock && block.officialAnswer != null && block.officialAnswer!.isNotEmpty) {
+                buffer.writeln('${block.label}) ${block.officialAnswer}');
+            }
+        }
+        if (buffer.isNotEmpty) return buffer.toString();
+    }
+    
+    return 'Answer not available';
   }
 
   String get paperLabel {
@@ -205,6 +238,20 @@ class QuestionModel {
       pdfUrl = paperData['pdf_url']?.toString();
     }
 
+    // Parse structure_data for structured questions
+    List<ExamContentBlock>? structureData;
+    final structureDataRaw = map['structure_data'];
+    if (structureDataRaw != null && structureDataRaw is List) {
+      try {
+        structureData = structureDataRaw
+            .whereType<Map<String, dynamic>>()
+            .map((blockMap) => ExamContentBlock.fromMap(blockMap))
+            .toList();
+      } catch (e) {
+        print('Error parsing structure_data: $e');
+      }
+    }
+
     return QuestionModel(
       id: id,
       paperId: paperId,
@@ -225,6 +272,7 @@ class QuestionModel {
       paperVariant: paperVariant,
       paperType: paperType,
       pdfUrl: pdfUrl,
+      structureData: structureData,
     );
   }
 
@@ -239,6 +287,8 @@ class QuestionModel {
       'image_url': imageUrl,
       'ai_answer': aiAnswerRaw,
       'explanation': explanationRaw,
+      'type': type,
+      'structure_data': structureData?.map((block) => block.toMap()).toList(),
     };
   }
 

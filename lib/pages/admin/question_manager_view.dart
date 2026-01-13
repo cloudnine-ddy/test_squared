@@ -88,7 +88,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
       // Load all questions
       final questionsRes = await _supabase
           .from('questions')
-          .select('id, paper_id, question_number, content, image_url, ai_answer')
+          .select('id, paper_id, question_number, content, image_url, ai_answer, type')
           .order('question_number');
 
       _questionsByPaper = {};
@@ -822,6 +822,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                 children: questions.map((q) {
                   final isSelected = _selectedQuestionId == q['id'];
                   final hasImage = q['image_url'] != null;
+                  final isStructured = q['type'] == 'structured';
 
                   return Tooltip(
                     message: _getQuestionTooltip(q),
@@ -835,11 +836,15 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                         decoration: BoxDecoration(
                           color: isSelected
                               ? AppColors.primary
-                              : (hasImage ? Colors.green.withValues(alpha: 0.15) : AppColors.surface),
+                              : (isStructured 
+                                  ? Colors.purple.withValues(alpha: 0.15) 
+                                  : (hasImage ? Colors.green.withValues(alpha: 0.15) : AppColors.surface)),
                           border: Border.all(
                             color: isSelected
                                 ? AppColors.primary
-                                : (hasImage ? Colors.green : AppColors.border),
+                                : (isStructured 
+                                    ? Colors.purple 
+                                    : (hasImage ? Colors.green : AppColors.border)),
                             width: isSelected ? 2 : 1,
                           ),
                           borderRadius: BorderRadius.circular(6),
@@ -855,7 +860,11 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                         child: Text(
                           '${q['question_number']}',
                           style: TextStyle(
-                            color: isSelected ? Colors.white : (hasImage ? Colors.green.shade700 : AppColors.textPrimary),
+                            color: isSelected 
+                                ? Colors.white 
+                                : (isStructured 
+                                    ? Colors.purple.shade700 
+                                    : (hasImage ? Colors.green.shade700 : AppColors.textPrimary)),
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
