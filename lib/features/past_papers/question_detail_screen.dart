@@ -990,7 +990,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (_question?.marks != null)
+                  if (_question != null)
                     Container(
                       margin: const EdgeInsets.only(right: 16),
                       child: WiredCard(
@@ -1002,13 +1002,17 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                           children: [
                             const Icon(Icons.star_rounded, color: Color(0xFF232832), size: 18),
                             const SizedBox(width: 6),
-                            Text(
-                              '${_question!.marks} marks',
-                              style: _patrickHand(
-                                color: const Color(0xFF232832),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
+                            Builder(
+                              builder: (context) {
+                                return Text(
+                                  '${_question!.totalMarks} marks',
+                                  style: _patrickHand(
+                                    color: const Color(0xFF232832),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                );
+                              }
                             ),
                           ],
                         ),
@@ -1136,8 +1140,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // Attempt Status Badge (show if viewing previous answer)
-                      if (_previousAttempt != null)
+                      // Attempt Status Badge (show if viewing previous answer OR just submitted)
+                      if (_previousAttempt != null || _answerSubmitted)
                         _buildAttemptStatusBadge(),
 
                       // Main tabbed card
@@ -1510,18 +1514,21 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 backgroundColor: (_answerSubmitted || _isCheckingAnswer) ? Colors.grey.shade300 : Colors.blue,
                 filled: true,
                 borderColor: (_answerSubmitted || _isCheckingAnswer) ? Colors.grey.shade400 : Colors.blue,
-                child: _isCheckingAnswer
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Center(
-                        child: Text(
-                        _answerSubmitted ? 'Answer Checked ✓' : 'Check My Answer',
-                        style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Center(
+                    child: _isCheckingAnswer
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            _answerSubmitted ? 'Answer Checked ✓' : 'Check My Answer',
+                            style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -2869,10 +2876,17 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
   /// Build attempt status badge
   /// Build attempt status badge
+  /// Build attempt status badge
   Widget _buildAttemptStatusBadge() {
-    final attemptedAt = DateTime.parse(_previousAttempt!['attempted_at']);
-    final timeAgo = _formatTimeAgo(attemptedAt);
-    final score = _previousAttempt!['score'] as int?;
+    final attemptedAt = _previousAttempt != null
+        ? DateTime.parse(_previousAttempt!['attempted_at'])
+        : DateTime.now();
+    final timeAgo = _previousAttempt != null
+        ? _formatTimeAgo(attemptedAt)
+        : 'Just now';
+    final score = _previousAttempt != null
+        ? _previousAttempt!['score'] as int?
+        : (_aiFeedback?['score'] as int?);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 20), // Fix overlap with margin
@@ -2922,7 +2936,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ),
 
-          if (_isViewingPreviousAnswer)
+          if (_isViewingPreviousAnswer || _answerSubmitted)
             ElevatedButton.icon(
               onPressed: _retryQuestion,
               icon: const Icon(Icons.refresh, size: 18),

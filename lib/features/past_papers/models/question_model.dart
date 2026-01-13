@@ -16,7 +16,7 @@ class QuestionModel {
   // MCQ-specific fields
   final String type; // 'mcq' or 'structured'
   final List<Map<String, String>>? options; // [{label: 'A', text: '...'}]
-  
+
   // Structured question fields
   final List<ExamContentBlock>? structureData; // JSONB blocks for structured questions
   final String? correctAnswer; // 'A', 'B', 'C', or 'D'
@@ -53,7 +53,7 @@ class QuestionModel {
 
   // Helper getters
   bool get hasAiSolution => aiSolution.isNotEmpty || (structureData?.any((b) => b is QuestionPartBlock && (b as QuestionPartBlock).aiAnswer != null) ?? false);
-  
+
   bool get hasOfficialAnswer {
       if (officialAnswer.isNotEmpty) return true;
       if (isStructured && structureData != null) {
@@ -68,6 +68,22 @@ class QuestionModel {
   bool get isStructured => type == 'structured' && structureData != null && structureData!.isNotEmpty;
   bool get hasOptions => options != null && options!.isNotEmpty;
   bool get hasExplanation => explanationRaw != null || (aiAnswerRaw != null && aiAnswerRaw!.containsKey('explanation')); // Check both location
+
+  /// Returns the total marks for the question.
+  /// For structured questions, sums the marks of individual parts dynamically
+  /// to ensure accuracy even if the database marks column is incorrect.
+  int get totalMarks {
+    if (isStructured && structureData != null) {
+      int sum = 0;
+      for (final block in structureData!) {
+        if (block is QuestionPartBlock) {
+          sum += block.marks;
+        }
+      }
+      if (sum > 0) return sum;
+    }
+    return marks ?? 0;
+  }
 
   /// Returns the AI answer text string for display
   String? get aiAnswer {
@@ -127,7 +143,7 @@ class QuestionModel {
   /// Returns the official answer text to display (aggregates structured parts if needed)
   String get formattedOfficialAnswer {
     if (officialAnswer.isNotEmpty) return officialAnswer;
-    
+
     if (isStructured && structureData != null) {
         final buffer = StringBuffer();
         for (final block in structureData!) {
@@ -137,7 +153,7 @@ class QuestionModel {
         }
         if (buffer.isNotEmpty) return buffer.toString();
     }
-    
+
     return 'Answer not available';
   }
 

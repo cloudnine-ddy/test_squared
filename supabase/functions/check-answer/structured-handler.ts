@@ -25,10 +25,11 @@ export async function handleStructuredQuestion(params: {
     console.log(`  - Part ${part.label}: ${part.marks} marks`)
   }
 
-  // Get the question's ACTUAL total marks from the database
+  // Get the question's ACTUAL total marks from the database structure
+  // We prioritize summing the structure_data parts because the 'marks' column might be outdated/incorrect
   const { data: questionData, error: questionError } = await supabase
     .from('questions')
-    .select('marks')
+    .select('marks, structure_data')
     .eq('id', questionId)
     .single()
 
@@ -37,8 +38,22 @@ export async function handleStructuredQuestion(params: {
     throw questionError
   }
 
-  const questionTotalMarks = questionData?.marks || structuredAnswers.reduce((sum, p) => sum + p.marks, 0)
-  console.log(`📊 Question total marks: ${questionTotalMarks}`)
+  // Calculate total from structure_data if available
+  let calculatedTotal = 0;
+  if (questionData.structure_data && Array.isArray(questionData.structure_data)) {
+    questionData.structure_data.forEach((block: any) => {
+      if (block.type === 'question_part' && typeof block.marks === 'number') {
+        calculatedTotal += block.marks;
+      }
+    });
+  }
+
+  // Fallback to existing marks or submission sum
+  const questionTotalMarks = calculatedTotal > 0
+    ? calculatedTotal
+    : (questionData?.marks || structuredAnswers.reduce((sum, p) => sum + p.marks, 0));
+
+  console.log(`📊 Question total marks (Calculated: ${calculatedTotal}, DB: ${questionData?.marks}): ${questionTotalMarks}`)
 
   // Grade each sub-part
   const perPartResults = []
@@ -79,22 +94,46 @@ Return JSON in this exact format:
 Be fair, give partial credit, and focus on helping the student learn. Return ONLY valid JSON.`
 
     try {
-      const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 512,
-          }
+    let geminiRes;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: 512,
+            }
+          })
         })
-      })
 
-      if (!geminiRes.ok) {
-        throw new Error(`Gemini API error: ${geminiRes.status}`)
+        if (geminiRes.status === 429) {
+          console.warn(`⚠️ Rate limited (429). Retrying in 1s... (Attempt ${attempts + 1}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+          continue;
+        }
+
+        break; // Exit loop if successful or other error
+      } catch (e) {
+        console.warn(`Network error during fetch:`, e);
+        attempts++;
+        if (attempts >= maxAttempts) throw e;
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
+    }
 
+    if (!geminiRes || !geminiRes.ok) {
+      const status = geminiRes ? geminiRes.status : 'unknown';
+      throw new Error(`Gemini API error: ${status}`)
+    }
+
+    try {
       const geminiJson = await geminiRes.json()
       let rawText = geminiJson.candidates[0].content.parts[0].text
 
@@ -113,14 +152,19 @@ Be fair, give partial credit, and focus on helping the student learn. Return ONL
       })
       earnedMarks += result.score
 
+    } catch (parseError) {
+       console.error(`Error parsing AI response for part ${part.label}:`, parseError)
+       throw parseError;
+    }
+
     } catch (error) {
-      console.error(`Error grading part ${part.label}:`, error)
-      perPartResults.push({
-        label: part.label,
-        isCorrect: false,
-        score: 0,
-        feedback: 'Unable to grade this part'
-      })
+       console.error(`Error grading part ${part.label}:`, error)
+       perPartResults.push({
+         label: part.label,
+         isCorrect: false,
+         score: 0,
+         feedback: 'Unable to grade this part'
+       })
     }
   }
 

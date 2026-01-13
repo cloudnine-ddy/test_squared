@@ -376,6 +376,17 @@ Extract ALL structured questions from this batch.`;
         ? textBlocks.map(b => b.content).join(' ').substring(0, 200)
         : `Structured Question ${q.question_number}`
 
+      // Calculate total marks from parts
+      let calculatedMarks = 0;
+      if (q.blocks) {
+        q.blocks.forEach(b => {
+          if (b.type === 'question_part' && typeof b.marks === 'number') {
+            calculatedMarks += b.marks;
+          }
+        });
+      }
+      const finalMarks = calculatedMarks > 0 ? calculatedMarks : (q.total_marks || 1);
+
       return {
         paper_id: paperId,
         question_number: q.question_number,
@@ -383,7 +394,7 @@ Extract ALL structured questions from this batch.`;
         content: contentSummary,
         structure_data: q.blocks,
         topic_ids: q.topic_ids || [],
-        marks: q.total_marks || 1,
+        marks: finalMarks,
         official_answer: '',
         ai_answer: null
       }

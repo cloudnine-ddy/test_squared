@@ -135,22 +135,45 @@ IMPORTANT:
 
 Return ONLY valid JSON, no markdown.`
 
-    // Call Gemini API
-    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 2048,
-        }
-      })
-    })
+    // Call Gemini API with Retry
+    let geminiRes;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-    if (!geminiRes.ok) {
-      const errorText = await geminiRes.text()
-      console.error('Gemini API error:', geminiRes.status, errorText)
+    while (attempts < maxAttempts) {
+      try {
+        geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 2048,
+            }
+          })
+        })
+
+        if (geminiRes.status === 429) {
+          console.log(`⚠️ Rate limited (429). Retrying in 1s... (Attempt ${attempts + 1}/${maxAttempts})`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          attempts++;
+          continue;
+        }
+
+        break;
+      } catch (e) {
+        console.warn(`Network error, retrying...`, e);
+        attempts++;
+        if (attempts >= maxAttempts) throw e;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!geminiRes || !geminiRes.ok) {
+      const errorText = geminiRes ? await geminiRes.text() : 'Unknown network error';
+      const status = geminiRes ? geminiRes.status : 500;
+      console.error('Gemini API error:', status, errorText)
       return new Response(
         JSON.stringify({ error: 'AI evaluation failed', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
