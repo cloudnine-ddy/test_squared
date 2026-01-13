@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
       .select('id, question_number, structure_data, content, type')
       .eq('paper_id', paperId)
       .eq('type', 'structured')
-    
+
     if (qError || !questions || !questions.length) {
       return new Response(JSON.stringify({ success: true, message: 'No questions' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     if (!msRes.ok) throw new Error('Failed to download PDF')
     const msBlob = await msRes.arrayBuffer()
     const msPdfDoc = await PDFDocument.load(msBlob)
-    
+
     // Convert to base64
     let msBase64 = '';
     const u8 = new Uint8Array(await msPdfDoc.save());
@@ -93,7 +93,7 @@ OUTPUT JSON:
 
 RULES:
 1. Extract answers for EVERY question and sub-part.
-2. "sub_part" should match valid part labels like "a", "b", "i", "ii", "a(i)". 
+2. "sub_part" should match valid part labels like "a", "b", "i", "ii", "a(i)".
 3. "official_answer": The exact text from the mark scheme key.
 4. "marks": Marks awarded.`;
 
@@ -118,7 +118,7 @@ RULES:
     for (const q of questions) {
         let qModified = false;
         const blocks = (q.structure_data || []) as any[];
-        
+
         // Filter answers relevant to this question (Normalize to string)
         const qAnswers = extractedAnswers.filter((a: any) => String(a.question_number) === String(q.question_number));
 
@@ -128,8 +128,8 @@ RULES:
 
         for (const block of blocks) {
             if (block.type === 'question_part') {
-                const cleanBlockLabel = (block.label || '').replace(/[^a-z0-9]/gi, '').toLowerCase(); 
-                
+                const cleanBlockLabel = (block.label || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+
                 // Strategy 1: Exact Match
                 let match = qAnswers.find((a: any) => {
                     const cleanAnsLabel = (a.sub_part || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -144,7 +144,7 @@ RULES:
                         return cleanAnsLabel.endsWith(cleanBlockLabel);
                     });
                 }
-                
+
                 if (!match) {
                      // Last resort log
                      // console.log(`Failed to match Q${q.question_number} part "${block.label}"...`);
@@ -175,7 +175,7 @@ RULES:
     // 5. Process AI Queue (Chunked & Throttled)
     for (let i = 0; i < aiQueue.length; i += CONCURRENCY_LIMIT) {
         const batch = aiQueue.slice(i, i + CONCURRENCY_LIMIT);
-        
+
         // Wait 2 seconds BETWEEN batches (Optimized for speed, relying on retries)
         if (i > 0) {
             console.log("Throttling for rate limit (2s)...");
@@ -183,25 +183,26 @@ RULES:
         }
 
         await Promise.all(batch.map(async (task) => {
-            const aiPrompt = `You are a helpful tutor explaining an exam solution.
-            
+            const aiPrompt = `You are a tutor. Provide a concise explanation for this exam answer.
+
 Question: "${task.question_content}"
-Official Mark Scheme Answer: "${task.official_answer}"
+Official Answer: "${task.official_answer}"
 
-Your Task:
-1. EXPLAIN why this is the correct answer.
-2. If the mark scheme is brief (e.g., just keywords), expand it into full sentences.
-3. Don't just repeat the answer - explain the concept.
-
-Output: A clear, student-friendly explanation.`;
+Write EXACTLY 4-5 sentences explaining why this is correct. Expand brief answers into full sentences.
+CRITICAL RULES:
+- Start directly with the explanation
+- NO preambles like "Okay, let's break down...", "The answer is...", "Sure..."
+- NO headings like "**The Big Idea:**" or "**Why it works:**"
+- NO conversational fluff
+- Just pure scientific explanation`;
 
             try {
                 const solRes = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
+                    body: JSON.stringify({
                         contents: [{ parts: [{ text: aiPrompt }] }],
-                        generationConfig: { maxOutputTokens: 300 }
+                        generationConfig: { maxOutputTokens: 200 }
                     })
                 }, 1); // 1 retry
 

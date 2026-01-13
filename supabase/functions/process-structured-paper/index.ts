@@ -59,8 +59,8 @@ function cleanJsonString(input: string): string {
   cleaned = cleaned.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
 
   // 3. Fix localized quotes
-  cleaned = cleaned.replace(/[\u201C\u201D]/g, '"'); 
-  
+  cleaned = cleaned.replace(/[\u201C\u201D]/g, '"');
+
   return cleaned;
 }
 
@@ -122,7 +122,7 @@ Deno.serve(async (req) => {
       .from('topics')
       .select('id, name')
       .eq('subject_id', paper.subject_id)
-    
+
     const topicsList = topics || []
     const topicsJson = JSON.stringify(topicsList.map(t => ({ id: t.id, name: t.name })))
 
@@ -143,15 +143,15 @@ Deno.serve(async (req) => {
       const safeStart = Math.max(0, startPage);
       const safeEnd = Math.min(totalPdfPages, endPage);
       actualStartPage = safeStart; // Remember this to offset page numbers later
-      
+
       console.log(`Creating batch PDF from page ${safeStart} to ${safeEnd}...`)
       subDoc = await PDFDocument.create();
-      
+
       const pageIndices = [];
       for(let i = safeStart; i < safeEnd; i++) {
         pageIndices.push(i);
       }
-      
+
       if (pageIndices.length > 0) {
         const copiedPages = await subDoc.copyPages(srcDoc, pageIndices);
         copiedPages.forEach(p => subDoc.addPage(p));
@@ -220,6 +220,8 @@ RULES:
 7. CRITICAL: Keep JSON output valid and within token limits.
 8. SUMMARIZE long "text" blocks. Do not copy entire reading passages word-for-word if they exceed 50 words. Just give the gist.
 9. DO NOT generate ai_answers.
+10. CRITICAL: ONLY extract questions that are ACTUALLY PRESENT in these pages. Do NOT hallucinate or invent question numbers.
+11. If a question is split across pages (starts in this batch but continues beyond), still extract it with the parts visible in this batch.
 
 Extract ALL structured questions from this batch.`;
 
@@ -254,13 +256,13 @@ Extract ALL structured questions from this batch.`;
       parsedData = JSON.parse(rawText)
     } catch (e) {
       console.warn('First JSON parse failed, attempting repair:', e)
-      
+
       // REPAIR STRATEGY:
       // 1. Double-escape backslashes that might be single
       // 2. Escape unescaped newlines/tabs inside strings
-      
+
       let repaired = rawText;
-      
+
       // Naive repair for unescaped newlines inside double quotes
       // We assume strings don't contain \" yet for simplicity of this heuristic regex
       repaired = repaired.replace(/(".*?")/gs, (match) => {
@@ -282,7 +284,7 @@ Extract ALL structured questions from this batch.`;
     }
 
     const rawQuestions = parsedData.questions || []
-    
+
     // Deduplicate questions by MERGING blocks for the same question_number
     const uniqueQuestionsMap = new Map();
     rawQuestions.forEach((q: StructuredQuestionResponse) => {
@@ -296,13 +298,16 @@ Extract ALL structured questions from this batch.`;
             }
             // Update output fields if present in the new chunk
             if (q.total_marks > existing.total_marks) existing.total_marks = q.total_marks;
-            
+
             console.log(`Merged duplicate Question ${q.question_number} (Added ${q.blocks?.length || 0} blocks).`);
         }
     });
     const questions = Array.from(uniqueQuestionsMap.values());
 
-    console.log(`Extracted ${questions.length} unique questions from batch (Raw: ${rawQuestions.length})`)
+    // Enhanced logging
+    const questionNumbers = questions.map(q => q.question_number).sort((a, b) => a - b);
+    console.log(`📊 Batch Summary: Extracted ${questions.length} unique questions from batch (Raw: ${rawQuestions.length})`);
+    console.log(`📋 Question Numbers: [${questionNumbers.join(', ')}]`);
 
     if (questions.length === 0) {
       return new Response(JSON.stringify({ success: true, message: 'No questions found', questions_created: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
@@ -322,7 +327,7 @@ Extract ALL structured questions from this batch.`;
              // actualStartPage is 0-based index. So page 11 is index 10.
              // absolute_page = (actualStartPage + 1) + (relative_page - 1)
              // simplified: actualStartPage + relative_page.
-             b.page = actualStartPage + b.page; 
+             b.page = actualStartPage + b.page;
           }
         });
       }
@@ -348,7 +353,7 @@ Extract ALL structured questions from this batch.`;
     // Native Upsert - Constraint Exists!
     // The previous error "duplicate key value violates unique constraint" CONFIRMS the constraint exists.
     // So we can safely use .upsert() now.
-    
+
     const { data: insertedQuestions, error: insertError } = await supabase
       .from('questions')
       .upsert(questionsToInsert, { onConflict: 'paper_id, question_number' })
@@ -361,30 +366,31 @@ Extract ALL structured questions from this batch.`;
 
     // Figure Cropping Phase
     let figsCropped = 0;
-    
+
     for (const q of insertedQuestions) {
         const structureData = q.structure_data as any[];
         if (!Array.isArray(structureData)) continue;
 
         let modified = false;
+        let firstImageUrl: string | null = null; // Track first image for image_url field
 
         for (const block of structureData) {
             if (block.type === 'figure' && block.bbox) {
                 // Call crop-figure Edge Function
                 // URL: ${supabaseUrl}/functions/v1/crop-figure
                 console.log(`Cropping figure for Q${q.question_number}, Page ${block.page}...`);
-                
+
                 try {
                      const cropRes = await fetchWithRetry(`${supabaseUrl}/functions/v1/crop-figure`, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json', 
-                            'Authorization': `Bearer ${supabaseKey}`, 
-                            'apikey': supabaseKey 
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${supabaseKey}`,
+                            'apikey': supabaseKey
                         },
                         body: JSON.stringify({
-                            pdfUrl, 
-                            questionId: q.id, 
+                            pdfUrl,
+                            questionId: q.id,
                             page: block.page,
                             bbox: block.bbox // {x, y, width, height}
                         })
@@ -394,6 +400,7 @@ Extract ALL structured questions from this batch.`;
                         const cropJson = await cropRes.json();
                         if (cropJson.image_url) {
                             block.url = cropJson.image_url; // Update URL in the block
+                            if (!firstImageUrl) firstImageUrl = cropJson.image_url; // Store first image
                             modified = true;
                             figsCropped++;
                         }
@@ -406,10 +413,13 @@ Extract ALL structured questions from this batch.`;
             }
         }
 
-        // If detection modified structured_data (added split image URLs), update DB
+        // Update DB with both structure_data and image_url field
         if (modified) {
             await supabase.from('questions')
-                .update({ structure_data: structureData }) // Save back updated blocks with URLs
+                .update({
+                    structure_data: structureData, // Save updated blocks with URLs
+                    image_url: firstImageUrl // Also populate image_url for UI compatibility
+                })
                 .eq('id', q.id);
         }
     }

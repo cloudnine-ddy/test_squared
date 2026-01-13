@@ -124,10 +124,10 @@ Deno.serve(async (req) => {
     for (let i = 0; i < totalPages; i += (BATCH_SIZE - BATCH_OVERLAP)) {
         const startPage = i + 1
         const endPage = Math.min(i + BATCH_SIZE, totalPages)
-        
+
         // Skip if this batch would be just 1-2 pages at the end (already covered)
         if (startPage >= totalPages) break
-        
+
         console.log(`Processing Batch: Pages ${startPage}-${endPage}...`)
 
         // Create Sub-PDF
@@ -336,7 +336,7 @@ RULES:
 Extract answers for ALL questions (MCQ and structured).
 
 OUTPUT JSON:
-{ "answers": [ 
+{ "answers": [
   {"question_number": 1, "sub_part": "a", "official_answer": "cell A / sperm cell", "marks": 1},
   {"question_number": 1, "sub_part": "b(i)", "official_answer": "contains genetic information; controls cell activities", "marks": 2}
 ] }
@@ -367,7 +367,7 @@ RULES:
                     // PARALLEL PROCESSING in batches of PARALLEL_BATCH_SIZE
                     for (let i = 0; i < answers.length; i += PARALLEL_BATCH_SIZE) {
                         const batch = answers.slice(i, i + PARALLEL_BATCH_SIZE)
-                        
+
                         await Promise.all(batch.map(async (ans: any) => {
                             const qMatch = insertedQuestions.find(q => q.question_number === ans.question_number)
                             if (!qMatch) return
@@ -377,19 +377,30 @@ RULES:
 
                             // Generate AI Solution for BOTH MCQ and Structured
                             const solPrompt = originalQ.type === 'mcq'
-                              ? `You are a ${subjectName} tutor. A student needs help understanding why "${ans.official_answer}" is the correct answer.
+                              ? `You are a ${subjectName} tutor. Provide a concise explanation of why "${ans.official_answer}" is correct.
 
 Question: ${originalQ.content || 'See paper'}
 Correct Answer: ${ans.official_answer}
 
-Provide a clear 3-4 sentence EXPLANATION of WHY this answer is correct. Include relevant scientific concepts. Do NOT say "The answer is..." - start directly with the reasoning.`
-                              : `You are a ${subjectName} tutor writing a MODEL ANSWER for a structured question.
+Write EXACTLY 4-5 sentences explaining the scientific reasoning.
+CRITICAL RULES:
+- Start directly with the explanation
+- NO preambles like "Okay, let's break down...", "The answer is...", "Let me explain...", "Sure..."
+- NO headings like "**The Big Idea:**" or "**Why this works:**"
+- Just pure scientific explanation
+- Keep it concise and focused on key concepts`
+                              : `You are a ${subjectName} tutor. Write a concise model answer for this structured question.
 
 Question: ${originalQ.content || 'See paper'}
 Marking Points: ${ans.official_answer}
 Marks: ${ans.marks || 'unknown'}
 
-Write a COMPLETE MODEL ANSWER that a student should write to earn full marks. Format it exactly as a student would write in an exam. Include all marking points. Do NOT list marking points - write it as proper prose/sentences.`
+Write a model answer as a student would write it (4-5 sentences maximum). Include all marking points as prose.
+CRITICAL RULES:
+- Start directly with the answer content
+- NO preambles or explanations about the marking scheme
+- Write as if you are the student answering in an exam
+- Concise and focused`
 
                             const solRes = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
                                 method: 'POST',

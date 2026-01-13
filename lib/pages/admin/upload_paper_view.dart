@@ -36,7 +36,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   // Question paper file
   String? _selectedFileName;
   Uint8List? _selectedFileBytes;
-  
+
   // Mark scheme file (optional)
   String? _markSchemeFileName;
   Uint8List? _markSchemeFileBytes;
@@ -252,7 +252,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
           _statusMessage = 'Uploading mark scheme...';
         });
       }
-      
+
       final markSchemePath = 'pdfs/$subjectId/${year}_${season}_${variant}_ms.pdf';
       await supabase.storage.from(bucketName).uploadBinary(
             markSchemePath,
@@ -305,9 +305,9 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     required String paperType,
     String? markSchemeUrl,
   }) async {
-    const int batchSize = 4; // Increased to 4 (structure only, no AI answers)
+    const int batchSize = 6; // Increased from 4 to reduce fragmentation and improve accuracy
     final supabase = Supabase.instance.client;
-    
+
     // First batch to get total page count
     if (mounted) {
       setState(() {
@@ -317,7 +317,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
     try {
       final functionName = paperType == 'structured' ? 'process-structured-paper' : 'analyze-paper';
-      
+
       final firstBatch = await supabase.functions.invoke(
         functionName,
         body: {
@@ -343,7 +343,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       // Start loop from batchSize because 0..batchSize is already done
       for (int start = batchSize; start < totalPages; start += batchSize) {
         final end = (start + batchSize > totalPages) ? totalPages : start + batchSize;
-        
+
         if (mounted) {
           setState(() {
             _statusMessage = 'Analyzing pages ${start + 1}-$end...';
@@ -390,7 +390,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       if (paperType == 'structured' && markSchemeUrl != null) {
         if (mounted) setState(() => _statusMessage = 'Processing Mark Scheme...');
         print('[Mark Scheme] Starting extraction...');
-        
+
         try {
           final msResponse = await supabase.functions.invoke(
             'process-mark-scheme',
@@ -399,7 +399,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
               'markSchemeUrl': markSchemeUrl,
             },
           );
-          
+
           if (msResponse.data?['success'] == true) {
              print('[Mark Scheme] Success: ${msResponse.data['message']}');
           } else {
@@ -418,10 +418,10 @@ class _UploadPaperViewState extends State<UploadPaperView> {
   Widget _buildProgressStep(int step, String title, String subtitle) {
     final isComplete = _uploadStep >= step;
     final isCurrent = _uploadStep == step - 1 || (_uploadStep == step && step < 5);
-    
+
     Color iconColor;
     IconData iconData;
-    
+
     if (isComplete) {
       iconColor = const Color(0xFF10B981);
       iconData = Icons.check_circle;
@@ -432,7 +432,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       iconColor = AppColors.textSecondary.withValues(alpha: 0.3);
       iconData = Icons.radio_button_off;
     }
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -582,7 +582,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       ],
                     ),
                     const SizedBox(height: 32),
-                    
+
                     // Visual Stepper
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -595,7 +595,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       ],
                     ),
                     const SizedBox(height: 32),
-                    
+
                     // Curriculum and Subject Row
                     Row(
                       children: [
@@ -641,7 +641,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Paper Details Row (Year, Season, Variant)
                     Row(
                       children: [
@@ -698,9 +698,9 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         ),
                       ],
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Paper Type Selection
                      Container(
                       padding: const EdgeInsets.all(4),
@@ -761,7 +761,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
 
                     // Enhanced Drop Zone
@@ -822,7 +822,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    
+
                     // Mark scheme file picker (optional)
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -895,7 +895,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
                     // Submit button
                     SizedBox(
