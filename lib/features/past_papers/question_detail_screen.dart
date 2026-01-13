@@ -76,6 +76,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
   // Structured question answers
   Map<String, dynamic> _structuredAnswers = {};
+  Set<int> _expandedPartIndices = {0}; // For accordion UI: which parts are currently expanded (default first one)
 
   // Bookmark and notes
   bool _isBookmarked = false;
@@ -198,22 +199,221 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     try {
       if (_isBookmarked) {
         await _bookmarkRepo.removeBookmark(widget.questionId);
+        setState(() {
+          _isBookmarked = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bookmark removed')),
+        );
       } else {
-        await _bookmarkRepo.addBookmark(widget.questionId);
+        // Show folder selection dialog before adding bookmark
+        final folder = await _showFolderSelectionDialog();
+        if (folder == null) {
+          return; // User cancelled
+        }
+        
+        await _bookmarkRepo.addBookmark(widget.questionId, folder: folder);
+        setState(() {
+          _isBookmarked = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bookmarked to $folder!')),
+        );
       }
-
-      // Update UI immediately
-      setState(() {
-        _isBookmarked = !_isBookmarked;
-      });
-
-      // Optional: Show toast/snack
     } catch (e) {
       print('Error toggling bookmark: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating bookmark')),
+        const SnackBar(content: Text('Error updating bookmark')),
       );
     }
+  }
+  
+  Future<String?> _showFolderSelectionDialog() async {
+    final folders = await _bookmarkRepo.getFolders();
+    final TextEditingController newFolderController = TextEditingController();
+
+    return showDialog<String>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.4),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: WiredCard(
+          backgroundColor: const Color(0xFFFDFBF7), // Cream background
+          borderColor: _primaryColor,
+          borderWidth: 2,
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  children: [
+                    WiredCard(
+                      padding: const EdgeInsets.all(10),
+                      backgroundColor: _primaryColor.withValues(alpha: 0.1),
+                      borderColor: _primaryColor,
+                      child: Icon(Icons.bookmark, color: _primaryColor, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      'Bookmark Question',
+                      style: _patrickHand(
+                        color: _primaryColor,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Folder Selection
+                if (folders.isNotEmpty) ...[
+                  Text(
+                    'SELECT FOLDER',
+                    style: _patrickHand(
+                      color: _primaryColor.withValues(alpha: 0.6),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: folders.map((folder) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: GestureDetector(
+                            onTap: () => Navigator.of(context).pop(folder),
+                            child: WiredCard(
+                              backgroundColor: Colors.white,
+                              borderColor: _primaryColor.withValues(alpha: 0.3),
+                              borderWidth: 1.5,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.folder, color: _primaryColor, size: 22),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      folder,
+                                      style: _patrickHand(
+                                        color: _primaryColor,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right, color: _primaryColor.withValues(alpha: 0.5), size: 22),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // New Folder Input
+                Text(
+                  'CREATE NEW FOLDER',
+                  style: _patrickHand(
+                    color: _primaryColor.withValues(alpha: 0.6),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                CustomPaint(
+                  painter: WiredBorderPainter(
+                    color: _primaryColor.withValues(alpha: 0.4),
+                    strokeWidth: 1.5,
+                  ),
+                  child: Container(
+                    color: Colors.white,
+                    child: TextField(
+                      controller: newFolderController,
+                      style: _patrickHand(color: _primaryColor, fontSize: 18),
+                      decoration: InputDecoration(
+                        hintText: 'Enter folder name...',
+                        hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.4), fontSize: 18),
+                        filled: false,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        prefixIcon: Icon(Icons.create_new_folder_outlined, color: _primaryColor.withValues(alpha: 0.6), size: 24),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 28),
+
+                // Action Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    WiredButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      backgroundColor: Colors.transparent,
+                      borderColor: _primaryColor.withValues(alpha: 0.3),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      child: Text(
+                        'Cancel',
+                        style: _patrickHand(
+                          color: _primaryColor.withValues(alpha: 0.7),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    WiredButton(
+                      onPressed: () {
+                        final newFolder = newFolderController.text.trim();
+                        if (newFolder.isNotEmpty) {
+                          Navigator.of(context).pop(newFolder);
+                        } else if (folders.isNotEmpty) {
+                          Navigator.of(context).pop(folders.first);
+                        } else {
+                          Navigator.of(context).pop('My Bookmarks');
+                        }
+                      },
+                      backgroundColor: const Color(0xFFFFB300), // Amber/Yellow
+                      filled: true,
+                      borderColor: const Color(0xFFFFB300),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.bookmark_add, color: Color(0xFF2D3E50), size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Save Bookmark',
+                            style: _patrickHand(
+                              color: const Color(0xFF2D3E50),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Load previous attempt if exists
@@ -1043,11 +1243,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             ),
                             const Spacer(),
                             if (_question!.hasPaperInfo)
-                              Text(
-                                _question!.paperLabel,
-                                style: _patrickHand(
-                                  color: _primaryColor.withValues(alpha: 0.6),
-                                  fontSize: 12,
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  _question!.paperLabel,
+                                  style: _patrickHand(
+                                    color: _primaryColor.withValues(alpha: 0.6),
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ),
                           ],
@@ -1083,19 +1286,19 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             // Figure label
                             Row(
                               children: [
-                                Icon(Icons.image_outlined, color: _primaryColor, size: 18),
+                                Icon(Icons.image_outlined, color: _primaryColor, size: 20),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Figure',
-                                  style: _patrickHand(fontSize: 14, fontWeight: FontWeight.bold),
+                                  style: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold),
                                 ),
                                 const Spacer(),
                                 if (_question!.hasFigure) ...[
-                                  Icon(Icons.zoom_in, color: _primaryColor.withValues(alpha: 0.5), size: 18),
+                                  Icon(Icons.zoom_in, color: _primaryColor.withValues(alpha: 0.5), size: 20),
                                   const SizedBox(width: 4),
                                   Text(
                                     'Tap to zoom',
-                                    style: _patrickHand(color: _primaryColor.withValues(alpha: 0.5), fontSize: 12),
+                                    style: _patrickHand(color: _primaryColor.withValues(alpha: 0.5), fontSize: 14),
                                   ),
                                 ],
                               ],
@@ -1185,7 +1388,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       height: 600, // Fixed height for tab view
       child: Column(
         children: [
-          const SizedBox(height: 0), // Removed gap between border and tabs
+            const SizedBox(height: 5), // Small gap between border and tabs
         // Tab Headers
         // Tab Headers
         Container(
@@ -1239,14 +1442,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 children: [
                   Icon(
                     icon,
-                    size: 20,
+                    size: 22,
                     color: isSelected ? (activeColor ?? _primaryColor) : _primaryColor.withValues(alpha: 0.4),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     label,
                     style: _patrickHand(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected ? (activeColor ?? _primaryColor) : _primaryColor.withValues(alpha: 0.4),
                     ),
@@ -1258,6 +1461,290 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         },
       ),
     );
+  }
+
+  /// Builds an expandable card for a structured question part (accordion style)
+  Widget _buildExpandablePartCard({
+    required int index,
+    required QuestionPartBlock part,
+    required bool isExpanded,
+    required String tabType, // 'answer', 'official', or 'ai'
+  }) {
+    final hasAnswer = _structuredAnswers[part.label] != null && 
+                     (_structuredAnswers[part.label] as String?)?.isNotEmpty == true;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: WiredCard(
+        backgroundColor: isExpanded ? Colors.white : const Color(0xFFFDFBF7),
+        borderColor: isExpanded ? _primaryColor : _primaryColor.withValues(alpha: 0.3),
+        borderWidth: isExpanded ? 2 : 1.5,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header (always visible) - tap anywhere to toggle
+            GestureDetector(
+              behavior: HitTestBehavior.opaque, // Makes entire area tappable
+              onTap: () => setState(() {
+                if (_expandedPartIndices.contains(index)) {
+                  _expandedPartIndices.remove(index);
+                } else {
+                  _expandedPartIndices.add(index);
+                }
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    // Expand/collapse icon
+                    Icon(
+                      isExpanded ? Icons.expand_more_rounded : Icons.chevron_right_rounded,
+                      color: _primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    // Part label badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isExpanded ? _primaryColor : _primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Part ${part.label}',
+                        style: _patrickHand(
+                          color: isExpanded ? Colors.white : _primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Part content preview (only when collapsed)
+                    if (!isExpanded)
+                      Expanded(
+                        child: Text(
+                          part.content,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _patrickHand(
+                            color: _primaryColor.withValues(alpha: 0.6),
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    if (isExpanded) const Spacer(),
+                    // Marks badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${part.marks} mark${part.marks > 1 ? 's' : ''}',
+                        style: _patrickHand(
+                          color: const Color(0xFF232832),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Status indicator (completed/pending) - only for answer tab
+                    if (tabType == 'answer' && hasAnswer)
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.check, color: Colors.green, size: 16),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            
+            // Expandable content
+            if (isExpanded) ...[
+              Container(
+                height: 1.5,
+                color: _primaryColor.withValues(alpha: 0.15),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildPartContent(part, tabType),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Builds the content for an expanded part based on tab type
+  Widget _buildPartContent(QuestionPartBlock part, String tabType) {
+    switch (tabType) {
+      case 'answer':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Question text
+            Text(
+              part.content,
+              style: _patrickHand(fontSize: 18, height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            // Answer input
+            TextField(
+              controller: TextEditingController(text: _structuredAnswers[part.label] ?? ''),
+              onChanged: (value) => _structuredAnswers[part.label] = value,
+              maxLines: 4,
+              enabled: !_answerSubmitted,
+              style: _patrickHand(color: _primaryColor, fontSize: 17),
+              decoration: InputDecoration(
+                hintText: 'Type your answer for part ${part.label}...',
+                hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.4), fontSize: 17),
+                filled: true,
+                fillColor: const Color(0xFFF5F3EE),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _primaryColor.withValues(alpha: 0.2)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _primaryColor.withValues(alpha: 0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: _primaryColor, width: 2),
+                ),
+              ),
+            ),
+          ],
+        );
+      
+      case 'official':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Question text (for context)
+            Text(
+              part.content,
+              style: _patrickHand(fontSize: 17, color: _primaryColor.withValues(alpha: 0.7), height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            // Official answer box
+            WiredCard(
+              backgroundColor: Colors.green.withValues(alpha: 0.05),
+              borderColor: Colors.green.withValues(alpha: 0.3),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ANSWER',
+                    style: _patrickHand(
+                      color: Colors.green,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (part.officialAnswer != null && part.officialAnswer!.isNotEmpty)
+                    Html(
+                      data: part.officialAnswer!,
+                      style: {
+                        "body": Style(
+                          color: const Color(0xFF2D3E50),
+                          fontFamily: 'PatrickHand',
+                          fontSize: FontSize(18),
+                          lineHeight: LineHeight(1.5),
+                          margin: Margins.zero,
+                        ),
+                      },
+                    )
+                  else
+                    Text(
+                      'No official answer available',
+                      style: TextStyle(
+                        fontFamily: 'PatrickHand',
+                        color: _primaryColor.withValues(alpha: 0.5),
+                        fontStyle: FontStyle.italic,
+                        fontSize: 14,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      
+      case 'ai':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Question text (for context)
+            Text(
+              part.content,
+              style: _patrickHand(fontSize: 17, color: _primaryColor.withValues(alpha: 0.7), height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            // AI explanation box
+            WiredCard(
+              backgroundColor: Colors.purple.withValues(alpha: 0.05),
+              borderColor: Colors.purple.withValues(alpha: 0.3),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.auto_awesome, color: Colors.purple, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'AI EXPLANATION',
+                        style: _patrickHand(
+                          color: Colors.purple,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (part.aiAnswer != null && part.aiAnswer!.isNotEmpty)
+                    MarkdownBody(
+                      data: part.aiAnswer!,
+                      styleSheet: MarkdownStyleSheet(
+                        p: TextStyle(
+                          fontFamily: 'PatrickHand',
+                          color: const Color(0xFF2D3E50),
+                          fontSize: 17,
+                          height: 1.5,
+                        ),
+                      ),
+                    )
+                  else
+                    Text(
+                      'AI explanation not available for this part',
+                      style: TextStyle(
+                        fontFamily: 'PatrickHand',
+                        color: _primaryColor.withValues(alpha: 0.5),
+                        fontStyle: FontStyle.italic,
+                        fontSize: 14,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        );
+      
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _buildAnswerTab() {
@@ -1421,22 +1908,20 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ],
               ],
             ),
-          ] else if (_question!.isStructured) ...[
-            // Structured question with blocks
-            SmartQuestionRenderer(
-              blocks: _question!.structureData ?? [],
-              onAnswersChanged: (answers) {
-                setState(() {
-                  _structuredAnswers = answers;
-                });
-              },
-              showSolutions: false, // Don't show official answers - show AI feedback instead
-              perPartFeedback: _aiFeedback != null && _aiFeedback!['perPartResults'] != null
-                  ? List<dynamic>.from(_aiFeedback!['perPartResults'])
-                  : null,
-              savedAnswers: _structuredAnswers, // Pass saved answers for pre-filling
-              isSubmitted: _answerSubmitted, // Lock inputs after submission
-            ),
+          ] else if (_question!.isStructured && _question!.structureData != null) ...[
+            // Structured question with accordion-style expandable parts
+            ...(_question!.structureData!.whereType<QuestionPartBlock>().toList().asMap().entries.map((entry) {
+              final index = entry.key;
+              final part = entry.value;
+              final isExpanded = _expandedPartIndices.contains(index);
+              
+              return _buildExpandablePartCard(
+                index: index,
+                part: part,
+                isExpanded: isExpanded,
+                tabType: 'answer',
+              );
+            })),
             const SizedBox(height: 16),
             // Submit button for structured questions
             SizedBox(
@@ -1715,12 +2200,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                               const SizedBox(height: 16),
                               WiredButton(
                                 onPressed: () {
-                                  AccessControlService.checkPremium(
-                                    context,
-                                    ref,
-                                    featureName: 'AI Solution',
-                                    highlights: ['Step-by-step AI explanations'],
-                                  );
+                                  context.push('/premium');
                                 },
                                 backgroundColor: Colors.amber,
                                 filled: true,
@@ -1762,131 +2242,41 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'AI Explanation',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 18),
+                style: _patrickHand(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 20),
               ),
             ],
           ),
           const SizedBox(height: 20),
 
-          // Structured Question Logic
+          // Structured Question Logic - Accordion style
           if (_question!.isStructured && _question!.structureData != null) ...[
-            ...(_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.purple.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
-                            ),
-                            child: Text(
-                              'Part ${block.label}',
-                              style: const TextStyle(
-                                color: Colors.purple,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              block.content,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Content
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (block.aiAnswer != null && block.aiAnswer!.isNotEmpty) ...[
-                            MarkdownBody(
-                              data: block.aiAnswer!,
-                              styleSheet: MarkdownStyleSheet(
-                                p: const TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 15,
-                                  height: 1.5,
-                                ),
-                              ),
-                            )
-                          ] else ...[
-                            Text(
-                              'AI explanation not available for this part.',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontStyle: FontStyle.italic,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            ...(_question!.structureData!.whereType<QuestionPartBlock>().toList().asMap().entries.map((entry) {
+              final index = entry.key;
+              final part = entry.value;
+              final isExpanded = _expandedPartIndices.contains(index);
+              
+              return _buildExpandablePartCard(
+                index: index,
+                part: part,
+                isExpanded: isExpanded,
+                tabType: 'ai',
               );
             })),
           ] else ...[
             // Regular question - show single AI answer
-            Container(
+            WiredCard(
+              backgroundColor: const Color(0xFFFDFBF7),
+              borderColor: Colors.purple.withValues(alpha: 0.5),
+              borderWidth: 2,
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
               child: MarkdownBody(
                 data: _question!.aiAnswer ?? 'No AI explanation available.',
                 styleSheet: MarkdownStyleSheet(
-                  p: const TextStyle(
-                    color: Colors.black87,
+                  p: TextStyle(
+                    fontFamily: 'PatrickHand',
+                    color: const Color(0xFF2D3E50),
                     fontSize: 16,
                     height: 1.6,
                   ),
@@ -1936,9 +2326,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         child: const Icon(Icons.verified, color: Colors.green, size: 20),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
+                      Text(
                         'Official Mark Scheme',
-                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
+                        style: _patrickHand(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                     ],
                   ),
@@ -2046,164 +2436,41 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 child: const Icon(Icons.verified, color: Colors.green, size: 20),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 'Official Mark Scheme',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 18),
+                style: _patrickHand(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 20),
               ),
             ],
           ),
           const SizedBox(height: 20),
 
-          // Check if structured question
+          // Check if structured question - Accordion style
           if (_question!.isStructured && _question!.structureData != null) ...[
-            // Display all parts' official answers
-            ...(_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header with Part label and marks
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-                            ),
-                            child: Text(
-                              'Part ${block.label}',
-                              style: const TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            '[${block.marks} mark${block.marks > 1 ? 's' : ''}]',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Content
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            block.content,
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontSize: 15,
-                              height: 1.4,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'ANSWER',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.0,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                if (block.officialAnswer != null && block.officialAnswer!.isNotEmpty)
-                                  Html(
-                                    data: block.officialAnswer!,
-                                    style: {
-                                      "body": Style(
-                                        color: Colors.black87,
-                                        fontFamily: 'PatrickHand',
-                                        fontSize: FontSize(16),
-                                        lineHeight: LineHeight(1.5),
-                                        margin: Margins.zero,
-                                      ),
-                                    },
-                                  )
-                                else
-                                  Text(
-                                    'No official answer available',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade500,
-                                      fontStyle: FontStyle.italic,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+            // Display all parts' official answers using accordion
+            ...(_question!.structureData!.whereType<QuestionPartBlock>().toList().asMap().entries.map((entry) {
+              final index = entry.key;
+              final part = entry.value;
+              final isExpanded = _expandedPartIndices.contains(index);
+              
+              return _buildExpandablePartCard(
+                index: index,
+                part: part,
+                isExpanded: isExpanded,
+                tabType: 'official',
               );
             })),
           ] else ...[
             // Regular question - show single official answer card
-            Container(
+            WiredCard(
+              backgroundColor: const Color(0xFFFDFBF7),
+              borderColor: Colors.green.withValues(alpha: 0.5),
+              borderWidth: 2,
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
               child: Html(
                 data: _question!.officialAnswer,
                 style: {
                   "body": Style(
-                    color: Colors.black87,
+                    color: const Color(0xFF2D3E50),
                     fontFamily: 'PatrickHand',
                     fontSize: FontSize(18),
                     lineHeight: LineHeight(1.6),

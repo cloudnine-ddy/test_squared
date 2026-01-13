@@ -210,17 +210,12 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Icon badge
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: iconColor.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
+              // Icon badge (Sketchy)
+              WiredCard(
+                backgroundColor: iconColor.withValues(alpha: 0.1),
+                borderColor: iconColor.withValues(alpha: 0.3),
+                borderWidth: 1.5,
+                padding: const EdgeInsets.all(8),
                 child: Icon(
                   isObjective ? Icons.quiz_outlined : Icons.edit_document,
                   color: iconColor,
@@ -244,19 +239,15 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: iconColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
+                        WiredCard(
+                          backgroundColor: iconColor.withValues(alpha: 0.08),
+                          borderColor: iconColor.withValues(alpha: 0.3),
+                          borderWidth: 1,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           child: Text(
                             isObjective ? 'Objective' : 'Subjective',
                             style: _patrickHand(
-                              fontSize: 12,
+                              fontSize: 14,
                               color: iconColor,
                               fontWeight: FontWeight.bold,
                             ),

@@ -351,7 +351,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                           style: TextStyle(
                             fontFamily: 'PatrickHand',
                             color: primaryColor.withValues(alpha: 0.6),
-                            fontSize: 12,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
                           ),
@@ -362,7 +362,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                           fontFamily: 'PatrickHand',
                           color: primaryColor,
                           fontWeight: FontWeight.w600,
-                          fontSize: 18,
+                          fontSize: 19,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -371,7 +371,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                         style: TextStyle(
                           fontFamily: 'PatrickHand',
                           color: primaryColor.withValues(alpha: 0.7),
-                          fontSize: 14,
+                          fontSize: 17,
                         ),
                       ),
                     ],
@@ -441,10 +441,10 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        mainAxisExtent: 180, // Fixed height to prevent excessive whitespace
+        crossAxisCount: 3,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        mainAxisExtent: 155, // Increased to fit larger badge
       ),
       itemCount: _topicStats.length,
       itemBuilder: (context, index) {
@@ -468,7 +468,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
       backgroundColor: Colors.white,
       borderColor: primaryColor.withValues(alpha: 0.2),
       borderWidth: 1.5,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -480,7 +480,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                 style: TextStyle(
                   fontFamily: 'PatrickHand',
                   color: primaryColor.withValues(alpha: 0.5),
-                  fontSize: 12,
+                  fontSize: 15,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
@@ -498,7 +498,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                     fontFamily: 'PatrickHand',
                     color: primaryColor,
                     fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                    fontSize: 19,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -508,13 +508,13 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
               MasteryBadge(level: stats.masteryLevel),
             ],
           ),
-          const Spacer(),
+          const SizedBox(height: 8),
           Text(
             '${stats.accuracyDisplay} accuracy',
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: primaryColor.withValues(alpha: 0.8),
-              fontSize: 14,
+              fontSize: 17,
             ),
           ),
           const SizedBox(height: 4),
@@ -523,7 +523,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: primaryColor.withValues(alpha: 0.5),
-              fontSize: 12,
+              fontSize: 15,
             ),
           ),
         ],

@@ -95,6 +95,7 @@ class WiredCard extends StatelessWidget {
   final EdgeInsetsGeometry? padding;
   final double? width;
   final double? height;
+  final double? minHeight;
 
   const WiredCard({
     super.key,
@@ -105,6 +106,7 @@ class WiredCard extends StatelessWidget {
     this.padding,
     this.width,
     this.height,
+    this.minHeight,
   });
 
   @override
@@ -118,6 +120,7 @@ class WiredCard extends StatelessWidget {
       child: Container(
         width: width,
         height: height,
+        constraints: minHeight != null ? BoxConstraints(minHeight: minHeight!) : null,
         color: backgroundColor,
         padding: padding,
         child: child,

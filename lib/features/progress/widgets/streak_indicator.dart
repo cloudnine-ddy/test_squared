@@ -43,7 +43,7 @@ class StreakIndicator extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'PatrickHand',
                     color: primaryColor.withValues(alpha: 0.7),
-                    fontSize: 18,
+                    fontSize: 19,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -78,7 +78,7 @@ class StreakIndicator extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: 'PatrickHand',
                       color: primaryColor.withValues(alpha: 0.5),
-                      fontSize: 15,
+                      fontSize: 17,
                     ),
                   ),
                 ],

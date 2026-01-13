@@ -108,22 +108,15 @@ class BookmarkFolderPanel extends StatelessWidget {
   }
 
   Widget _buildFolderItem(BuildContext context, String folder, bool isSelected) {
-    if (isSelected) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: WiredCard(
-          backgroundColor: _primaryColor.withValues(alpha: 0.1),
-          borderColor: _primaryColor.withValues(alpha: 0.3),
-          borderWidth: 1.5,
-          padding: const EdgeInsets.all(0),
-          child: _buildListTile(context, folder, isSelected),
-        ),
-      );
-    }
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: _buildListTile(context, folder, isSelected),
+      child: WiredCard(
+        backgroundColor: isSelected ? _primaryColor.withValues(alpha: 0.1) : Colors.white,
+        borderColor: isSelected ? _primaryColor.withValues(alpha: 0.4) : _primaryColor.withValues(alpha: 0.2),
+        borderWidth: 1.5,
+        padding: const EdgeInsets.all(0),
+        child: _buildListTile(context, folder, isSelected),
+      ),
     );
   }
 
@@ -150,14 +143,12 @@ class BookmarkFolderPanel extends StatelessWidget {
           ? Theme(
               data: Theme.of(context).copyWith(
                   popupMenuTheme: PopupMenuThemeData(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
-                    color: _primaryColor.withValues(alpha: 0.2),
-                    width: 1.5,
-                  ),
+                color: const Color(0xFFFDFBF7), // Cream background
+                shape: WiredShapeBorder(
+                  color: _primaryColor,
+                  width: 1.5,
                 ),
+                elevation: 0,
               )),
               child: PopupMenuButton<String>(
                 icon: Icon(
@@ -168,21 +159,23 @@ class BookmarkFolderPanel extends StatelessWidget {
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: 'rename',
+                    height: 48,
                     child: Row(
                       children: [
-                        const Icon(Icons.edit, size: 16, color: _primaryColor),
-                        const SizedBox(width: 8),
-                        Text('Rename', style: _patrickHand()),
+                        const Icon(Icons.edit, size: 20, color: _primaryColor),
+                        const SizedBox(width: 12),
+                        Text('Rename', style: _patrickHand(fontSize: 18)),
                       ],
                     ),
                   ),
                   PopupMenuItem(
                     value: 'delete',
+                    height: 48,
                     child: Row(
                       children: [
-                        const Icon(Icons.delete, size: 16, color: Colors.red),
-                        const SizedBox(width: 8),
-                        Text('Delete', style: _patrickHand(color: Colors.red)),
+                        const Icon(Icons.delete, size: 20, color: Colors.red),
+                        const SizedBox(width: 12),
+                        Text('Delete', style: _patrickHand(color: Colors.red, fontSize: 18)),
                       ],
                     ),
                   ),
@@ -206,7 +199,9 @@ class BookmarkFolderPanel extends StatelessWidget {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
-        child: WiredCard(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: WiredCard(
           backgroundColor: Colors.white,
           borderColor: _primaryColor,
           borderWidth: 1.5,
@@ -226,7 +221,7 @@ class BookmarkFolderPanel extends StatelessWidget {
               Text(
                 'Are you sure you want to delete "$folder"? All bookmarks in this folder will be moved to "My Bookmarks".',
                 style: _patrickHand(
-                  fontSize: 16,
+                  fontSize: 18,
                   color: _primaryColor.withValues(alpha: 0.7),
                 ),
                 textAlign: TextAlign.center,
@@ -235,23 +230,29 @@ class BookmarkFolderPanel extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  WiredButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text('Cancel', style: _patrickHand(color: Colors.grey)),
+                    backgroundColor: Colors.transparent,
+                    borderColor: _primaryColor.withValues(alpha: 0.3),
+                    child: Text('Cancel', style: _patrickHand(color: _primaryColor.withValues(alpha: 0.7))),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton(
+                  const SizedBox(width: 12),
+                  WiredButton(
                     onPressed: () {
                       Navigator.pop(context);
                       onDeleteFolder(folder);
                     },
-                    child: Text('Delete', style: _patrickHand(color: Colors.red, fontWeight: FontWeight.bold)),
+                    filled: true,
+                    backgroundColor: const Color(0xFFFF5252), // Red
+                    borderColor: const Color(0xFFFF5252),
+                    child: Text('Delete', style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -279,37 +280,51 @@ class BookmarkFolderPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.3))),
+              CustomPaint(
+                painter: WiredBorderPainter(
+                  color: _primaryColor.withValues(alpha: 0.5),
+                  strokeWidth: 1.5,
                 ),
-                child: TextField(
-                  controller: controller,
-                  decoration: InputDecoration(
-                    hintText: 'Folder name',
-                    hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.5)),
-                    border: InputBorder.none,
+                child: Container(
+                  color: Colors.white,
+                  child: TextField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      hintText: 'Folder name',
+                      hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.5)),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    style: _patrickHand(fontSize: 18),
+                    autofocus: true,
                   ),
-                  style: _patrickHand(fontSize: 18),
-                  autofocus: true,
                 ),
               ),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  WiredButton(
                     onPressed: () => Navigator.pop(context),
-                    child: Text('Cancel', style: _patrickHand(color: Colors.grey)),
+                    backgroundColor: Colors.transparent,
+                    borderColor: _primaryColor.withValues(alpha: 0.3),
+                    child: Text('Cancel', style: _patrickHand(color: _primaryColor.withValues(alpha: 0.7))),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton(
+                  const SizedBox(width: 12),
+                  WiredButton(
                     onPressed: () {
                       if (controller.text.isNotEmpty && controller.text != folder) {
                         Navigator.pop(context);
                         onRenameFolder(folder, controller.text);
                       }
                     },
+                    filled: true,
+                    backgroundColor: const Color(0xFFFFB300), // Amber
+                    borderColor: const Color(0xFFFFB300),
                     child: Text('Rename', style: _patrickHand(color: _primaryColor, fontWeight: FontWeight.bold)),
                   ),
                 ],

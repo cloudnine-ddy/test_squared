@@ -425,7 +425,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                       child: Text(
                         topic.name,
                         style: _patrickHand(
-                          fontSize: 16,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                         maxLines: 2,
@@ -438,29 +438,68 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                 const Spacer(),
 
                 // Question count badge
-                WiredCard(
-                  backgroundColor: _primaryColor.withValues(alpha: 0.08),
-                  borderColor: _primaryColor.withValues(alpha: 0.3),
-                  borderWidth: 1,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.quiz_outlined,
-                        size: 14,
-                        color: _primaryColor.withValues(alpha: 0.7),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '$totalQuestions question${totalQuestions != 1 ? 's' : ''}',
-                        style: _patrickHand(
-                          fontSize: 13,
-                          color: _primaryColor.withValues(alpha: 0.8),
+                // Question count badge with breakdown
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (topic.mcqCount > 0)
+                      WiredCard(
+                        backgroundColor: _primaryColor.withValues(alpha: 0.08),
+                        borderColor: _primaryColor.withValues(alpha: 0.3),
+                        borderWidth: 1,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        child: Text(
+                          '${topic.mcqCount} MCQ',
+                          style: _patrickHand(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor.withValues(alpha: 0.8),
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    if (topic.structuredCount > 0)
+                      WiredCard(
+                        backgroundColor: _primaryColor.withValues(alpha: 0.08),
+                        borderColor: _primaryColor.withValues(alpha: 0.3),
+                        borderWidth: 1,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        child: Text(
+                          '${topic.structuredCount} Structured',
+                          style: _patrickHand(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ),
+                    if (topic.mcqCount == 0 && topic.structuredCount == 0)
+                      WiredCard(
+                        backgroundColor: _primaryColor.withValues(alpha: 0.08),
+                        borderColor: _primaryColor.withValues(alpha: 0.3),
+                        borderWidth: 1,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.quiz_outlined,
+                              size: 16,
+                              color: _primaryColor.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '$totalQuestions question${totalQuestions != 1 ? 's' : ''}',
+                              style: _patrickHand(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: _primaryColor.withValues(alpha: 0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
 
                 const SizedBox(height: 12),
@@ -475,14 +514,14 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                         Text(
                           'Progress',
                           style: _patrickHand(
-                            fontSize: 13,
+                            fontSize: 15,
                             color: _primaryColor.withValues(alpha: 0.6),
                           ),
                         ),
                         Text(
                           '${progressPercentage.toInt()}%',
                           style: _patrickHand(
-                            fontSize: 14,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: const Color(0xFFEF6C00), // Orange 800 for contrast
                           ),
@@ -520,7 +559,7 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
                     Text(
                       '$completedQuestions/$totalQuestions completed',
                       style: _patrickHand(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: _primaryColor.withValues(alpha: 0.5),
                       ),
                     ),

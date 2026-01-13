@@ -39,11 +39,13 @@ class PastPaperRepository {
 
       // Count questions per topic
       Map<String, int> topicCounts = {};
+      Map<String, int> topicMCQCounts = {};
+      Map<String, int> topicStructuredCounts = {};
 
       if (paperIds.isNotEmpty) {
         final questionsResponse = await _supabase
             .from('questions')
-            .select('topic_ids')
+            .select('topic_ids, type')
             .inFilter('paper_id', paperIds);
 
         final questionsData = questionsResponse as List<dynamic>;
@@ -51,16 +53,24 @@ class PastPaperRepository {
 
         for (var q in questionsData) {
           final topicIds = q['topic_ids'];
+          final type = q['type'] as String? ?? 'Structured'; 
+          
           if (topicIds is List) {
             for (var topicId in topicIds) {
               final id = topicId.toString();
               topicCounts[id] = (topicCounts[id] ?? 0) + 1;
+              
+              if (type.toLowerCase() == 'mcq') {
+                 topicMCQCounts[id] = (topicMCQCounts[id] ?? 0) + 1;
+              } else {
+                 topicStructuredCounts[id] = (topicStructuredCounts[id] ?? 0) + 1;
+              }
             }
           }
         }
       }
 
-      print('DEBUG getTopics: Topic counts: $topicCounts');
+      print('DEBUG getTopics: Topic counts: $topicCounts, MCQ: $topicMCQCounts, Struct: $topicStructuredCounts');
 
       // Map topics with counts
       final topics = topicsData.map((e) {
@@ -69,6 +79,8 @@ class PastPaperRepository {
         return TopicModel.fromMap({
           ...map,
           'question_count': topicCounts[topicId] ?? 0,
+          'mcq_count': topicMCQCounts[topicId] ?? 0,
+          'structured_count': topicStructuredCounts[topicId] ?? 0,
         });
       }).toList();
 

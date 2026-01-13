@@ -40,7 +40,7 @@ class DailyProgressChart extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: 'PatrickHand',
                   color: primaryColor,
-                  fontSize: 20,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -52,7 +52,7 @@ class DailyProgressChart extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: primaryColor.withValues(alpha: 0.6),
-              fontSize: 14,
+              fontSize: 16,
             ),
           ),
           const SizedBox(height: 24),

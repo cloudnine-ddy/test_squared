@@ -46,7 +46,7 @@ class StatCard extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: primaryColor.withValues(alpha: 0.7),
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -56,7 +56,7 @@ class StatCard extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: primaryColor,
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -66,7 +66,7 @@ class StatCard extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: primaryColor.withValues(alpha: 0.5),
-              fontSize: 14,
+              fontSize: 16,
             ),
           ),
         ],

@@ -61,7 +61,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   Future<void> _loadFolders() async {
     final folders = await _bookmarkRepo.getFolders();
     if (mounted) {
-      setState(() => _folders = ['My Bookmarks', ...folders]);
+      // Filter out 'My Bookmarks' from database to avoid duplicates
+      final filteredFolders = folders.where((f) => f != 'My Bookmarks').toList();
+      setState(() => _folders = ['My Bookmarks', ...filteredFolders]);
     }
   }
 
@@ -271,11 +273,12 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                     Theme(
                       data: Theme.of(context).copyWith(
                         popupMenuTheme: PopupMenuThemeData(
-                          color: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
+                          color: const Color(0xFFFDFBF7), // Cream background
+                          shape: WiredShapeBorder(
+                            color: _primaryColor,
+                            width: 1.5,
                           ),
+                          elevation: 0, // Removed elevation shadow to rely on wired border
                         ),
                       ),
                       child: PopupMenuButton(
@@ -286,21 +289,23 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                         itemBuilder: (context) => [
                           PopupMenuItem(
                             value: 'move',
+                            height: 48,
                             child: Row(
                               children: [
-                                Icon(Icons.folder_outlined, size: 18, color: _primaryColor),
-                                const SizedBox(width: 8),
-                                Text('Move to folder', style: _patrickHand(color: _primaryColor)),
+                                Icon(Icons.folder_outlined, size: 20, color: _primaryColor),
+                                const SizedBox(width: 12),
+                                Text('Move to folder', style: _patrickHand(color: _primaryColor, fontSize: 18)),
                               ],
                             ),
                           ),
                           PopupMenuItem(
                             value: 'remove',
+                            height: 48,
                             child: Row(
                               children: [
-                                const Icon(Icons.bookmark_remove, size: 18, color: Colors.red),
-                                const SizedBox(width: 8),
-                                Text('Remove bookmark', style: _patrickHand(color: Colors.red)),
+                                const Icon(Icons.bookmark_remove, size: 20, color: Colors.red),
+                                const SizedBox(width: 12),
+                                Text('Remove bookmark', style: _patrickHand(color: Colors.red, fontSize: 18)),
                               ],
                             ),
                           ),
@@ -384,13 +389,33 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: _folders.map((folder) {
-                  return ListTile(
-                    title: Text(
-                      folder,
-                      style: _patrickHand(fontSize: 18),
-                    ),
-                    onTap: () => Navigator.pop(context, folder),
-                  );
+                    final isSelected = folder == _selectedFolder;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context, folder),
+                        child: WiredCard(
+                          backgroundColor: Colors.white,
+                          borderColor: _primaryColor.withValues(alpha: 0.3),
+                          borderWidth: 1.5,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.folder_outlined, color: _primaryColor.withValues(alpha: 0.7), size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  folder,
+                                  style: _patrickHand(fontSize: 18),
+                                ),
+                              ),
+                              if (isSelected)
+                                Icon(Icons.check, color: _primaryColor, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
                 }).toList(),
               ),
             ],
@@ -417,7 +442,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
-        child: WiredCard(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: WiredCard(
           backgroundColor: Colors.white,
           borderColor: _primaryColor,
           borderWidth: 1.5,
@@ -433,16 +460,22 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.3))),
-                ),
+              WiredCard(
+                backgroundColor: Colors.transparent,
+                borderColor: _primaryColor.withValues(alpha: 0.5),
+                borderWidth: 1.5,
+                padding: EdgeInsets.zero,
                 child: TextField(
                   controller: controller,
                   decoration: InputDecoration(
                     hintText: 'Folder name',
                     hintStyle: _patrickHand(color: _primaryColor.withValues(alpha: 0.5)),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                   style: _patrickHand(fontSize: 18),
                   autofocus: true,
@@ -452,13 +485,18 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  WiredButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: Text('Cancel', style: _patrickHand(color: Colors.grey)),
+                    backgroundColor: Colors.transparent,
+                    borderColor: _primaryColor.withValues(alpha: 0.3),
+                    child: Text('Cancel', style: _patrickHand(color: _primaryColor.withValues(alpha: 0.7))),
                   ),
-                  const SizedBox(width: 8),
-                  TextButton(
+                  const SizedBox(width: 12),
+                  WiredButton(
                     onPressed: () => Navigator.pop(context, true),
+                    filled: true,
+                    backgroundColor: const Color(0xFFFFB300), // Amber
+                    borderColor: const Color(0xFFFFB300),
                     child: Text('Create', style: _patrickHand(color: _primaryColor, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -466,6 +504,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
 

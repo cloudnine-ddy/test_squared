@@ -6,6 +6,8 @@ class TopicModel {
   final String subjectId;
   final String description;
   final int questionCount;
+  final int mcqCount;
+  final int structuredCount;
   final Color color;
 
   const TopicModel({
@@ -14,6 +16,8 @@ class TopicModel {
     required this.subjectId,
     required this.description,
     required this.questionCount,
+    this.mcqCount = 0,
+    this.structuredCount = 0,
     required this.color,
   });
 
@@ -38,6 +42,8 @@ class TopicModel {
       subjectId: map['subject_id'] as String? ?? '',
       description: map['description'] as String? ?? '',
       questionCount: map['question_count'] as int? ?? map['questionCount'] as int? ?? 0,
+      mcqCount: map['mcq_count'] as int? ?? 0,
+      structuredCount: map['structured_count'] as int? ?? 0,
       color: colorValue,
     );
   }
@@ -50,6 +56,8 @@ class TopicModel {
       'subject_id': subjectId,
       'description': description,
       'question_count': questionCount,
+      'mcq_count': mcqCount,
+      'structured_count': structuredCount,
       'color': color.value,
     };
   }

@@ -44,30 +44,18 @@ class DashboardEmptyState extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Illustration/Icon with sketchy circle
-              CustomPaint(
-                painter: WiredBorderPainter(
-                  color: _primaryColor.withValues(alpha: 0.3),
-                  strokeWidth: 2,
-                  seed: 42,
-                ),
-                child: Container(
-                  width: 160,
-                  height: 160,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.school_outlined,
-                    size: 70,
-                    color: _primaryColor,
-                  ),
-                ),
+              // TestSquared Logo
+              Image.asset(
+                'lib/core/assets/images/logo_box_test_squared.png',
+                width: 120,
+                height: 120,
               ),
 
               const SizedBox(height: 40),
 
               // Welcome message
               Text(
-                'Welcome to Test²!',
+                'Welcome to TestSquared!',
                 style: _patrickHand(
                   fontSize: 42,
                   fontWeight: FontWeight.bold,
@@ -144,6 +132,7 @@ class DashboardEmptyState extends StatelessWidget {
         borderColor: _primaryColor.withValues(alpha: 0.3),
         borderWidth: 1.5,
         width: 200,
+        minHeight: 200,
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [

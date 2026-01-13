@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/past_paper_repository.dart'; // Added import
 import '../../../shared/wired/wired_widgets.dart'; // Sketchy widgets
@@ -434,7 +435,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
             const SizedBox(height: 24),
             WiredButton(
               onPressed: () {
-                // TODO: Navigate to premium upgrade
+                context.push('/premium');
               },
               backgroundColor: const Color(0xFFD4AF37),
               filled: true,

@@ -17,14 +17,14 @@ class MasteryBadge extends StatelessWidget {
       backgroundColor: config.color.withValues(alpha: 0.1),
       borderColor: config.color.withValues(alpha: 0.5),
       borderWidth: 1.0,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             config.icon,
             color: config.color,
-            size: 14,
+            size: 18,
           ),
           const SizedBox(width: 4),
           Text(
@@ -32,7 +32,7 @@ class MasteryBadge extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'PatrickHand',
               color: config.color,
-              fontSize: 12,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
           ),

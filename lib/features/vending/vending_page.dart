@@ -122,13 +122,13 @@ class VendingPage extends StatelessWidget {
                                       Row(
                                         children: [
                                           WiredButton(
-                                            onPressed: () => context.push('/dashboard'),
+                                            onPressed: () => context.push('/login'),
                                             filled: true,
                                             backgroundColor: _primaryColor,
                                             borderColor: _primaryColor,
                                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                             child: Text(
-                                              'Try for Free',
+                                              'Log in',
                                               style: _patrickHand(
                                                 color: Colors.white,
                                                 fontSize: 24,
@@ -143,7 +143,7 @@ class VendingPage extends StatelessWidget {
                                             borderColor: _primaryColor,
                                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                             child: Text(
-                                              'Get Started Free',
+                                              'Sign up free',
                                               style: _patrickHand(
                                                 color: _primaryColor,
                                                 fontSize: 24,
@@ -199,17 +199,19 @@ class VendingPage extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 32),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center, // Center buttons for mobile
+                                  Wrap(
+                                    alignment: WrapAlignment.center,
+                                    spacing: 16,
+                                    runSpacing: 16,
                                     children: [
                                       WiredButton(
-                                        onPressed: () => context.push('/dashboard'),
+                                        onPressed: () => context.push('/login'),
                                         filled: true,
                                         backgroundColor: _primaryColor,
                                         borderColor: _primaryColor,
                                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                         child: Text(
-                                          'Try for Free',
+                                          'Log in',
                                           style: _patrickHand(
                                             color: Colors.white,
                                             fontSize: 24,
@@ -217,14 +219,13 @@ class VendingPage extends StatelessWidget {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 24),
                                       WiredButton(
                                         onPressed: () => context.push('/signup'),
                                         filled: false,
                                         borderColor: _primaryColor,
                                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                         child: Text(
-                                          'Get Started Free',
+                                          'Sign up free',
                                           style: _patrickHand(
                                             color: _primaryColor,
                                             fontSize: 24,
@@ -777,7 +778,7 @@ class VendingPage extends StatelessWidget {
             const SizedBox(height: 32),
             // CTA Button
             WiredButton(
-              onPressed: () => context.push('/dashboard'),
+              onPressed: () => context.push('/signup'),
               filled: true,
               backgroundColor: _primaryColor,
               borderColor: _primaryColor,
@@ -786,7 +787,7 @@ class VendingPage extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Start Your Frictionless Study Session',
+                    'Get Started for Free',
                     style: _patrickHand(
                       color: Colors.white,
                       fontSize: 20,
@@ -796,6 +797,18 @@ class VendingPage extends StatelessWidget {
                   const SizedBox(width: 12),
                   const Icon(Icons.arrow_forward, color: Colors.white, size: 20),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => context.push('/login'),
+              child: Text(
+                'Already have an account? Log in',
+                style: _patrickHand(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _primaryColor.withValues(alpha: 0.8),
+                ),
               ),
             ),
           ],
@@ -896,30 +909,33 @@ class VendingPage extends StatelessWidget {
           Align(
             alignment: Alignment.centerRight,
             child: Row(
-              mainAxisSize: MainAxisSize.min, // Keep minimal width for alignment
+              mainAxisSize: MainAxisSize.min,
               children: [
                 TextButton(
                   onPressed: () => context.push('/login'),
                   child: Text(
                     'Log in',
                     style: _patrickHand(
-                      fontSize: 22, // Bigger
+                      fontSize: MediaQuery.of(context).size.width > 450 ? 22 : 18,
                       fontWeight: FontWeight.bold,
                       color: _primaryColor,
                     ),
                   ),
                 ),
-                const SizedBox(width: 20),
+                SizedBox(width: MediaQuery.of(context).size.width > 450 ? 20 : 10),
                 WiredButton(
                   onPressed: () => context.push('/signup'),
                   filled: true,
                   backgroundColor: _primaryColor,
                   borderColor: _primaryColor,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), // Reduced padding
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.of(context).size.width > 450 ? 20 : 12, 
+                    vertical: 10,
+                  ), 
                   child: Text(
                     'Get Started Free',
                     style: _patrickHand(
-                      fontSize: 18, // Slightly smaller
+                      fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 14,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -960,15 +976,18 @@ class VendingPage extends StatelessWidget {
       child: Column(
         children: [
           // Section Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Icon(Icons.psychology_outlined, color: _primaryColor.withValues(alpha: 0.6), size: 36),
-              const SizedBox(width: 12),
               Text(
                 'Why is studying so hard?',
+                textAlign: TextAlign.center,
                 style: _patrickHand(
-                  fontSize: 52,
+                  fontSize: MediaQuery.of(context).size.width > 600 ? 52 : 36,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1301,8 +1320,11 @@ class VendingPage extends StatelessWidget {
           return Column(
             children: [
               // Headline with sparkle
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 16,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -1314,14 +1336,14 @@ class VendingPage extends StatelessWidget {
                     ),
                     child: const Icon(Icons.auto_awesome, color: Colors.white, size: 32),
                   ),
-                  const SizedBox(width: 16),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: isWide ? CrossAxisAlignment.start : CrossAxisAlignment.center,
                     children: [
                       Text(
                         'Prepare for the Future,',
+                        textAlign: isWide ? TextAlign.left : TextAlign.center,
                         style: _patrickHand(
-                          fontSize: 40,
+                          fontSize: isWide ? 40 : 32,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -1331,8 +1353,9 @@ class VendingPage extends StatelessWidget {
                         ).createShader(bounds),
                         child: Text(
                           'Not Just the Past.',
+                          textAlign: isWide ? TextAlign.left : TextAlign.center,
                           style: _patrickHand(
-                            fontSize: 40,
+                            fontSize: isWide ? 40 : 32,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),

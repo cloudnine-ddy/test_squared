@@ -36,7 +36,7 @@ class PremiumPage extends StatelessWidget {
                onPressed: () => context.pop(),
             ),
             title: Text(
-              'Test² Premium',
+              'TestSquared Premium',
               style: _patrickHand(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -48,13 +48,23 @@ class PremiumPage extends StatelessWidget {
           // Hero Section
           SliverToBoxAdapter(
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24), // More vertical padding
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
               child: Column(
                 children: [
+                  // Logo in Hero Section
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 24),
+                    height: 100,
+                    child: Image.asset(
+                      'lib/core/assets/images/logo_box_test_squared.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+                    ),
+                  ),
                   Text(
                     'Unlock Your Full Potential',
                     style: _patrickHand(
-                      fontSize: 48, // Larger title
+                      fontSize: 48,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
@@ -62,12 +72,20 @@ class PremiumPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Get unlimited access to all features and ace your exams',
+                    'Get unlimited access to all features and ace your exams with TestSquared',
                     style: _patrickHand(
                       fontSize: 24,
                       color: AppColors.textSecondary,
                     ),
                     textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 100),
+                    child: WiredDivider(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      thickness: 2,
+                    ),
                   ),
                 ],
               ),
@@ -81,15 +99,15 @@ class PremiumPage extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   // Responsive layout for cards
-                  if (constraints.maxWidth > 800) {
+                  if (constraints.maxWidth > 1000) {
                      return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(child: _buildFreeCard(context)),
                         const SizedBox(width: 24),
-                        Expanded(child: _buildPremiumCard(context)),
+                        Expanded(child: _buildProCard(context)),
                         const SizedBox(width: 24),
-                        Expanded(child: _buildLifetimeCard(context)),
+                        Expanded(child: _buildEliteCard(context)),
                       ],
                     );
                   } else {
@@ -97,13 +115,40 @@ class PremiumPage extends StatelessWidget {
                       children: [
                         _buildFreeCard(context),
                         const SizedBox(height: 32),
-                        _buildPremiumCard(context),
+                        _buildProCard(context),
                         const SizedBox(height: 32),
-                        _buildLifetimeCard(context),
+                        _buildEliteCard(context),
                       ],
                     );
                   }
                 },
+              ),
+            ),
+          ),
+
+          // Small print below cards
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                children: [
+                  Text(
+                    'Unlimited usage subject to fair use.',
+                    style: _patrickHand(
+                      fontSize: 14,
+                      color: AppColors.textSecondary.withValues(alpha: 0.7),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    'Features may expand over time.',
+                    style: _patrickHand(
+                      fontSize: 14,
+                      color: AppColors.textSecondary.withValues(alpha: 0.7),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ),
@@ -181,7 +226,7 @@ class PremiumPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Join thousands of students who improved their grades with Test² Premium',
+                      'Join thousands of students who improved their grades with TestSquared Premium',
                       style: _patrickHand(
                         fontSize: 20,
                         color: Colors.white.withValues(alpha: 0.9),
@@ -217,36 +262,45 @@ class PremiumPage extends StatelessWidget {
   Widget _buildFreeCard(BuildContext context) {
     return _buildPricingCardBase(
       title: 'Free',
+      subtitle: 'Smart practice for everyday revision',
       price: 'RM 0',
-      period: 'forever',
+      period: '/ month',
       features: [
-        '5 questions per day',
-        'Basic progress tracking',
-        'Community support',
-        'Limited subjects',
+        'Limited AI answer checking',
+        'Basic marking feedback',
+        'Limited question generation',
+        'Bookmark questions',
+        'View notes & sketches',
+        'Access to all IGCSE subjects',
       ],
-      buttonText: 'Current Plan',
-      buttonColor: AppColors.textSecondary,
+      footnote: '*Limits apply: AI Answer checks – 5/day, Question Generation - 10/Week',
+      buttonText: 'Get Free →',
+      buttonColor: AppColors.primary,
       filledButton: false, 
-      onPressed: null,
+      onPressed: () => context.pop(),
       isPopular: false,
     );
   }
 
-  Widget _buildPremiumCard(BuildContext context) {
+  Widget _buildProCard(BuildContext context) {
     return _buildPricingCardBase(
-      title: 'Premium',
-      price: 'RM 29',
-      period: '/month',
+      title: 'Pro',
+      subtitle: 'Everything you need to improve your grades',
+      price: 'RM 10',
+      period: '/ month',
       features: [
-        '✨ Unlimited questions',
-        '✨ AI-powered explanations',
-        '✨ Advanced analytics',
-        '✨ All subjects',
-        '✨ Priority support',
-        '✨ Download questions',
+        'Everything in Free, plus:',
+        'Unlimited AI answer checking',
+        'Full marking-scheme comparison',
+        'Method & working feedback',
+        'Unlimited question generation',
+        'Save questions to personal library',
+        'Editable notes & sketch tools',
+        'Topic-level progress tracking',
+        'Faster AI responses',
       ],
-      buttonText: 'Upgrade Now',
+      footnote: 'Best value for most students',
+      buttonText: 'Get Pro →',
       buttonColor: AppColors.primary,
       filledButton: true,
       onPressed: () {
@@ -261,19 +315,23 @@ class PremiumPage extends StatelessWidget {
     );
   }
 
-   Widget _buildLifetimeCard(BuildContext context) {
+  Widget _buildEliteCard(BuildContext context) {
     return _buildPricingCardBase(
-      title: 'Lifetime',
-      price: 'RM 199',
-      period: 'one-time',
+      title: 'Elite',
+      subtitle: 'Exam-level mastery for top scorers',
+      price: 'RM 29',
+      period: '/ month',
       features: [
-        '🚀 Everything in Premium',
-        '🚀 Lifetime access',
-        '🚀 Future features included',
-        '🚀 VIP support',
-        '🚀 Early access',
+        'Everything in Pro, plus:',
+        'Advanced hints before full solutions',
+        'Custom difficulty control (easy → A*)',
+        'Long-term progress analytics',
+        'Exportable progress reports (PDF)',
+        'Priority AI response speed',
+        'Priority support',
       ],
-      buttonText: 'Get Lifetime',
+      footnote: 'Built for A/A* students and exam-focused learners',
+      buttonText: 'Get Elite →',
       buttonColor: AppColors.accent,
       filledButton: true,
       onPressed: () {
@@ -290,9 +348,11 @@ class PremiumPage extends StatelessWidget {
 
   Widget _buildPricingCardBase({
     required String title,
+    required String subtitle,
     required String price,
     required String period,
     required List<String> features,
+    required String footnote,
     required String buttonText,
     required Color buttonColor,
     required bool filledButton,
@@ -315,19 +375,21 @@ class PremiumPage extends StatelessWidget {
                 ),
               ),
            ),
-           _buildCardContent(title, price, period, features, buttonText, buttonColor, filledButton, onPressed, isPopular: true),
+           _buildCardContent(title, subtitle, price, period, features, footnote, buttonText, buttonColor, filledButton, onPressed, isPopular: true),
         ],
       );
     } else {
-       return _buildCardContent(title, price, period, features, buttonText, buttonColor, filledButton, onPressed, isPopular: false);
+       return _buildCardContent(title, subtitle, price, period, features, footnote, buttonText, buttonColor, filledButton, onPressed, isPopular: false);
     }
   }
 
   Widget _buildCardContent(
-    String title, 
+    String title,
+    String subtitle,
     String price, 
     String period, 
-    List<String> features, 
+    List<String> features,
+    String footnote,
     String buttonText, 
     Color buttonColor, 
     bool filledButton,
@@ -363,12 +425,21 @@ class PremiumPage extends StatelessWidget {
           Text(
             title,
             style: _patrickHand(
-              fontSize: 28,
+              fontSize: 32,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: AppColors.primary,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: _patrickHand(
+              fontSize: 16,
+              color: AppColors.textSecondary,
+              height: 1.2,
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
@@ -376,48 +447,25 @@ class PremiumPage extends StatelessWidget {
               Text(
                 price,
                 style: _patrickHand(
-                  fontSize: 48,
+                  fontSize: 42,
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               Text(
                 period,
                 style: _patrickHand(
-                  fontSize: 20,
+                  fontSize: 18,
                   color: AppColors.textSecondary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           WiredDivider(color: AppColors.border),
-           const SizedBox(height: 32),
-          ...features.map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline, // Sketchy-er outline icon
-                      color: isPopular ? AppColors.primary : AppColors.success,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: _patrickHand(
-                          fontSize: 18,
-                          color: AppColors.textPrimary,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+          const SizedBox(height: 24),
+          ...features.map((feature) => _buildFeatureRow(feature, isPopular)),
           const SizedBox(height: 40),
           SizedBox(
             width: double.infinity,
@@ -431,8 +479,44 @@ class PremiumPage extends StatelessWidget {
                 style: _patrickHand(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                   color: filledButton ? Colors.white : buttonColor,
+                  color: filledButton ? Colors.white : buttonColor,
                 ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            footnote,
+            style: _patrickHand(
+              fontSize: 13,
+              color: AppColors.textSecondary.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow(String feature, bool isPopular) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.check_circle_outline,
+            color: isPopular ? AppColors.primary : AppColors.success,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              feature,
+              style: _patrickHand(
+                fontSize: 17,
+                color: AppColors.textPrimary,
+                height: 1.2,
               ),
             ),
           ),

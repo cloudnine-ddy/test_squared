@@ -336,13 +336,7 @@ class PremiumUpgradeDialog extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          // TODO: Navigate to upgrade page
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Upgrade flow coming soon!'),
-                              backgroundColor: Colors.amber,
-                            ),
-                          );
+                          context.push('/premium');
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
