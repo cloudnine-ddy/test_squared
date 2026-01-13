@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:ui';
 import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
+import 'models/question_blocks.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import 'widgets/question_image_header.dart';
@@ -197,12 +199,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       } else {
         await _bookmarkRepo.addBookmark(widget.questionId);
       }
-      
+
       // Update UI immediately
       setState(() {
         _isBookmarked = !_isBookmarked;
       });
-      
+
       // Optional: Show toast/snack
     } catch (e) {
       print('Error toggling bookmark: $e');
@@ -225,9 +227,30 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           _previousAttempt = attempt.toMap();
           _isViewingPreviousAnswer = true;
 
-          // Pre-fill the answer
+          // Pre-fill the answer for regular questions
           if (attempt.answerText != null) {
-            _studentAnswerController.text = attempt.answerText!;
+            // Check if it's structured answer (JSON format)
+            try {
+              final parsed = jsonDecode(attempt.answerText!);
+              if (parsed is List) {
+                // Structured answer format: [{"(a)(i)": "answer1"}, {"(a)(ii)": "answer2"}]
+                _structuredAnswers = {};
+                for (var item in parsed) {
+                  if (item is Map) {
+                    item.forEach((key, value) {
+                      _structuredAnswers[key.toString()] = value.toString();
+                    });
+                  }
+                }
+                print('📥 Loaded structured answers: ${_structuredAnswers.keys}');
+              } else {
+                // Regular text answer
+                _studentAnswerController.text = attempt.answerText!;
+              }
+            } catch (e) {
+              // Not JSON, treat as regular text
+              _studentAnswerController.text = attempt.answerText!;
+            }
           }
           if (attempt.selectedOption != null) {
             _selectedMcqAnswer = attempt.selectedOption;
@@ -442,6 +465,114 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     // (Optional: trigger any listeners if needed)
   }
 
+  Future<void> _checkStructuredAnswer() async {
+    if (_question == null || _structuredAnswers.isEmpty) return;
+
+    // Check premium access
+    final canUseCheckAnswer = ref.read(canUseCheckAnswerProvider);
+    final isPremium = ref.read(isPremiumProvider);
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    if (!canUseCheckAnswer) {
+      AccessControlService.checkPremium(
+        context,
+        ref,
+        featureName: 'AI Answer Checking',
+        highlights: [
+          'You have used all 5 free answer checks',
+          'Upgrade to Premium for unlimited checks',
+          'Get instant AI-powered feedback',
+          'Track your progress over time',
+        ],
+      );
+      return;
+    }
+
+    // Decrement free checks for non-premium users
+    if (!isPremium && userId != null) {
+      await decrementFreeChecks(userId);
+      ref.invalidate(currentUserProvider);
+    }
+
+    setState(() {
+      _isCheckingAnswer = true;
+    });
+
+    try {
+      final timeSpent = _questionStartTime != null
+          ? DateTime.now().difference(_questionStartTime!).inSeconds
+          : 0;
+
+      // Build structured answers array from blocks
+      final structuredAnswersArray = <Map<String, dynamic>>[];
+
+      if (_question!.structureData != null) {
+        for (final block in _question!.structureData!) {
+          if (block is QuestionPartBlock) {
+            final questionPart = block as QuestionPartBlock;
+            final answer = _structuredAnswers[questionPart.label];
+            if (answer != null && answer.toString().trim().isNotEmpty) {
+              structuredAnswersArray.add({
+                'label': questionPart.label,
+                'studentAnswer': answer.toString(),
+                'officialAnswer': questionPart.officialAnswer,
+                'marks': questionPart.marks,
+              });
+            }
+          }
+        }
+      }
+
+      if (structuredAnswersArray.isEmpty) {
+        throw Exception('Please answer at least one part');
+      }
+
+      print('📝 Submitting ${structuredAnswersArray.length} answers:');
+      for (final ans in structuredAnswersArray) {
+        final preview = ans['studentAnswer']?.toString() ?? '';
+        final previewText = preview.length > 20 ? preview.substring(0, 20) : preview;
+        print('  - Part ${ans['label']}: "$previewText..."');
+      }
+
+      final response = await Supabase.instance.client.functions.invoke(
+        'check-answer',
+        body: {
+          'questionId': _question!.id,
+          'isStructured': true,
+          'structuredAnswers': structuredAnswersArray,
+          'userId': userId,
+          'timeSpent': timeSpent,
+          'hintsUsed': 0,
+        },
+      );
+
+      if (response.status == 200 && response.data != null) {
+        print('✅ Structured answer response: ${response.data}');
+        setState(() {
+          _aiFeedback = response.data as Map<String, dynamic>;
+          _answerSubmitted = true;
+          _isCheckingAnswer = false;
+        });
+        print('📊 Per-part results: ${_aiFeedback!['perPartResults']}');
+        print('Structured question progress saved');
+      } else {
+        throw Exception(response.data?['error'] ?? 'Unknown error');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingAnswer = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error checking answer: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showAnswerSheet() {
     if (_question == null) return;
 
@@ -640,8 +771,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ),
         ),
-        height: 80, 
-        child: SafeArea( 
+        height: 80,
+        child: SafeArea(
           child: Row(
             children: [
               // Previous Button
@@ -663,9 +794,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                        Icon(Icons.arrow_back_rounded, size: 22, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
                        const SizedBox(width: 8),
                        Text(
-                         'Previous', 
+                         'Previous',
                          style: _patrickHand(
-                           fontSize: 18, 
+                           fontSize: 18,
                            color: _prevQuestionId == null ? Colors.grey : _primaryColor,
                            fontWeight: FontWeight.bold,
                         ),
@@ -825,7 +956,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: Colors.amber, 
+                              color: Colors.amber,
                               shape: BoxShape.circle,
                               border: Border.all(color: Colors.white, width: 1.5),
                             ),
@@ -844,14 +975,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     width: 44,
                     height: 44,
                     child: WiredButton(
-                      onPressed: _toggleBookmark, 
+                      onPressed: _toggleBookmark,
                       padding: EdgeInsets.zero,
                       backgroundColor: _isBookmarked ? _primaryColor : Colors.white,
                       filled: true,
                       borderColor: _primaryColor,
                        child: Icon(
                         _isBookmarked ? Icons.bookmark_added_rounded : Icons.bookmark_outline_rounded,
-                        color: _isBookmarked ? Colors.white : _primaryColor, 
+                        color: _isBookmarked ? Colors.white : _primaryColor,
                         size: 20
                       ),
                     ),
@@ -1168,7 +1299,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ...(_question!.options!.map((option) {
               final isSelected = _selectedMcqAnswer == option['label'];
               final isCorrectTarget = option['label'] == _question!.effectiveCorrectAnswer;
-              
+
               // Only mark as correct if selected AND correct. Don't spoil others.
               final isCorrect = _answerSubmitted && isSelected && isCorrectTarget;
               final isWrong = _answerSubmitted && isSelected && !isCorrectTarget;
@@ -1286,52 +1417,65 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ] else if (_question!.isStructured) ...[
             // Structured question with blocks
-            // Structured question with blocks
             SmartQuestionRenderer(
-              blocks: _question!.structureData!,
+              blocks: _question!.structureData ?? [],
               onAnswersChanged: (answers) {
                 setState(() {
                   _structuredAnswers = answers;
                 });
               },
-              initialAnswers: _previousAttempt?['structured_answers'],
-              showSolutions: _answerSubmitted,
+              showSolutions: false, // Don't show official answers - show AI feedback instead
+              perPartFeedback: _aiFeedback != null && _aiFeedback!['perPartResults'] != null
+                  ? List<dynamic>.from(_aiFeedback!['perPartResults'])
+                  : null,
+              savedAnswers: _structuredAnswers, // Pass saved answers for pre-filling
+              isSubmitted: _answerSubmitted, // Lock inputs after submission
             ),
             const SizedBox(height: 16),
             // Submit button for structured questions
             SizedBox(
               width: double.infinity,
               child: WiredButton(
-                onPressed: (_answerSubmitted || _structuredAnswers.isEmpty) ? null : () {
-                  // For now, just mark as submitted
-                  // TODO: Implement structured question checking
-                  setState(() {
-                    _answerSubmitted = true;
-                    _aiFeedback = {
-                      'isCorrect': true,
-                      'is_correct': true,
-                      'score': 100,
-                      'feedback': 'Structured question submitted successfully',
-                      'strengths': [],
-                      'hints': [],
-                      'improvements': [],
-                    };
-                  });
-                },
+                onPressed: (_answerSubmitted || _structuredAnswers.isEmpty || _isCheckingAnswer)
+                    ? null
+                    : _checkStructuredAnswer,
                 backgroundColor: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey.shade300 : Colors.blue,
                 filled: true,
                 borderColor: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey.shade400 : Colors.blue,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   child: Center(
-                    child: Text(
-                      _answerSubmitted ? 'Submitted ✓' : 'Submit Answers',
-                      style: _patrickHand(
-                        color: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey : Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
+                    child: _isCheckingAnswer
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Grading...',
+                                style: _patrickHand(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            _answerSubmitted ? 'Submitted ✓' : 'Check Answer',
+                            style: _patrickHand(
+                              color: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -1382,35 +1526,43 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
           // Feedback
           if (_aiFeedback != null) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             WiredCard(
+              padding: const EdgeInsets.all(16),
               backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
                   ? Colors.green.withValues(alpha: 0.1)
                   : Colors.red.withValues(alpha: 0.1),
               borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle_outline : Icons.cancel_outlined,
-                      color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      isPremium 
-                        ? (_aiFeedback!['feedback'] ?? '') // Show full feedback if premium
-                        : ((_aiFeedback!['isCorrect'] ?? false) ? 'Correct!' : 'Incorrect.'), // Concise if not premium
-                      style: _patrickHand(
-                        height: 1.4,
-                        fontSize: 17,
-                        color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green.shade700 : Colors.red.shade700,
-                        fontWeight: FontWeight.w600
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle_outline : Icons.cancel_outlined,
+                              color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                // Show earned/total marks if available, otherwise show feedback
+                                _aiFeedback!.containsKey('earnedMarks') && _aiFeedback!.containsKey('totalMarks')
+                                    ? 'You scored ${_aiFeedback!['earnedMarks']}/${_aiFeedback!['totalMarks']} marks (${_aiFeedback!['score']}%)'
+                                    : (_aiFeedback!['feedback'] ?? ''),
+                                style: _patrickHand(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green.shade700 : Colors.red.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1501,8 +1653,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             child: Stack(
               children: [
                 // Transparent blocking layer
-                Container(color: Colors.transparent), 
-                
+                Container(color: Colors.transparent),
+
                 // Centered floating card
                 Center(
                   child: WiredCard(
@@ -1517,7 +1669,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                                Container(
-                                width: 48, 
+                                width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
                                   color: Colors.amber.withValues(alpha: 0.2),
@@ -1526,7 +1678,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                 ),
                                 child: const Icon(
                                   Icons.lock_outline_rounded,
-                                  size: 24, 
+                                  size: 24,
                                   color: Colors.amber,
                                 ),
                               ),
@@ -1551,7 +1703,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 16), 
+                              const SizedBox(height: 16),
                               WiredButton(
                                 onPressed: () {
                                   AccessControlService.checkPremium(
@@ -1564,7 +1716,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                 backgroundColor: Colors.amber,
                                 filled: true,
                                 borderColor: Colors.amber.shade700,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10), 
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
                                 child: Text(
                                   'Unlock Premium',
                                   style: _patrickHand(
@@ -1602,7 +1754,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               ),
               const SizedBox(width: 12),
               const Text(
-                'AI Step-by-Step Solution',
+                'AI Explanation',
                 style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ],
@@ -1610,10 +1762,91 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           const SizedBox(height: 16),
           const Divider(color: Colors.white12),
           const SizedBox(height: 16),
-          Text(
-            _question!.aiSolution,
-            style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
-          ),
+
+          // Check if structured question
+          if (_question!.isStructured && _question!.structureData != null) ... [
+            // Display all parts' AI answers
+            ... (_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D1117),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Part ${block.label}',
+                            style: const TextStyle(
+                              color: Colors.purple,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '[${block.marks} mark${block.marks > 1 ? 's' : ''}]',
+                          style: TextStyle(
+                            color: AppColors.textPrimary.withValues(alpha: 0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      block.content,
+                      style: TextStyle(
+                        color: AppColors.textPrimary.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (block.aiAnswer != null && block.aiAnswer!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Divider(color: Colors.white12),
+                      const SizedBox(height: 12),
+                      Text(
+                        block.aiAnswer!,
+                        style: _patrickHand(
+                          color: Colors.purple.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'AI explanation not available',
+                        style: TextStyle(
+                          color: AppColors.textPrimary.withValues(alpha: 0.4),
+                          fontStyle: FontStyle.italic,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            })),
+          ] else ...[
+            // Regular question - show single AI answer
+            Text(
+              _question!.aiAnswer ?? 'AI explanation not available for this question yet.',
+              style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
+            ),
+          ],
         ],
       ),
     );
@@ -1680,7 +1913,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               children: [
                 // Transparent blocking layer
                 Container(color: Colors.transparent),
-                
+
                 // Centered floating card
                 Center(
                   child: WiredCard(
@@ -1775,10 +2008,91 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           const SizedBox(height: 16),
           const Divider(color: Colors.white12),
           const SizedBox(height: 16),
-          Text(
-            _question!.officialAnswer,
-            style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
-          ),
+
+          // Check if structured question
+          if (_question!.isStructured && _question!.structureData != null) ...[
+            // Display all parts' official answers
+            ...(_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D1117),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'Part ${block.label}',
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '[${block.marks} mark${block.marks > 1 ? 's' : ''}]',
+                          style: TextStyle(
+                            color: AppColors.textPrimary.withValues(alpha: 0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      block.content,
+                      style: TextStyle(
+                        color: AppColors.textPrimary.withValues(alpha: 0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (block.officialAnswer != null && block.officialAnswer!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Divider(color: Colors.white12),
+                      const SizedBox(height: 12),
+                      Text(
+                        block.officialAnswer!,
+                        style: _patrickHand(
+                          color: Colors.green.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          height: 1.5,
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'No official answer available',
+                        style: TextStyle(
+                          color: AppColors.textPrimary.withValues(alpha: 0.4),
+                          fontStyle: FontStyle.italic,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            })),
+          ] else ...[
+            // Regular question - show single official answer
+            Text(
+              _question!.officialAnswer,
+              style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
+            ),
+          ],
         ],
       ),
     );
@@ -1942,7 +2256,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                               onPressed: (_answerSubmitted || _isCheckingAnswer)
                                   ? null
                                   : () {
-                                      if (_studentAnswerController.text.trim().isNotEmpty) {
+                                      if (_question!.isStructured) {
+                                        _checkStructuredAnswer();
+                                      } else if (_studentAnswerController.text.trim().isNotEmpty) {
                                         _checkAnswer();
                                       }
                                     },

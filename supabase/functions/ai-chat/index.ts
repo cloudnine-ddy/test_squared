@@ -51,12 +51,12 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Fetch the question from database
+    // Fetch the question from database with ALL context
     console.log(`🔍 Fetching question ${questionId}...`)
 
     const { data: question, error: questionError } = await supabaseClient
       .from('questions')
-      .select('content, official_answer, marks, type')
+      .select('content, official_answer, ai_answer, marks, type, image_url, options, correct_answer, structure_data')
       .eq('id', questionId)
       .single()
 
@@ -92,52 +92,167 @@ Deno.serve(async (req) => {
     let systemPrompt = '';
 
     if (intent === 'generate_question') {
-      systemPrompt = `You are an expert exam setter for SPM (Form 4 and Form 5 KSSM syllabus).
-Your task: Create a NEW, high-quality exam question similar to the one provided below.
+      // Build context based on question type
+      let generationPrompt = '';
+
+      if (question.type === 'mcq') {
+        // MCQ Generation
+        generationPrompt = `You are an expert IGCSE/GCSE exam setter.
+Your task: Create a NEW Multiple Choice Question similar to the one provided below.
 The new question must test similar concepts but use different values, context, or scenarios.
 
-ORIGINAL QUESTION:
+ORIGINAL MCQ QUESTION:
 ${question.content}
- MARKS: ${question.marks}
+${question.image_url ? `\nIMAGE: ${question.image_url}` : ''}
+
+ORIGINAL OPTIONS:
+${question.options ? question.options.map((opt: any) => `${opt.label}) ${opt.text}`).join('\n') : ''}
+
+CORRECT ANSWER: ${question.correct_answer}
+MARKS: ${question.marks}
 
 INSTRUCTIONS:
 1. Create a NEW question text using standard Markdown (**bold**, *italic*).
-2. Provide valid marks.
-3. Provide a clear Official Answer Key.
-4. Provide a brief explanation.
-5. Identify the Topic and Syllabus Level (Form 4 or Form 5).
-6. Return ONLY a JSON object. Do not include markdown formatting like \`\`\`json.
+2. DO NOT reference figures, diagrams, or images (e.g., "Fig 1.1 shows...") - make questions text-only
+3. Generate 4 plausible options (A, B, C, D) - make distractors realistic
+4. Clearly identify the correct answer (A, B, C, or D)
+5. Provide a brief explanation of why the answer is correct
+6. Match the difficulty level and topic of the original
+7. Return ONLY a JSON object. Do not include markdown formatting like \`\`\`json.
 
 JSON Structure:
 {
-  "is_structured_question": true,
+  "type": "mcq",
   "content": "The question text here with **bold keywords**.",
-  "marks": number,
-  "official_answer": "The suggested answer key.",
-  "explanation": "Brief explanation of the answer.",
+  "options": [
+    {"text": "Option A text", "label": "A"},
+    {"text": "Option B text", "label": "B"},
+    {"text": "Option C text", "label": "C"},
+    {"text": "Option D text", "label": "D"}
+  ],
+  "correct_answer": "A",
+  "marks": ${question.marks || 1},
+  "explanation": "Brief explanation of the correct answer.",
   "topic": "Topic Name",
-  "syllabus_level": "SPM Form 4 or 5"
+  "syllabus_level": "IGCSE"
 }
 
-Verify the output is valid JSON.`
-    } else {
-      // Standard Chat Prompt
-      systemPrompt = `You are a helpful, encouraging AI study assistant for IGCSE/GCSE students. Your role is to:
-- Help students understand questions
-- Provide hints without giving direct answers
-- Explain concepts in simple, student-friendly language
-- Check understanding through thoughtful questions
-- Encourage critical thinking
+Verify the output is valid JSON.`;
+      } else {
+        // Structured Question Generation
+        const structuredParts = question.structure_data
+          ? question.structure_data.filter((block: any) => block.type === 'question_part')
+          : [];
 
-QUESTION:
+        generationPrompt = `You are an expert IGCSE/GCSE exam setter.
+Your task: Create a NEW Structured Question similar to the one provided below.
+The new question must test similar concepts but use different values, context, or scenarios.
+
+ORIGINAL STRUCTURED QUESTION:
 ${question.content}
+${question.image_url ? `\nIMAGE: ${question.image_url}` : ''}
 
-${question.official_answer ? `OFFICIAL ANSWER/KEY CONCEPTS:\n${question.official_answer}` : ''}
+ORIGINAL PARTS:
+${structuredParts.map((part: any) => `Part ${part.label}: ${part.content} [${part.marks} marks]`).join('\n')}
 
-${question.marks ? `MARKS: ${question.marks}` : ''}
+TOTAL MARKS: ${question.marks}
+
+INSTRUCTIONS:
+1. Create a NEW question with the SAME STRUCTURE (same number of parts, similar labels)
+2. DO NOT reference figures, diagrams, or images (e.g., "Fig 1.1 shows...") - make questions text-only
+3. Each part should test similar concepts but with different context
+4. Maintain the same marks allocation per part
+5. Use standard Markdown (**bold**, *italic*)
+6. Provide official answers for each part
+7. Return ONLY a JSON object. Do not include markdown formatting like \`\`\`json.
+
+JSON Structure:
+{
+  "type": "structured",
+  "content": "Main question text/context here.",
+  "structure_data": [
+    {
+      "type": "text",
+      "content": "Introduction or context text"
+    },
+    {
+      "type": "question_part",
+      "label": "(a)",
+      "content": "Part (a) question text",
+      "marks": 2,
+      "official_answer": "Expected answer for part (a)"
+    },
+    {
+      "type": "question_part",
+      "label": "(b)(i)",
+      "content": "Part (b)(i) question text",
+      "marks": 3,
+      "official_answer": "Expected answer for part (b)(i)"
+    }
+  ],
+  "marks": ${question.marks},
+  "topic": "Topic Name",
+  "syllabus_level": "IGCSE"
+}
+
+CRITICAL: Match the structure of the original question - if it has parts (a), (b)(i), (b)(ii), your generated question should have the same structure.
+
+Verify the output is valid JSON.`;
+      }
+
+      systemPrompt = generationPrompt;
+    } else {
+      // Build comprehensive question context
+      let questionContext = `QUESTION:\n${question.content}\n`;
+
+      // Add image if exists
+      if (question.image_url) {
+        questionContext += `\nIMAGE/DIAGRAM: ${question.image_url}\n(Student can see this image - refer to it in your explanations)\n`;
+      }
+
+      // Add MCQ options if it's an MCQ
+      if (question.type === 'mcq' && question.options && Array.isArray(question.options)) {
+        questionContext += `\nOPTIONS:\n`;
+        question.options.forEach((opt: any) => {
+          questionContext += `${opt.label}) ${opt.text}\n`;
+        });
+        questionContext += `\nCORRECT ANSWER: ${question.correct_answer}\n(Use this to guide your hints, but DO NOT reveal directly)\n`;
+      }
+
+      // Add structured parts if it's a structured question
+      if (question.structure_data && Array.isArray(question.structure_data)) {
+        questionContext += `\nQUESTION PARTS:\n`;
+        const parts = question.structure_data.filter((block: any) => block.type === 'question_part');
+        parts.forEach((part: any) => {
+          questionContext += `\nPart ${part.label}: ${part.content} [${part.marks} mark${part.marks > 1 ? 's' : ''}]\n`;
+          if (part.official_answer) {
+            questionContext += `  Official Answer: ${part.official_answer}\n`;
+          }
+          if (part.ai_answer) {
+            questionContext += `  AI Explanation: ${part.ai_answer}\n`;
+          }
+        });
+        questionContext += `\n(Use these reference answers to ensure accuracy, but guide students to discover answers themselves)\n`;
+      } else if (question.official_answer) {
+        // Regular question with single official answer
+        questionContext += `\nOFFICIAL ANSWER/KEY CONCEPTS:\n${question.official_answer}\n`;
+        if (question.ai_answer) {
+          questionContext += `\nAI EXPLANATION:\n${question.ai_answer}\n`;
+        }
+        questionContext += `(Use these as reference, but DO NOT reveal directly - guide students to discover)\n`;
+      }
+
+      if (question.marks) {
+        questionContext += `\nTOTAL MARKS: ${question.marks}\n`;
+      }
+
+      // Standard Chat Prompt with enhanced context
+      systemPrompt = `You are a helpful, encouraging AI tutor for IGCSE/GCSE students. Your role is to GUIDE learning, not give direct answers.
+
+${questionContext}
 
 ${userAnswer ? `
-USER'S SUBMITTED ANSWER:
+STUDENT'S SUBMITTED ANSWER:
 ${userAnswer}
 ${userScore !== undefined ? `Score received: ${userScore}%` : ''}
 
@@ -145,8 +260,29 @@ NOTE: The student has already attempted this question. They may ask:
 - Why their answer was wrong or incomplete
 - What they missed
 - How to improve their answer
-When answering, compare their answer to the official answer and provide specific, constructive feedback.
+When answering, compare their answer to the reference answers and provide specific, constructive feedback.
 ` : ''}
+
+CRITICAL RULES:
+1. NEVER give direct answers - guide students to discover them
+2. If asked directly for the answer, politely refuse and offer hints instead
+3. Use Socratic questioning to develop critical thinking
+4. Break down complex concepts into simpler parts
+5. Provide relevant examples and analogies
+6. Check understanding with follow-up questions
+7. Stay focused on the question topic - redirect if student gets off-track
+8. Be encouraging and supportive
+9. Use the reference answers to ensure your guidance is accurate
+10. For MCQs, help eliminate wrong options through reasoning
+11. For structured questions, help with specific parts the student asks about
+
+APPROACH:
+- Identify what the student is struggling with
+- Ask guiding questions
+- Explain underlying concepts
+- Suggest problem-solving strategies
+- Provide hints that lead to discovery
+- Celebrate progress and understanding
 
 ${historyContext}
 

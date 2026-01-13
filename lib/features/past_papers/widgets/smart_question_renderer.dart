@@ -9,16 +9,20 @@ import '../../../core/theme/app_colors.dart';
 /// - Question Parts (with styled "Part (a)" badges and input fields)
 class SmartQuestionRenderer extends StatefulWidget {
   final List<ExamContentBlock> blocks;
-  final Function(Map<String, dynamic> answers) onAnswersChanged;
-  final Map<String, dynamic>? initialAnswers;
+  final Function(Map<String, String>) onAnswersChanged;
   final bool showSolutions;
+  final List<dynamic>? perPartFeedback;
+  final Map<String, dynamic>? savedAnswers; // Pre-fill with saved answers
+  final bool isSubmitted; // Lock inputs after submission
 
   const SmartQuestionRenderer({
     super.key,
     required this.blocks,
     required this.onAnswersChanged,
-    this.initialAnswers,
     this.showSolutions = false,
+    this.perPartFeedback,
+    this.savedAnswers,
+    this.isSubmitted = false,
   });
 
   @override
@@ -27,31 +31,39 @@ class SmartQuestionRenderer extends StatefulWidget {
 
 class _SmartQuestionRendererState extends State<SmartQuestionRenderer> {
   final Map<String, TextEditingController> _controllers = {};
-  final Map<String, dynamic> _answers = {};
+  final Map<String, String> _answers = {}; // Changed to String for consistency with onAnswersChanged
 
   @override
   void initState() {
     super.initState();
-    _initializeControllers();
-  }
+    print('🎮 Initializing controllers for ${widget.blocks.length} blocks');
 
-  void _initializeControllers() {
-    for (final block in widget.blocks) {
+    // Initialize controllers for each question part
+    for (var block in widget.blocks) {
       if (block is QuestionPartBlock) {
-        final controller = TextEditingController(
-          text: widget.initialAnswers?[block.label]?.toString() ?? '',
-        );
-        _controllers[block.label] = controller;
-        _answers[block.label] = widget.initialAnswers?[block.label];
+        final label = block.label;
+        print('  📝 Creating controller for label: "$label"');
 
-        controller.addListener(() {
+        // Pre-fill with saved answer if available
+        final savedAnswer = widget.savedAnswers?[label]?.toString() ?? '';
+        _controllers[label] = TextEditingController(text: savedAnswer);
+        _answers[label] = savedAnswer;
+
+        if (savedAnswer.isNotEmpty) {
+          print('  ✅ Pre-filled "$label" with saved answer');
+        }
+
+        _controllers[label]!.addListener(() {
           setState(() {
-            _answers[block.label] = controller.text;
+            _answers[label] = _controllers[label]!.text;
           });
           widget.onAnswersChanged(_answers);
         });
       }
     }
+
+    print('🎮 Total controllers created: ${_controllers.length}');
+    print('🎮 Controller keys: ${_controllers.keys.toList()}');
   }
 
   @override
@@ -60,6 +72,15 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(SmartQuestionRenderer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.perPartFeedback != oldWidget.perPartFeedback) {
+      print('🔔 perPartFeedback updated!');
+      print('   New feedback: ${widget.perPartFeedback}');
+    }
   }
 
   @override
@@ -155,8 +176,8 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.image_not_supported, 
-            size: 48, 
+          Icon(Icons.image_not_supported,
+            size: 48,
             color: AppColors.textSecondary.withValues(alpha: 0.3)
           ),
           const SizedBox(height: 8),
@@ -270,19 +291,111 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> {
   }
 
   Widget _buildInputArea(QuestionPartBlock block) {
-    final controller = _controllers[block.label];
-    if (controller == null) return const SizedBox.shrink();
-
-    // Styled Input Container
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.textSecondary.withValues(alpha: 0.15),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: _controllers[block.label],
+          maxLines: 4,
+          enabled: !widget.showSolutions && !widget.isSubmitted, // Lock after submission
+          decoration: InputDecoration(
+            hintText: widget.isSubmitted ? 'Answer submitted' : 'Write your answer here...',
+            filled: true,
+            fillColor: (widget.showSolutions || widget.isSubmitted) ? Colors.grey.shade100 : Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey.shade300),
+            ),
+          ),
         ),
-      ),
-      child: _buildSpecificInput(block, controller),
+
+        // Display AI feedback for this part if available
+        if (widget.perPartFeedback != null) ...[
+          const SizedBox(height: 12),
+          Builder(
+            builder: (context) {
+              print('🔍 Checking feedback for part: ${block.label}');
+              print('   Available feedback: ${widget.perPartFeedback}');
+
+              // Find feedback for this specific part
+              final feedbackList = widget.perPartFeedback as List;
+              final feedback = feedbackList.cast<Map<String, dynamic>>().firstWhere(
+                (f) {
+                  print('   Comparing "${f['label']}" with "${block.label}"');
+                  return f['label'] == block.label;
+                },
+                orElse: () => <String, dynamic>{},
+              );
+
+              print('   Found feedback: $feedback');
+
+              if (feedback.isEmpty) {
+                print('   ❌ No feedback found for ${block.label}');
+                return const SizedBox.shrink();
+              }
+
+              final isCorrect = feedback['isCorrect'] ?? false;
+              final score = feedback['score'] ?? 0;
+              final feedbackText = feedback['feedback'] ?? '';
+              final marks = block.marks ?? 0;
+
+              print('   ✅ Rendering feedback: $score/$marks marks');
+
+              return Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isCorrect
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.red.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: isCorrect ? Colors.green : Colors.red,
+                    width: 1.5,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isCorrect ? Icons.check_circle : Icons.cancel,
+                          color: isCorrect ? Colors.green : Colors.red,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Score: $score/$marks marks',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isCorrect ? Colors.green.shade700 : Colors.red.shade700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (feedbackText.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        feedbackText,
+                        style: TextStyle(
+                          color: Colors.grey.shade800,
+                          fontSize: 13,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ],
     );
   }
 
@@ -315,10 +428,10 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> {
           children: block.options!.map((opt) {
             final isSelected = controller.text == opt;
             final isCorrect = block.correctAnswer == opt;
-            
+
             Color? bgColor;
             Color? borderColor;
-            
+
             if (widget.showSolutions) {
                if (isCorrect) {
                  bgColor = Colors.green.withValues(alpha: 0.2);
