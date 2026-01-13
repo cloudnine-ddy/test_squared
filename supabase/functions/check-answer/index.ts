@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { handleStructuredQuestion } from './structured-handler.ts'
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
 
@@ -12,6 +13,14 @@ interface CheckAnswerRequest {
   timeSpent?: number  // Add time tracking
   hintsUsed?: number  // Add hints tracking
   selectedOption?: string  // For MCQ questions
+  // NEW: For structured questions
+  isStructured?: boolean
+  structuredAnswers?: Array<{
+    label: string  // e.g. "a", "b(i)"
+    studentAnswer: string
+    officialAnswer: string | null
+    marks: number
+  }>
 }
 
 interface CheckAnswerResponse {
@@ -22,6 +31,15 @@ interface CheckAnswerResponse {
   strengths: string[]
   improvements: string[]
   attemptId?: string  // Return the saved attempt ID
+  // NEW: For structured questions
+  perPartResults?: Array<{
+    label: string
+    isCorrect: boolean
+    score: number
+    feedback: string
+  }>
+  totalMarks?: number
+  earnedMarks?: number
 }
 
 Deno.serve(async (req) => {
@@ -44,21 +62,37 @@ Deno.serve(async (req) => {
       userId,
       timeSpent,
       hintsUsed,
-      selectedOption
+      selectedOption,
+      isStructured,
+      structuredAnswers
     } = await req.json() as CheckAnswerRequest
 
-    // Validate inputs
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    // Handle structured questions differently
+    if (isStructured && structuredAnswers && structuredAnswers.length > 0) {
+      return await handleStructuredQuestion({
+        questionId,
+        structuredAnswers,
+        userId,
+        timeSpent,
+        hintsUsed,
+        supabase,
+        apiKey: Deno.env.get('GEMINI_API_KEY') || '',
+        corsHeaders
+      })
+    }
+
+    // Validate inputs for regular questions
     if (!studentAnswer || studentAnswer.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: 'Student answer is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const supabase = createClient(supabaseUrl, supabaseKey)
 
     // Get API key
     const apiKey = Deno.env.get('GEMINI_API_KEY')

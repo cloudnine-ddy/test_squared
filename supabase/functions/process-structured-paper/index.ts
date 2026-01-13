@@ -64,6 +64,32 @@ function cleanJsonString(input: string): string {
   return cleaned;
 }
 
+/**
+ * Makes question part labels globally unique by adding a counter suffix.
+ * Example: First (i) stays (i), second (i) becomes (i)_1, third becomes (i)_2
+ */
+function makeLabelsUnique(blocks: any[]): any[] {
+  const labelCounts = new Map<string, number>();
+
+  return blocks.map(block => {
+    if (block.type === 'question_part' && block.label) {
+      const label = block.label;
+      const count = labelCounts.get(label) || 0;
+      labelCounts.set(label, count + 1);
+
+      // If this is a duplicate (count > 0), add suffix
+      if (count > 0) {
+        console.log(`  🔄 Deduplicating label "${label}" -> "${label}_${count}"`);
+        return {
+          ...block,
+          label: `${label}_${count}`
+        };
+      }
+    }
+    return block;
+  });
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -171,7 +197,7 @@ Deno.serve(async (req) => {
     }
     const pdfBase64 = toBase64(new Uint8Array(pdfBytes))
 
-    // Gemini prompt with BBOX REQUEST
+    // Gemini prompt with BBOX REQUEST and AI ANSWER GENERATION
     const prompt = `You are a ${subjectName} exam analyzer extracting STRUCTURED QUESTIONS from this specific batch of pages.
 CRITICAL: Process the exam paper sequentially. EXTRACT FIGURES and diagrams carefully.
 
@@ -179,18 +205,26 @@ OUTPUT FORMAT: Strict JSON Object containing a "questions" array.
 Each question object must represent the full question flow as an ordered list of "blocks".
 
 BLOCK TYPES:
-1. "text": For introduction text.
+1. "text": For introduction text or context (e.g., "(b) A new species was introduced..." with 0 marks).
 2. "figure": For diagrams, graphs, charts.
    - "figure_label": "Figure 1", "Figure 2.1"
    - "description": VERY BRIEF description of visual (Max 15 words).
    - "page": Relative page number in this batch (1-based index).
    - "bbox": Estimate bounding box coordinates as PERCENTAGES [x, y, width, height]. Example: {"x": 10, "y": 20, "width": 80, "height": 40}.
    - HEURISTIC: Figures are almost always located IMMEDIATELY ABOVE their label (e.g., "Fig. 1.1"). Look for the label, then define the bbox for the visual area above it. Exclude the label from the bbox if possible.
-3. "question_part": For actual questions (a, b, i, ii).
-   - "label": "a)", "b)(i)"
+3. "question_part": For actual questions that require answers (a, b, i, ii).
+   - "label": CRITICAL - Use HIERARCHICAL labels that match mark schemes:
+     * For main parts: "(a)", "(b)", "(c)"
+     * For sub-parts: "(a)(i)", "(a)(ii)", "(b)(i)", "(b)(ii)"
+     * For sub-sub-parts: "(a)(i)(1)", "(a)(i)(2)"
+     * NEVER use just "(i)" or "(ii)" alone - ALWAYS prepend the parent part letter
    - "content": Question text.
-   - "marks": Number of marks.
-   - "ai_answer": DO NOT GENERATE. Leave as null. (We will generate this in a separate pass).
+   - "marks": Number of marks (MUST be > 0 for question_part).
+   - "ai_answer": GENERATE a concise, accurate answer based on the question and mark scheme if visible.
+
+CRITICAL RULE FOR 0-MARK PARTS:
+- If you see a part like "(b)" that is just introductory text with 0 marks (e.g., "A new species was introduced to an ecosystem."), treat it as a "text" block, NOT a "question_part".
+- Only create "question_part" blocks for parts that have marks > 0 and require an answer.
 
 EXAMPLE JSON OUTPUT:
 {
@@ -200,10 +234,13 @@ EXAMPLE JSON OUTPUT:
       "blocks": [
         { "type": "text", "content": "A system consists of two blocks. (Summarized)" },
         { "type": "figure", "figure_label": "Figure 1.1", "description": "Blocks on ramp", "page": 1, "bbox": {"x": 10, "y": 20, "width": 80, "height": 30} },
-        { "type": "question_part", "label": "a)", "content": "Calculate tension.", "marks": 2, "ai_answer": null }
+        { "type": "text", "content": "(b) A new species was introduced to an ecosystem." },
+        { "type": "figure", "figure_label": "Fig. 1.2", "description": "Population growth graph", "page": 1, "bbox": {"x": 10, "y": 55, "width": 80, "height": 25} },
+        { "type": "question_part", "label": "(b)(i)", "content": "Complete the sentence to describe the term population.", "marks": 1, "ai_answer": "A population is a group of organisms of one species living in the same area at the same time." },
+        { "type": "question_part", "label": "(b)(ii)", "content": "Describe and explain the reasons for the shape of the graph at X.", "marks": 3, "ai_answer": "The graph shows exponential growth initially, then levels off as the population reaches carrying capacity due to limited resources." }
       ],
       "topic_ids": ["topic-uuid"],
-      "total_marks": 2
+      "total_marks": 4
     }
   ]
 }
@@ -219,9 +256,11 @@ RULES:
 6. Group all parts (a, b, i, ii) under their parent Question Number.
 7. CRITICAL: Keep JSON output valid and within token limits.
 8. SUMMARIZE long "text" blocks. Do not copy entire reading passages word-for-word if they exceed 50 words. Just give the gist.
-9. DO NOT generate ai_answers.
+9. GENERATE ai_answers for ALL question_part blocks. Make them concise and accurate.
 10. CRITICAL: ONLY extract questions that are ACTUALLY PRESENT in these pages. Do NOT hallucinate or invent question numbers.
 11. If a question is split across pages (starts in this batch but continues beyond), still extract it with the parts visible in this batch.
+12. LABEL FORMAT: When you see "1 (a) (i)" in the paper, extract label as "(a)(i)". When you see "1 (b) (ii)", extract as "(b)(ii)". ALWAYS include parent context.
+13. 0-MARK PARTS: If a part has 0 marks or is just context/introduction, use "text" block type, NOT "question_part".
 
 Extract ALL structured questions from this batch.`;
 
@@ -374,12 +413,14 @@ Extract ALL structured questions from this batch.`;
         let modified = false;
         let firstImageUrl: string | null = null; // Track first image for image_url field
 
-        for (const block of structureData) {
+        // Apply label deduplication
+        q.structure_data = makeLabelsUnique(structureData);
+
+        for (const block of q.structure_data) { // Iterate over potentially modified structureData
             if (block.type === 'figure' && block.bbox) {
                 // Call crop-figure Edge Function
                 // URL: ${supabaseUrl}/functions/v1/crop-figure
                 console.log(`Cropping figure for Q${q.question_number}, Page ${block.page}...`);
-
                 try {
                      const cropRes = await fetchWithRetry(`${supabaseUrl}/functions/v1/crop-figure`, {
                         method: 'POST',

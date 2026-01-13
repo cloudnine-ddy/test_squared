@@ -168,7 +168,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 if (type == 'text') return TextBlock.fromMap(map);
                 if (type == 'figure') return FigureBlock.fromMap(map);
                 if (type == 'question_part') return QuestionPartBlock.fromMap(map);
-                return TextBlock(content: 'Unknown block type: $type'); 
+                return TextBlock(content: 'Unknown block type: $type');
             }).toList();
         } catch (e) {
             print('Error parsing structure data: $e');
@@ -193,7 +193,22 @@ class _QuestionEditorState extends State<QuestionEditor> {
   }
 
   Future<void> _saveQuestion() async {
-    if (!_formKey.currentState!.validate()) return;
+    print('[QuestionEditor] _saveQuestion called');
+    print('[QuestionEditor] _formKey.currentState: ${_formKey.currentState}');
+    print('[QuestionEditor] _isStructured: $_isStructured');
+    print('[QuestionEditor] _structureBlocks.length: ${_structureBlocks.length}');
+
+    if (_formKey.currentState == null) {
+      print('[QuestionEditor] ERROR: Form key current state is null!');
+      ToastService.showError('Form not initialized properly');
+      return;
+    }
+
+    if (!_formKey.currentState!.validate()) {
+      print('[QuestionEditor] Form validation failed');
+      ToastService.showError('Please fill in all required fields');
+      return;
+    }
 
     if (mounted) setState(() => _isSaving = true);
 
@@ -235,7 +250,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
          // 1. Save blocks
          updateData['structure_data'] = _structureBlocks.map((b) => b.toMap()).toList();
          updateData['type'] = 'structured';
-         
+
          // 2. Generate summary content
          final summary = _structureBlocks
             .whereType<TextBlock>()
@@ -243,12 +258,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
             .take(2)
             .join(' ');
          updateData['content'] = summary.isNotEmpty ? summary : 'Structured Question $_questionNumber';
-         
+
          // 3. Official answer and marks?
          // Note: official_answer logic for structured is complex, maybe just leave basic field?
          // For now, let's keep the main official_answer field as a fallback/summary
          updateData['official_answer'] = _officialAnswerController.text.trim();
-         
+
       } else {
          // LEGACY/MCQ UPDATE
          updateData['content'] = _contentController.text.trim();
@@ -490,7 +505,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       controller: officialAnswerController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Official Answer / Mark Scheme', 
+                        labelText: 'Official Answer / Mark Scheme',
                         border: OutlineInputBorder(),
                         hintText: 'Explanation from mark scheme...'
                       ),
@@ -500,7 +515,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       controller: aiAnswerController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'AI Answer / Explanation', 
+                        labelText: 'AI Answer / Explanation',
                         border: OutlineInputBorder(),
                         hintText: 'AI generated explanation...'
                       ),
@@ -561,9 +576,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Widget _buildBlockPreview(int index) {
     final block = _structureBlocks[index];
-    
+
     return Card(
-      key: ValueKey(block), 
+      key: ValueKey(block),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         title: Text('${block.type.toUpperCase()} Block'),
@@ -623,14 +638,14 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
     if (result != null && mounted) {
       setState(() => _isSaving = true);
-      
+
       try {
         // We have new crop coordinates, call crop-figure immediately
         final newPage = result['page'] as int;
         final newBbox = {
-           'x': result['x'], 
-           'y': result['y'], 
-           'width': result['width'], 
+           'x': result['x'],
+           'y': result['y'],
+           'width': result['width'],
            'height': result['height']
         };
 
@@ -646,7 +661,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
         if (response.data?['image_url'] != null) {
            final newUrl = '${response.data['image_url']}?t=${DateTime.now().millisecondsSinceEpoch}';
-           
+
            setState(() {
               // Update the block with new URL and Metadata
               _structureBlocks[index] = FigureBlock(
@@ -697,9 +712,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                  ),
             ],
           ),
-          if (block.url != null) 
+          if (block.url != null)
              Text('URL: ${block.url}', style: const TextStyle(fontSize: 12))
-          else 
+          else
              const Text('No Image URL (Waiting for crop)', style: TextStyle(fontSize: 12, color: Colors.orange)),
         ],
       );
@@ -1507,57 +1522,60 @@ class _QuestionEditorState extends State<QuestionEditor> {
             ],
           ),
         ),
-        
+
         // Right - Metadata (Topics, Q#, etc.)
         Container(width: 1, color: AppColors.border),
         Expanded(
           flex: 4, // 40%
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                 const Text('Metadata', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                 const SizedBox(height: 16),
-                 
-                 // Q Number
-                 TextFormField(
-                    initialValue: _questionNumber.toString(),
-                    decoration: _inputDecoration('Q Number'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (v) {
-                      _questionNumber = int.tryParse(v) ?? 1;
-                      _markChanged();
-                    },
-                 ),
-                 
-                 const SizedBox(height: 16),
-                 _buildSection('Topics', _buildOptimizedTopicSelector()),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   const Text('Metadata', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                   const SizedBox(height: 16),
 
-                 const SizedBox(height: 16),
-                 
-                 // AI & Official Answer Summary
-                 _buildSection(
-                    'AI Answer Overview',
-                    TextFormField(
-                      controller: _aiSolutionController,
-                      decoration: _inputDecoration('General AI Explanation...'),
-                      maxLines: 4,
-                      onChanged: (_) => _markChanged(),
-                    ),
-                 ),
-                 
-                 const SizedBox(height: 16),
-                 _buildSection(
-                    'Official Answer Note',
-                    TextFormField(
-                      controller: _officialAnswerController,
-                      decoration: _inputDecoration('Mark scheme notes...'),
-                      maxLines: 4,
-                      onChanged: (_) => _markChanged(),
-                    ),
-                 ),
-              ],
+                   // Q Number
+                   TextFormField(
+                      initialValue: _questionNumber.toString(),
+                      decoration: _inputDecoration('Q Number'),
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) {
+                        _questionNumber = int.tryParse(v) ?? 1;
+                        _markChanged();
+                      },
+                   ),
+
+                   const SizedBox(height: 16),
+                   _buildSection('Topics', _buildOptimizedTopicSelector()),
+
+                   const SizedBox(height: 16),
+
+                   // AI & Official Answer Summary
+                   _buildSection(
+                      'AI Answer Overview',
+                      TextFormField(
+                        controller: _aiSolutionController,
+                        decoration: _inputDecoration('General AI Explanation...'),
+                        maxLines: 4,
+                        onChanged: (_) => _markChanged(),
+                      ),
+                   ),
+
+                   const SizedBox(height: 16),
+                   _buildSection(
+                      'Official Answer Note',
+                      TextFormField(
+                        controller: _officialAnswerController,
+                        decoration: _inputDecoration('Mark scheme notes...'),
+                        maxLines: 4,
+                        onChanged: (_) => _markChanged(),
+                      ),
+                   ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1626,7 +1644,7 @@ class _CropDialogState extends State<_CropDialog> {
   Future<void> _renderPageAsImage() async {
     try {
       debugPrint('🖼️ Rendering page $_page as image...');
-      
+
       // Call render-page edge function to convert PDF page to PNG
       final response = await _supabase.functions.invoke(
         'render-page',
@@ -1635,20 +1653,20 @@ class _CropDialogState extends State<_CropDialog> {
           'page': _page,
         },
       );
-      
+
       if (response.status != 200) {
         notifyError('Render failed: HTTP ${response.status}');
         setState(() => _isLoading = false);
         return;
       }
-      
+
       final data = response.data;
       if (data['error'] != null) {
         notifyError(data['error'].toString());
         setState(() => _isLoading = false);
         return;
       }
-      
+
       final imageBase64 = data['image_base64'] as String?;
       final imageUrl = data['image_url'] as String?;
 
@@ -1670,7 +1688,7 @@ class _CropDialogState extends State<_CropDialog> {
         notifyError('No image data returned');
         setState(() => _isLoading = false);
       }
-      
+
     } catch (e) {
       notifyError('Failed to render page: $e');
       setState(() => _isLoading = false);

@@ -74,16 +74,34 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
       final userId = Supabase.instance.client.auth.currentUser!.id;
       final qData = widget.questionData;
 
-      // 1. Insert into questions table
-      final questionRes = await Supabase.instance.client.from('questions').insert({
+      // Prepare insert data based on question type
+      final Map<String, dynamic> insertData = {
         'content': qData['content'] ?? '',
-        'type': 'ai_generated',
+        'type': qData['type'] ?? 'ai_generated', // Use AI's type (mcq/structured)
         'marks': qData['marks'] ?? 0,
         'official_answer': qData['official_answer'] ?? '',
         'explanation': {'markdown': qData['explanation'] ?? ''},
         'topic_ids': [],
         'created_by': userId,
-      }).select('id').single();
+      };
+
+      // Add MCQ-specific fields
+      if (qData['type'] == 'mcq' && qData['options'] != null) {
+        insertData['options'] = qData['options'];
+        insertData['correct_answer'] = qData['correct_answer'];
+      }
+
+      // Add structured question fields
+      if (qData['type'] == 'structured' && qData['structure_data'] != null) {
+        insertData['structure_data'] = qData['structure_data'];
+      }
+
+      // 1. Insert into questions table
+      final questionRes = await Supabase.instance.client
+          .from('questions')
+          .insert(insertData)
+          .select('id')
+          .single();
 
       final newQuestionId = questionRes['id'];
 
@@ -323,6 +341,109 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
                   ),
                 ),
                 const SizedBox(height: 20),
+
+                // MCQ Options (if MCQ type)
+                if (widget.questionData['type'] == 'mcq' && widget.questionData['options'] != null) ...[
+                  ...((widget.questionData['options'] as List).map((option) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE8DCC8)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8DCC8),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                option['label'] ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF5D4037),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              option['text'] ?? '',
+                              style: const TextStyle(
+                                color: Color(0xFF2D2D2D),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  })),
+                  const SizedBox(height: 16),
+                ],
+
+                // Structured Question Parts (if structured type)
+                if (widget.questionData['type'] == 'structured' && widget.questionData['structure_data'] != null) ...[
+                  ...((widget.questionData['structure_data'] as List).where((block) => block['type'] == 'question_part').map((part) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE8DCC8)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Part ${part['label']}',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '[${part['marks']} mark${part['marks'] > 1 ? 's' : ''}]',
+                                style: const TextStyle(
+                                  color: Color(0xFF8B6F47),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            part['content'] ?? '',
+                            style: const TextStyle(
+                              color: Color(0xFF2D2D2D),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  })),
+                  const SizedBox(height: 16),
+                ],
 
                 // Dynamic Figure Rendering (Client-Side Crop)
                 if (widget.pdfUrl != null &&

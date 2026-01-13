@@ -63,6 +63,7 @@ dependencies:
   # URL launcher for opening PDFs
   url_launcher: ^6.3.0
   google_fonts: ^7.0.0
+  flutter_html: ^3.0.0
 
 dev_dependencies:
   flutter_test:
