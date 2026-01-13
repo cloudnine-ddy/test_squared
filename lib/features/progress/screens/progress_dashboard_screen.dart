@@ -329,13 +329,11 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
+                WiredCard(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                  ),
+                  backgroundColor: Colors.orange.withValues(alpha: 0.1),
+                  borderColor: Colors.orange.withValues(alpha: 0.3),
+                  borderWidth: 1,
                   child: const Icon(
                     Icons.trending_down,
                     color: Colors.orange,
@@ -379,7 +377,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                     ],
                   ),
                 ),
-                TextButton(
+                WiredButton(
                   onPressed: () {
                     if (topicId != null) {
                       context.push('/topic/$topicId');
@@ -387,18 +385,16 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
                       ToastService.showInfo('Topic details unavailable');
                     }
                   },
-                  style: TextButton.styleFrom(
-                    foregroundColor: primaryColor,
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(color: primaryColor.withValues(alpha: 0.3)),
-                    ),
-                  ),
+                  backgroundColor: Colors.white,
+                  filled: true,
+                  borderColor: primaryColor.withValues(alpha: 0.3),
                   child: const Text(
                     'Practice',
-                    style: TextStyle(fontFamily: 'PatrickHand', fontSize: 16),
+                    style: TextStyle(
+                      fontFamily: 'PatrickHand',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -448,7 +444,7 @@ class _ProgressDashboardScreenState extends State<ProgressDashboardScreen> {
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        childAspectRatio: 1.1,
+        mainAxisExtent: 180, // Fixed height to prevent excessive whitespace
       ),
       itemCount: _topicStats.length,
       itemBuilder: (context, index) {

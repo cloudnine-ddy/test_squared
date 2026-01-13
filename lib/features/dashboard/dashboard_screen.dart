@@ -110,48 +110,59 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Curriculum Switcher (no logo)
-                          PopupMenuButton<String>(
-                            offset: const Offset(0, 40),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                          // Curriculum Switcher (Sketchy)
+                          Theme(
+                            data: Theme.of(context).copyWith(
+                              popupMenuTheme: PopupMenuThemeData(
+                                shape: WiredShapeBorder(color: _primaryColor, width: 2),
+                                elevation: 0,
+                                color: _backgroundColor,
+                              ),
                             ),
-                            color: _backgroundColor,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  _selectedCurriculum,
-                                  style: _patrickHand(fontSize: 18),
+                            child: PopupMenuButton<String>(
+                              offset: const Offset(0, 50),
+                              child: WiredCard(
+                                borderColor: _primaryColor,
+                                borderWidth: 2,
+                                backgroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _selectedCurriculum,
+                                      style: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold),
+                                    ),
+                                    Icon(
+                                      Icons.keyboard_arrow_down,
+                                      color: _primaryColor.withValues(alpha: 0.8),
+                                      size: 20,
+                                    ),
+                                  ],
                                 ),
-                                Icon(
-                                  Icons.keyboard_arrow_down,
-                                  color: _primaryColor.withValues(alpha: 0.6),
-                                  size: 20,
-                                ),
-                              ],
+                              ),
+                              itemBuilder: (BuildContext context) {
+                                return _curriculums.map((String curriculum) {
+                                  return PopupMenuItem<String>(
+                                    value: curriculum,
+                                    child: Text(
+                                      curriculum,
+                                      style: _patrickHand(fontSize: 16),
+                                    ),
+                                  );
+                                }).toList();
+                              },
+                              onSelected: (String newValue) {
+                                // Prevent selection of "Coming Soon" items
+                                if (newValue.contains('Coming Soon')) {
+                                  ToastService.showWarning('This curriculum is coming soon!');
+                                  return;
+                                }
+                                setState(() {
+                                  _selectedCurriculum = newValue;
+                                });
+                              },
                             ),
-                            itemBuilder: (BuildContext context) {
-                              return _curriculums.map((String curriculum) {
-                                return PopupMenuItem<String>(
-                                  value: curriculum,
-                                  child: Text(
-                                    curriculum,
-                                    style: _patrickHand(fontSize: 16),
-                                  ),
-                                );
-                              }).toList();
-                            },
-                            onSelected: (String newValue) {
-                              // Prevent selection of "Coming Soon" items
-                              if (newValue.contains('Coming Soon')) {
-                                ToastService.showWarning('This curriculum is coming soon!');
-                                return;
-                              }
-                              setState(() {
-                                _selectedCurriculum = newValue;
-                              });
-                            },
                           ),
                         ],
                       ),
@@ -164,17 +175,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         filled: true,
                         backgroundColor: _primaryColor,
                         borderColor: _primaryColor,
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.grid_view, color: Colors.white, size: 16),
-                            const SizedBox(width: 6),
+                            const Icon(Icons.grid_view, color: Colors.white, size: 18),
+                            const SizedBox(width: 10),
                             Text(
                               'Explore Subjects',
                               style: _patrickHand(
-                                fontSize: 15,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
@@ -379,9 +390,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               if (!widget.previewMode)
                               PopupMenuButton<String>(
                                 icon: Icon(
-                                  Icons.settings,
+                                  Icons.more_vert_rounded,
                                   color: _primaryColor.withValues(alpha: 0.6),
-                                  size: 20,
+                                  size: 24,
                                 ),
                                 color: Colors.white,
                                 elevation: 4,
@@ -390,6 +401,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   side: BorderSide(color: _primaryColor.withValues(alpha: 0.8), width: 1.5),
                                 ),
                                 itemBuilder: (context) => [
+                                    /* 
+                                    // TODO: Re-enable when Dark Mode and Accessibility are ready
                                     PopupMenuItem(
                                       value: 'theme',
                                       child: Row(
@@ -434,6 +447,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       ],
                                     ),
                                   ),
+                                  */
                                   PopupMenuItem(
                                     value: 'logout',
                                     child: Row(

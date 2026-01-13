@@ -645,30 +645,78 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         final years = snapshot.data!;
 
         return ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(24),
           itemCount: years.length,
           itemBuilder: (context, index) {
             final year = years[index];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                title: Text(
-                  '$year',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                subtitle: Text(
-                  'Past papers from $year',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                  ),
-                ),
-                trailing: const Icon(Icons.chevron_right),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: InkWell(
                 onTap: () {
                   context.push('/papers/year/$year/subject/${widget.subjectId}');
                 },
+                borderRadius: BorderRadius.circular(8),
+                child: WiredCard(
+                  backgroundColor: Colors.white,
+                  borderColor: _primaryColor.withValues(alpha: 0.3),
+                  borderWidth: 2,
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      // Year badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: _primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _primaryColor.withValues(alpha: 0.2),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '$year',
+                          style: _patrickHand(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: _primaryColor,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      // Description
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Past Papers',
+                              style: _patrickHand(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _primaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'View all papers from $year',
+                              style: _patrickHand(
+                                fontSize: 14,
+                                color: _primaryColor.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Arrow
+                      Icon(
+                        Icons.chevron_right,
+                        color: _primaryColor.withValues(alpha: 0.5),
+                        size: 28,
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           },

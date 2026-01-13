@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'data/past_paper_repository.dart';
 import 'models/paper_model.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
+import '../../shared/wired/wired_widgets.dart';
 
 /// Screen for selecting a specific paper for a given year
 class PaperSelectionScreen extends StatefulWidget {
@@ -23,6 +23,26 @@ class PaperSelectionScreen extends StatefulWidget {
 class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
   List<PaperModel> _papers = [];
   bool _isLoading = true;
+
+  // Sketchy Theme Colors
+  static const Color _primaryColor = Color(0xFF2D3E50); // Deep Navy
+  static const Color _backgroundColor = Color(0xFFFDFBF7); // Cream beige
+
+  // Patrick Hand text style helper
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
 
   @override
   void initState() {
@@ -55,20 +75,39 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.sidebar,
+        backgroundColor: _primaryColor,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           '${widget.year} Papers',
-          style: const TextStyle(color: Colors.white),
+          style: _patrickHand(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: _primaryColor),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading papers...',
+                    style: _patrickHand(
+                      fontSize: 16,
+                      color: _primaryColor.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            )
           : _papers.isEmpty
               ? _buildEmptyState()
               : _buildPapersList(),
@@ -80,11 +119,18 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.description_outlined, color: Colors.white24, size: 64),
+          Icon(
+            Icons.description_outlined,
+            color: _primaryColor.withValues(alpha: 0.3),
+            size: 64,
+          ),
           const SizedBox(height: 16),
           Text(
             'No papers found for ${widget.year}',
-            style: TextStyle(color: Colors.white54, fontSize: 16),
+            style: _patrickHand(
+              fontSize: 18,
+              color: _primaryColor.withValues(alpha: 0.6),
+            ),
           ),
         ],
       ),
@@ -96,7 +142,7 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
     final seasons = seasonGroups.keys.toList();
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       itemCount: seasons.length,
       itemBuilder: (context, index) {
         final season = seasons[index];
@@ -111,15 +157,33 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Season header with sketchy style
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            season,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+          padding: const EdgeInsets.fromLTRB(8, 16, 8, 16),
+          child: Row(
+            children: [
+              WiredCard(
+                backgroundColor: Colors.white,
+                borderColor: _primaryColor.withValues(alpha: 0.4),
+                borderWidth: 2,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  season,
+                  style: _patrickHand(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _primaryColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: WiredDivider(
+                  color: _primaryColor.withValues(alpha: 0.2),
+                  thickness: 1.5,
+                ),
+              ),
+            ],
           ),
         ),
         ...papers.map((paper) => _buildPaperTile(paper)),
@@ -129,43 +193,89 @@ class _PaperSelectionScreenState extends State<PaperSelectionScreen> {
   }
 
   Widget _buildPaperTile(PaperModel paper) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: AppColors.sidebar,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: ListTile(
+    final isObjective = paper.paperType == 'objective';
+    final iconColor = isObjective ? Colors.blue : Colors.purple;
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
         onTap: () {
           context.push('/paper/${paper.id}');
         },
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            paper.paperType == 'objective' ? Icons.quiz : Icons.edit_document,
-            color: Colors.white,
-            size: 20,
+        borderRadius: BorderRadius.circular(8),
+        child: WiredCard(
+          backgroundColor: Colors.white,
+          borderColor: _primaryColor.withValues(alpha: 0.25),
+          borderWidth: 2,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Icon badge
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: iconColor.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Icon(
+                  isObjective ? Icons.quiz_outlined : Icons.edit_document,
+                  color: iconColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Paper info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      paper.displayName,
+                      style: _patrickHand(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: _primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: iconColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isObjective ? 'Objective' : 'Subjective',
+                            style: _patrickHand(
+                              fontSize: 12,
+                              color: iconColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Arrow
+              Icon(
+                Icons.chevron_right,
+                color: _primaryColor.withValues(alpha: 0.4),
+                size: 28,
+              ),
+            ],
           ),
         ),
-        title: Text(
-          paper.displayName,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          paper.paperType == 'objective' ? 'Objective' : 'Subjective',
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.white54),
       ),
     );
   }

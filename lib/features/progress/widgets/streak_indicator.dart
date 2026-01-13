@@ -22,13 +22,11 @@ class StreakIndicator extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          Container(
+          WiredCard(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
-            ),
+            backgroundColor: Colors.white,
+            borderColor: Colors.orange.withValues(alpha: 0.5),
+            borderWidth: 1.5,
             child: const Icon(
               Icons.local_fire_department_rounded,
               color: Colors.deepOrange,

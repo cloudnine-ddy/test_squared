@@ -29,16 +29,11 @@ class StatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
+          WiredCard(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: iconColor.withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
+            backgroundColor: iconColor.withValues(alpha: 0.1),
+            borderColor: iconColor.withValues(alpha: 0.5),
+            borderWidth: 1,
             child: Icon(
               icon,
               color: iconColor,

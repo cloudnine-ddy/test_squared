@@ -261,3 +261,58 @@ class WiredDividerPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+// Custom shape border for sketchy effect on Material widgets (like PopupMenu)
+class WiredShapeBorder extends OutlinedBorder {
+  final Color color;
+  final double width;
+  final int seed;
+
+  WiredShapeBorder({
+    this.color = AppColors.primary,
+    this.width = 2.0,
+    this.seed = 42,
+  }) : super(side: BorderSide(color: color, width: width));
+
+  @override
+  OutlinedBorder copyWith({BorderSide? side}) {
+    return WiredShapeBorder(
+      color: side?.color ?? color,
+      width: side?.width ?? width,
+      seed: seed,
+    );
+  }
+
+  @override
+  Path getInnerPath(Rect rect, {TextDirection? textDirection}) {
+    return Path()..addRect(rect.deflate(width));
+  }
+
+  @override
+  Path getOuterPath(Rect rect, {TextDirection? textDirection}) {
+    return Path()..addRect(rect);
+  }
+
+  @override
+  void paint(Canvas canvas, Rect rect, {TextDirection? textDirection}) {
+    final painter = WiredBorderPainter(
+      color: color,
+      strokeWidth: width,
+      seed: seed,
+    );
+    
+    canvas.save();
+    canvas.translate(rect.left, rect.top);
+    painter.paint(canvas, rect.size);
+    canvas.restore();
+  }
+
+  @override
+  ShapeBorder scale(double t) {
+    return WiredShapeBorder(
+      color: color,
+      width: width * t,
+      seed: seed,
+    );
+  }
+}

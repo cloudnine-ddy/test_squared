@@ -23,6 +23,11 @@ class QuestionDetailScreenWithChat extends ConsumerStatefulWidget {
 
 class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScreenWithChat> {
   bool _showChat = true;
+  double _splitRatio = 0.6; // Left panel takes 60% by default
+  
+  static const double _minLeftRatio = 0.3;
+  static const double _maxLeftRatio = 0.8;
+  static const double _dividerWidth = 8.0;
 
   @override
   Widget build(BuildContext context) {
@@ -46,25 +51,61 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
             );
           }
 
-          // Desktop: Split screen
+          // Desktop: Split screen with resizable divider
+          final totalWidth = constraints.maxWidth;
+          final leftWidth = _showChat 
+              ? (totalWidth - _dividerWidth) * _splitRatio 
+              : totalWidth;
+          final rightWidth = _showChat 
+              ? (totalWidth - _dividerWidth) * (1 - _splitRatio) 
+              : 0.0;
+
           return Row(
             children: [
-              // Left: Original question screen (60%)
-              Expanded(
-                flex: _showChat ? 6 : 10,
+              // Left: Original question screen
+              SizedBox(
+                width: leftWidth,
                 child: QuestionDetailScreen(
                   questionId: widget.questionId,
                   topicId: widget.topicId,
                 ),
               ),
 
-              // Right: AI Chat (40%)
+              // Draggable Divider
               if (_showChat)
-                Expanded(
-                  flex: 4,
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        final newRatio = _splitRatio + (details.delta.dx / totalWidth);
+                        _splitRatio = newRatio.clamp(_minLeftRatio, _maxLeftRatio);
+                      });
+                    },
+                    child: Container(
+                      width: _dividerWidth,
+                      color: const Color(0xFFFDFBF7),
+                      child: Center(
+                        child: Container(
+                          width: 4,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D3E50).withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Right: AI Chat
+              if (_showChat)
+                SizedBox(
+                  width: rightWidth,
                   child: Stack(
                       children: [
-                         // Divider Line
+                         // Divider Line (sketchy)
                          Positioned(
                            left: 0, 
                            top: 0, 
@@ -84,35 +125,14 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
                            margin: const EdgeInsets.only(left: 2),
                            child: Column(
                              children: [
-                               // Chat toggle header
-                               Container(
-                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                 decoration: BoxDecoration(
-                                   color: AppColors.surface,
-                                   border: Border(
-                                     bottom: BorderSide(color: AppColors.border, width: 1),
-                                   ),
-                                 ),
-                                 child: Row(
-                                   children: [
-                                     const Spacer(),
-                                     IconButton(
-                                       onPressed: () {
-                                         setState(() => _showChat = false);
-                                       },
-                                       icon: Icon(Icons.close, color: AppColors.textSecondary),
-                                       tooltip: 'Hide AI Assistant',
-                                     ),
-                                   ],
-                                 ),
-                               ),
-                               // Chat panel
-                               Expanded(
-                                 child: AIChatPanel(
-                                   questionId: widget.questionId,
-                                   isPremium: isPremium,
-                                 ),
-                               ),
+                                // Chat panel
+                                Expanded(
+                                  child: AIChatPanel(
+                                    questionId: widget.questionId,
+                                    isPremium: isPremium,
+                                    onClose: () => setState(() => _showChat = false),
+                                  ),
+                                ),
                              ],
                            ),
                          ),
@@ -125,19 +145,40 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
       ),
       // FAB to toggle chat on/off
       floatingActionButton: !_showChat
-          ? FloatingActionButton.extended(
-              onPressed: () {
-                setState(() => _showChat = true);
-              },
-              backgroundColor: const Color(0xFF2D3E50), // Navy
-              icon: const Icon(Icons.psychology, color: Colors.white),
-              label: const Text(
-                'AI Assistant',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: 'PatrickHand',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 90, right: 16),
+              child: UnconstrainedBox( // Force natural size
+                child: WiredButton(
+                  onPressed: () => setState(() => _showChat = true),
+                  backgroundColor: const Color(0xFF2D3E50),
+                  filled: true,
+                  borderColor: const Color(0xFF2D3E50),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
+                        ),
+                        child: const Icon(Icons.psychology, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Ask AI',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontFamily: 'PatrickHand',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             )

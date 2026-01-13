@@ -660,9 +660,16 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                       Icon(Icons.arrow_back_rounded, size: 18, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
+                       Icon(Icons.arrow_back_rounded, size: 22, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
                        const SizedBox(width: 8),
-                       Text('Previous', style: _patrickHand(color: _prevQuestionId == null ? Colors.grey : _primaryColor)),
+                       Text(
+                         'Previous', 
+                         style: _patrickHand(
+                           fontSize: 18, 
+                           color: _prevQuestionId == null ? Colors.grey : _primaryColor,
+                           fontWeight: FontWeight.bold,
+                        ),
+                       ),
                     ],
                   ),
                 ),
@@ -694,20 +701,24 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     filled: true,
                     borderColor: _primaryColor,
                     child: Row(
-                         mainAxisAlignment: MainAxisAlignment.center,
-                         children: [
-                            Icon(
-                              _nextQuestionId == null ? Icons.check_circle_outline : Icons.arrow_back_rounded,
-                              size: 18,
-                              color: _nextQuestionId == null ? _primaryColor : Colors.white
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _nextQuestionId == null ? 'Completed' : 'Next',
-                              style: _patrickHand(color: _nextQuestionId == null ? _primaryColor : Colors.white),
-                            ),
-                         ],
-                      ),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _nextQuestionId == null ? Icons.check_circle_outline : Icons.arrow_back_rounded, // RTL flips this
+                          size: 22,
+                          color: _nextQuestionId == null ? _primaryColor : Colors.white
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _nextQuestionId == null ? 'Completed' : 'Next',
+                          style: _patrickHand(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _nextQuestionId == null ? _primaryColor : Colors.white
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
