@@ -10,7 +10,7 @@ abstract class ExamContentBlock {
 
   factory ExamContentBlock.fromMap(Map<String, dynamic> map) {
     final type = map['type']?.toString() ?? '';
-    
+
     switch (type) {
       case 'text':
         return TextBlock.fromMap(map);
@@ -120,11 +120,11 @@ class QuestionPartBlock extends ExamContentBlock {
       marks: int.tryParse(map['marks']?.toString() ?? '1') ?? 1,
       inputType: map['input_type']?.toString() ?? 'text_area',
       correctAnswer: map['correct_answer'],
-      options: map['options'] != null 
+      options: map['options'] != null
           ? List<String>.from(map['options'] as List)
           : null,
       officialAnswer: map['official_answer']?.toString(),
-      aiAnswer: map['ai_answer']?.toString(),
+      aiAnswer: map['ai_answer']?.toString() ?? map['explanation']?.toString() ?? map['ai_explanation']?.toString(),
     );
   }
 

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'dart:ui';
 import 'data/past_paper_repository.dart';
 import 'models/question_model.dart';
@@ -1583,7 +1585,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     final isPremium = ref.watch(isPremiumProvider);
 
     // Always show the tab - display message if no content
-    final hasContent = _question!.aiAnswer != null && _question!.aiAnswer!.isNotEmpty;
+    final hasContent = _question!.hasAiSolution;
 
     if (!hasContent) {
       return Center(
@@ -1738,7 +1740,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       );
     }
 
-    // Premium users see the normal content
+    // Authenticated users see the normal content
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1748,103 +1750,141 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             children: [
               WiredCard(
                 padding: const EdgeInsets.all(8),
-                backgroundColor: Colors.purple.withValues(alpha: 0.2),
+                backgroundColor: Colors.purple.withValues(alpha: 0.1),
                 borderColor: Colors.purple,
                 child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
               ),
               const SizedBox(width: 12),
               const Text(
                 'AI Explanation',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 18),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          // Check if structured question
-          if (_question!.isStructured && _question!.structureData != null) ... [
-            // Display all parts' AI answers
-            ... (_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
+          // Structured Question Logic
+          if (_question!.isStructured && _question!.structureData != null) ...[
+            ...(_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D1117),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.purple.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Part ${block.label}',
-                            style: const TextStyle(
-                              color: Colors.purple,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.purple.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              'Part ${block.label}',
+                              style: const TextStyle(
+                                color: Colors.purple,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '[${block.marks} mark${block.marks > 1 ? 's' : ''}]',
-                          style: TextStyle(
-                            color: AppColors.textPrimary.withValues(alpha: 0.6),
-                            fontSize: 12,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              block.content,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.grey.shade600,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      block.content,
-                      style: TextStyle(
-                        color: AppColors.textPrimary.withValues(alpha: 0.7),
-                        fontSize: 14,
+                        ],
                       ),
                     ),
-                    if (block.aiAnswer != null && block.aiAnswer!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Divider(color: Colors.white12),
-                      const SizedBox(height: 12),
-                      Text(
-                        block.aiAnswer!,
-                        style: _patrickHand(
-                          color: Colors.purple.withValues(alpha: 0.9),
-                          fontSize: 15,
-                          height: 1.5,
-                        ),
+
+                    // Content
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (block.aiAnswer != null && block.aiAnswer!.isNotEmpty) ...[
+                            MarkdownBody(
+                              data: block.aiAnswer!,
+                              styleSheet: MarkdownStyleSheet(
+                                p: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 15,
+                                  height: 1.5,
+                                ),
+                              ),
+                            )
+                          ] else ...[
+                            Text(
+                              'AI explanation not available for this part.',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontStyle: FontStyle.italic,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ] else ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'AI explanation not available',
-                        style: TextStyle(
-                          color: AppColors.textPrimary.withValues(alpha: 0.4),
-                          fontStyle: FontStyle.italic,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               );
             })),
           ] else ...[
             // Regular question - show single AI answer
-            Text(
-              _question!.aiAnswer ?? 'AI explanation not available for this question yet.',
-              style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: MarkdownBody(
+                data: _question!.aiAnswer ?? 'No AI explanation available.',
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(
+                    color: Colors.black87,
+                    fontSize: 16,
+                    height: 1.6,
+                  ),
+                ),
+              ),
             ),
           ],
         ],
@@ -1856,12 +1896,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
 
     if (!_question!.hasOfficialAnswer) {
-      return Center(
+      return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.description_outlined, color: Colors.white24, size: 48),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text('Official answer not available', style: TextStyle(color: Colors.white38)),
           ],
         ),
@@ -1884,7 +1924,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     children: [
                       WiredCard(
                         padding: const EdgeInsets.all(8),
-                        backgroundColor: Colors.green.withValues(alpha: 0.2),
+                        backgroundColor: Colors.green.withValues(alpha: 0.1),
                         borderColor: Colors.green,
                         child: const Icon(Icons.verified, color: Colors.green, size: 20),
                       ),
@@ -1994,20 +2034,18 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             children: [
               WiredCard(
                 padding: const EdgeInsets.all(8),
-                backgroundColor: Colors.green.withValues(alpha: 0.2),
+                backgroundColor: Colors.green.withValues(alpha: 0.1),
                 borderColor: Colors.green,
                 child: const Icon(Icons.verified, color: Colors.green, size: 20),
               ),
               const SizedBox(width: 12),
               const Text(
                 'Official Mark Scheme',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 18),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          const Divider(color: Colors.white12),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Check if structured question
           if (_question!.isStructured && _question!.structureData != null) ...[
@@ -2015,82 +2053,157 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ...(_question!.structureData!.whereType<QuestionPartBlock>().map((block) {
               return Container(
                 margin: const EdgeInsets.only(bottom: 16),
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0D1117),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  border: Border.all(color: Colors.grey.shade200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'Part ${block.label}',
-                            style: const TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                    // Header with Part label and marks
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              'Part ${block.label}',
+                              style: const TextStyle(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '[${block.marks} mark${block.marks > 1 ? 's' : ''}]',
-                          style: TextStyle(
-                            color: AppColors.textPrimary.withValues(alpha: 0.6),
-                            fontSize: 12,
+                          Text(
+                            '[${block.marks} mark${block.marks > 1 ? 's' : ''}]',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      block.content,
-                      style: TextStyle(
-                        color: AppColors.textPrimary.withValues(alpha: 0.7),
-                        fontSize: 14,
+                        ],
                       ),
                     ),
-                    if (block.officialAnswer != null && block.officialAnswer!.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Divider(color: Colors.white12),
-                      const SizedBox(height: 12),
-                      Text(
-                        block.officialAnswer!,
-                        style: _patrickHand(
-                          color: Colors.green.withValues(alpha: 0.9),
-                          fontSize: 15,
-                          height: 1.5,
-                        ),
+
+                    // Content
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            block.content,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 15,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'ANSWER',
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                if (block.officialAnswer != null && block.officialAnswer!.isNotEmpty)
+                                  Html(
+                                    data: block.officialAnswer!,
+                                    style: {
+                                      "body": Style(
+                                        color: Colors.black87,
+                                        fontFamily: 'PatrickHand',
+                                        fontSize: FontSize(16),
+                                        lineHeight: LineHeight(1.5),
+                                        margin: Margins.zero,
+                                      ),
+                                    },
+                                  )
+                                else
+                                  Text(
+                                    'No official answer available',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade500,
+                                      fontStyle: FontStyle.italic,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ] else ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'No official answer available',
-                        style: TextStyle(
-                          color: AppColors.textPrimary.withValues(alpha: 0.4),
-                          fontStyle: FontStyle.italic,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                    ),
                   ],
                 ),
               );
             })),
           ] else ...[
-            // Regular question - show single official answer
-            Text(
-              _question!.officialAnswer,
-              style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
+            // Regular question - show single official answer card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Html(
+                data: _question!.officialAnswer,
+                style: {
+                  "body": Style(
+                    color: Colors.black87,
+                    fontFamily: 'PatrickHand',
+                    fontSize: FontSize(18),
+                    lineHeight: LineHeight(1.6),
+                    margin: Margins.zero,
+                  ),
+                },
+              ),
             ),
           ],
         ],
