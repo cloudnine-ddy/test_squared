@@ -12,6 +12,7 @@ import 'widgets/question_action_bar.dart';
 import 'widgets/pdf_crop_viewer.dart';
 import 'widgets/answer_reveal_sheet.dart';
 import 'widgets/formatted_question_text.dart';
+import 'widgets/smart_question_renderer.dart';
 import '../bookmarks/widgets/bookmark_button.dart';
 import '../bookmarks/screens/note_editor_dialog.dart';
 import '../bookmarks/data/bookmark_repository.dart';
@@ -68,6 +69,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   DateTime? _questionStartTime;
   Map<String, dynamic>? _previousAttempt;
   bool _isViewingPreviousAnswer = false;
+
+  // Structured question answers
+  Map<String, dynamic> _structuredAnswers = {};
 
   // Bookmark and notes
   bool _isBookmarked = false;
@@ -446,7 +450,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => AnswerRevealSheet(
-        officialAnswer: _question!.officialAnswer,
+        officialAnswer: _question!.formattedOfficialAnswer,
         aiSolution: _question!.aiSolution,
         hasOfficialAnswer: _question!.hasOfficialAnswer,
         hasAiSolution: _question!.hasAiSolution,
@@ -1268,6 +1272,58 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   ),
                 ],
               ],
+            ),
+          ] else if (_question!.isStructured) ...[
+            // Structured question with blocks
+            // Structured question with blocks
+            SmartQuestionRenderer(
+              blocks: _question!.structureData!,
+              onAnswersChanged: (answers) {
+                setState(() {
+                  _structuredAnswers = answers;
+                });
+              },
+              initialAnswers: _previousAttempt?['structured_answers'],
+              showSolutions: _answerSubmitted,
+            ),
+            const SizedBox(height: 16),
+            // Submit button for structured questions
+            SizedBox(
+              width: double.infinity,
+              child: WiredButton(
+                onPressed: (_answerSubmitted || _structuredAnswers.isEmpty) ? null : () {
+                  // For now, just mark as submitted
+                  // TODO: Implement structured question checking
+                  setState(() {
+                    _answerSubmitted = true;
+                    _aiFeedback = {
+                      'isCorrect': true,
+                      'is_correct': true,
+                      'score': 100,
+                      'feedback': 'Structured question submitted successfully',
+                      'strengths': [],
+                      'hints': [],
+                      'improvements': [],
+                    };
+                  });
+                },
+                backgroundColor: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey.shade300 : Colors.blue,
+                filled: true,
+                borderColor: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey.shade400 : Colors.blue,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  child: Center(
+                    child: Text(
+                      _answerSubmitted ? 'Submitted ✓' : 'Submit Answers',
+                      style: _patrickHand(
+                        color: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ] else ...[
             // Text input for written questions

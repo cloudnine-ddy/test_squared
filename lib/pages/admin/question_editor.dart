@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
 import '../../core/services/pdf_helper.dart';
 import '../../features/past_papers/widgets/pdf_crop_viewer.dart';
+import 'package:test_squared/features/past_papers/models/question_blocks.dart'; // ExamContentBlocks
 
 /// Full Question Editor - Edit all fields of a question
 class QuestionEditor extends StatefulWidget {
@@ -59,6 +61,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
   double _figureY = 30;
   double _figureWidth = 40;
   double _figureHeight = 30;
+
+  // Structured fields
+  bool _isStructured = false;
+  List<ExamContentBlock> _structureBlocks = [];
 
   // MCQ fields
   bool _isMCQ = false;
@@ -148,6 +154,28 @@ class _QuestionEditorState extends State<QuestionEditor> {
         _options = optionsRaw.map((o) => Map<String, dynamic>.from(o as Map)).toList();
       }
 
+      // STRUCTURED DATA
+      final structureData = _question?['structure_data'];
+      if (structureData != null && structureData is List && structureData.isNotEmpty) {
+        _isStructured = true;
+        try {
+            _structureBlocks = (structureData as List).map((x) {
+               // Handle the JSON map -> Block conversion
+               // Assuming ExamContentBlock.fromMap factory exists and handles 'type'
+                final map = Map<String, dynamic>.from(x as Map);
+                // Simple factory dispatch based on type if not in model
+                final type = map['type'];
+                if (type == 'text') return TextBlock.fromMap(map);
+                if (type == 'figure') return FigureBlock.fromMap(map);
+                if (type == 'question_part') return QuestionPartBlock.fromMap(map);
+                return TextBlock(content: 'Unknown block type: $type'); 
+            }).toList();
+        } catch (e) {
+            print('Error parsing structure data: $e');
+            _isStructured = false; // Fallback
+        }
+      }
+
       // AI Solution
       if (aiAnswer is Map) {
         _aiSolutionController.text = aiAnswer['text']?.toString() ?? aiAnswer['ai_solution']?.toString() ?? '';
@@ -196,15 +224,38 @@ class _QuestionEditorState extends State<QuestionEditor> {
       }
 
       // Prepare update data
-      final updateData = {
-        'content': _contentController.text.trim(),
-        'official_answer': _officialAnswerController.text.trim(),
+      final Map<String, dynamic> updateData = {
         'question_number': _questionNumber,
         'topic_ids': _selectedTopicIds,
         'ai_answer': aiAnswer,
-        'options': _isMCQ ? _options : null,
-        'correct_answer': _isMCQ ? _correctAnswer : null,
       };
+
+      if (_isStructured) {
+         // STRUCTURED UPDATE
+         // 1. Save blocks
+         updateData['structure_data'] = _structureBlocks.map((b) => b.toMap()).toList();
+         updateData['type'] = 'structured';
+         
+         // 2. Generate summary content
+         final summary = _structureBlocks
+            .whereType<TextBlock>()
+            .map((b) => b.content)
+            .take(2)
+            .join(' ');
+         updateData['content'] = summary.isNotEmpty ? summary : 'Structured Question $_questionNumber';
+         
+         // 3. Official answer and marks?
+         // Note: official_answer logic for structured is complex, maybe just leave basic field?
+         // For now, let's keep the main official_answer field as a fallback/summary
+         updateData['official_answer'] = _officialAnswerController.text.trim();
+         
+      } else {
+         // LEGACY/MCQ UPDATE
+         updateData['content'] = _contentController.text.trim();
+         updateData['official_answer'] = _officialAnswerController.text.trim();
+         updateData['options'] = _isMCQ ? _options : null;
+         updateData['correct_answer'] = _isMCQ ? _correctAnswer : null;
+      }
 
       print('[QuestionEditor] Updating question ${widget.questionId}');
       print('[QuestionEditor] Update data: $updateData');
@@ -294,6 +345,376 @@ class _QuestionEditorState extends State<QuestionEditor> {
     }
   }
 
+  // --- STRUCTURED BLOCK HELPERS ---
+
+  void _addTextBlock() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Add Text Block'),
+          content: TextField(
+            controller: controller,
+            maxLines: 3,
+            decoration: const InputDecoration(hintText: 'Enter text content...', border: OutlineInputBorder()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.isNotEmpty) {
+                  setState(() {
+                    _structureBlocks.add(TextBlock(content: controller.text));
+                    _markChanged();
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _addFigureBlock() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final urlController = TextEditingController();
+        final labelController = TextEditingController(text: 'Figure ${_structureBlocks.whereType<FigureBlock>().length + 1}');
+        final descController = TextEditingController();
+        return AlertDialog(
+          title: const Text('Add Figure Block'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(labelText: 'Image URL', hintText: 'https://...', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: labelController,
+                decoration: const InputDecoration(labelText: 'Figure Label', hintText: 'Figure 1', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descController,
+                decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder()),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (labelController.text.isNotEmpty) {
+                  setState(() {
+                    _structureBlocks.add(FigureBlock(
+                      url: urlController.text.isEmpty ? null : urlController.text,
+                      figureLabel: labelController.text,
+                      description: descController.text,
+                    ));
+                    _markChanged();
+                  });
+                  Navigator.pop(context);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _addQuestionPartBlock() {
+    _openQuestionPartDialog();
+  }
+
+  void _openQuestionPartDialog({QuestionPartBlock? existingBlock, int? index}) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final labelController = TextEditingController(text: existingBlock?.label ?? _getNextPartLabel());
+        final contentController = TextEditingController(text: existingBlock?.content ?? '');
+        final marksController = TextEditingController(text: existingBlock?.marks.toString() ?? '1');
+        final answerController = TextEditingController(text: existingBlock?.correctAnswer?.toString() ?? '');
+        final officialAnswerController = TextEditingController(text: existingBlock?.officialAnswer ?? '');
+        final aiAnswerController = TextEditingController(text: existingBlock?.aiAnswer ?? '');
+        String inputType = existingBlock?.inputType ?? 'text_area';
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(existingBlock == null ? 'Add Question Part' : 'Edit Question Part'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: labelController,
+                      decoration: const InputDecoration(labelText: 'Part Label', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: contentController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(labelText: 'Question Text', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: marksController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Marks', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: inputType,
+                      decoration: const InputDecoration(labelText: 'Input Type', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'text_area', child: Text('Text Area')),
+                        DropdownMenuItem(value: 'fill_in_blanks', child: Text('Fill in Blanks')),
+                        DropdownMenuItem(value: 'mcq', child: Text('Multiple Choice')),
+                      ],
+                      onChanged: (value) => setDialogState(() => inputType = value!),
+                    ),
+                     const SizedBox(height: 12),
+                    TextField(
+                      controller: officialAnswerController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Official Answer / Mark Scheme', 
+                        border: OutlineInputBorder(),
+                        hintText: 'Explanation from mark scheme...'
+                      ),
+                    ),
+                     const SizedBox(height: 12),
+                    TextField(
+                      controller: aiAnswerController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'AI Answer / Explanation', 
+                        border: OutlineInputBorder(),
+                        hintText: 'AI generated explanation...'
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: () {
+                    if (labelController.text.isNotEmpty && contentController.text.isNotEmpty) {
+                      setState(() {
+                        final newBlock = QuestionPartBlock(
+                          label: labelController.text,
+                          content: contentController.text,
+                          marks: int.tryParse(marksController.text) ?? 1,
+                          inputType: inputType,
+                          correctAnswer: answerController.text,
+                          officialAnswer: officialAnswerController.text,
+                          aiAnswer: aiAnswerController.text,
+                        );
+
+                        if (index != null && index < _structureBlocks.length) {
+                          _structureBlocks[index] = newBlock;
+                        } else {
+                          _structureBlocks.add(newBlock);
+                        }
+                         _markChanged();
+                      });
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: Text(existingBlock == null ? 'Add' : 'Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getNextPartLabel() {
+     final parts = _structureBlocks.whereType<QuestionPartBlock>().length;
+     // Simple labeling strategy
+     const labels = ['a)', 'b)', 'c)', 'd)', 'e)', 'f)'];
+     if (parts < labels.length) return labels[parts];
+     return '';
+  }
+
+  void _removeBlock(int index) {
+    setState(() {
+      _structureBlocks.removeAt(index);
+      _markChanged();
+    });
+  }
+
+  Widget _buildBlockPreview(int index) {
+    final block = _structureBlocks[index];
+    
+    return Card(
+      key: ValueKey(block), 
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text('${block.type.toUpperCase()} Block'),
+        subtitle: _buildBlockContent(block),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (block is QuestionPartBlock)
+              IconButton(
+                icon: const Icon(Icons.edit, color: Colors.blue),
+                onPressed: () => _openQuestionPartDialog(existingBlock: block, index: index),
+              ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _removeBlock(index),
+            ),
+          ],
+        ),
+        leading: const Icon(Icons.drag_handle),
+      ),
+    );
+  }
+
+  Future<void> _editFigureCrop(int index) async {
+    final block = _structureBlocks[index];
+    if (block is! FigureBlock || _paper == null || _paper!['pdf_url'] == null) return;
+
+    // Extract current crop info or use defaults
+    int page = 1;
+    double x = 10, y = 30, w = 40, h = 30;
+
+    if (block.meta != null) {
+      if (block.meta!.containsKey('page')) page = (block.meta!['page'] as num).toInt();
+      // bbox might be nested or flat, let's look for bbox object first
+      var bbox = block.meta!['bbox'];
+      if (bbox is Map) {
+         x = (bbox['x'] as num?)?.toDouble() ?? x;
+         y = (bbox['y'] as num?)?.toDouble() ?? y;
+         w = (bbox['width'] as num?)?.toDouble() ?? w;
+         h = (bbox['height'] as num?)?.toDouble() ?? h;
+      }
+    }
+
+    // Open Crop Dialog
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _CropDialog(
+        pdfUrl: _paper!['pdf_url'],
+        page: page,
+        x: x,
+        y: y,
+        width: w,
+        height: h,
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() => _isSaving = true);
+      
+      try {
+        // We have new crop coordinates, call crop-figure immediately
+        final newPage = result['page'] as int;
+        final newBbox = {
+           'x': result['x'], 
+           'y': result['y'], 
+           'width': result['width'], 
+           'height': result['height']
+        };
+
+        final response = await _supabase.functions.invoke(
+          'crop-figure',
+          body: {
+            'pdfUrl': _paper!['pdf_url'],
+            'questionId': widget.questionId,
+            'page': newPage,
+            'bbox': newBbox,
+          },
+        );
+
+        if (response.data?['image_url'] != null) {
+           final newUrl = '${response.data['image_url']}?t=${DateTime.now().millisecondsSinceEpoch}';
+           
+           setState(() {
+              // Update the block with new URL and Metadata
+              _structureBlocks[index] = FigureBlock(
+                 url: newUrl,
+                 figureLabel: block.figureLabel,
+                 description: block.description,
+                 meta: {
+                    'page': newPage,
+                    'bbox': newBbox
+                 }
+              );
+              _markChanged();
+           });
+           ToastService.showSuccess('Figure updated!');
+        } else {
+           throw Exception(response.data?['error'] ?? 'No image returned');
+        }
+
+      } catch (e) {
+        ToastService.showError('Crop update failed: $e');
+      } finally {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Widget _buildBlockContent(ExamContentBlock block) {
+    if (block is TextBlock) {
+      return Text(block.content, maxLines: 2, overflow: TextOverflow.ellipsis);
+    } else if (block is FigureBlock) {
+      final index = _structureBlocks.indexOf(block);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+               Text('Label: ${block.figureLabel}', style: const TextStyle(fontWeight: FontWeight.bold)),
+               const Spacer(),
+               if (index != -1)
+                 TextButton.icon(
+                    icon: const Icon(Icons.crop, size: 16),
+                    label: const Text('Edit Crop', style: TextStyle(fontSize: 12)),
+                    onPressed: () => _editFigureCrop(index),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                 ),
+            ],
+          ),
+          if (block.url != null) 
+             Text('URL: ${block.url}', style: const TextStyle(fontSize: 12))
+          else 
+             const Text('No Image URL (Waiting for crop)', style: TextStyle(fontSize: 12, color: Colors.orange)),
+        ],
+      );
+    } else if (block is QuestionPartBlock) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Part ${block.label}  [${block.marks} marks]', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(block.content, maxLines: 2, overflow: TextOverflow.ellipsis),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -319,223 +740,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
               // Form - Vertical Layout (single scrollable column)
               Expanded(
-                child: Form(
-                  key: _formKey,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Question Content
-                        _buildSection(
-                          'Question Content',
-                          TextFormField(
-                            controller: _contentController,
-                            decoration: _inputDecoration('Enter question content...'),
-                            maxLines: 6,
-                            style: const TextStyle(fontSize: 15),
-                            onChanged: (_) => _markChanged(),
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Two columns for metadata: Question Number + Topics
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Question Number (small)
-                            SizedBox(
-                              width: 120,
-                              child: _buildSection(
-                                'Q#',
-                                TextFormField(
-                                  initialValue: _questionNumber.toString(),
-                                  decoration: _inputDecoration(''),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (v) {
-                                    _questionNumber = int.tryParse(v) ?? 1;
-                                    _markChanged();
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            // Topics (expandable)
-                            Expanded(
-                              child: _buildSection(
-                                'Topics',
-                                _buildOptimizedTopicSelector(),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Figure & Image Section
-                        _buildSection(
-                          'Figure & Image',
-                          _buildFigureSection(),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Official Answer
-                        _buildSection(
-                          'Official Answer',
-                          TextFormField(
-                            controller: _officialAnswerController,
-                            decoration: _inputDecoration('Enter official answer...'),
-                            maxLines: 5,
-                            onChanged: (val) {
-                              _markChanged();
-                              // Sync to MCQ selection if it matches an option label
-                              if (_isMCQ && val.trim().isNotEmpty) {
-                                final upperVal = val.trim().toUpperCase();
-                                final matchingOption = _options.firstWhere(
-                                  (opt) => (opt['label'] as String?)?.toUpperCase() == upperVal,
-                                  orElse: () => {},
-                                );
-                                if (matchingOption.isNotEmpty) {
-                                  setState(() => _correctAnswer = matchingOption['label']);
-                                }
-                              }
-                            },
-                          ),
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // AI Solution
-                        _buildSection(
-                          'AI Solution (Step-by-Step)',
-                          TextFormField(
-                            controller: _aiSolutionController,
-                            decoration: _inputDecoration('AI generated solution...'),
-                            maxLines: 6,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textPrimary.withOpacity(0.9),
-                            ),
-                            onChanged: (_) => _markChanged(),
-                          ),
-                        ),
-
-                        // MCQ Options (if applicable)
-                        if (_isMCQ) ...[
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _buildSection('MCQ Options', const SizedBox.shrink()),
-                              TextButton.icon(
-                                onPressed: () {
-                                  setState(() {
-                                    final nextLabel = String.fromCharCode(65 + _options.length);
-                                    _options.add({'label': nextLabel, 'text': ''});
-                                    _markChanged();
-                                  });
-                                },
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text('Add Option'),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Column(
-                            children: [
-                              for (int i = 0; i < _options.length; i++)
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surface,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: _options[i]['label'] == _correctAnswer
-                                          ? Colors.green
-                                          : AppColors.border,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Radio<String>(
-                                        value: _options[i]['label'] ?? '',
-                                        groupValue: _correctAnswer,
-                                        activeColor: Colors.green,
-                                        onChanged: (val) {
-                                          setState(() {
-                                            _correctAnswer = val;
-                                            // Sync to Official Answer field
-                                            if (val != null && _isMCQ) {
-                                              _officialAnswerController.text = val;
-                                            }
-                                            _markChanged();
-                                          });
-                                        },
-                                      ),
-                                      SizedBox(
-                                        width: 40,
-                                        child: TextFormField(
-                                          initialValue: _options[i]['label'],
-                                          textAlign: TextAlign.center,
-                                          decoration: const InputDecoration(
-                                            border: InputBorder.none,
-                                            isDense: true,
-                                          ),
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
-                                          ),
-                                          onChanged: (val) {
-                                            _options[i]['label'] = val;
-                                            _markChanged();
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: TextFormField(
-                                          initialValue: _options[i]['text'],
-                                          decoration: const InputDecoration(
-                                            border: InputBorder.none,
-                                            hintText: 'Option text...',
-                                            isDense: true,
-                                          ),
-                                          style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
-                                          maxLines: null,
-                                          onChanged: (val) {
-                                            _options[i]['text'] = val;
-                                            _markChanged();
-                                          },
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.close, size: 16, color: Colors.grey),
-                                        onPressed: () {
-                                          setState(() {
-                                            if (_correctAnswer == _options[i]['label']) {
-                                              _correctAnswer = null;
-                                            }
-                                            _options.removeAt(i);
-                                            _markChanged();
-                                          });
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-
-                        // Bottom padding for comfortable scrolling
-                        const SizedBox(height: 40),
-                      ],
-                    ),
-                  ),
-                ),
+                child: _isStructured ? _buildStructuredForm() : _buildLegacyForm(),
               ),
             ],
           ),
@@ -1032,6 +1237,333 @@ class _QuestionEditorState extends State<QuestionEditor> {
       ],
     );
   }
+
+  // --- FORM BUILDERS ---
+
+  Widget _buildLegacyForm() {
+    return Form(
+      key: _formKey,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Question Content
+            _buildSection(
+              'Question Content',
+              TextFormField(
+                controller: _contentController,
+                decoration: _inputDecoration('Enter question content...'),
+                maxLines: 6,
+                style: const TextStyle(fontSize: 15),
+                onChanged: (_) => _markChanged(),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Two columns for metadata: Question Number + Topics
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Question Number (small)
+                SizedBox(
+                  width: 120,
+                  child: _buildSection(
+                    'Q#',
+                    TextFormField(
+                      initialValue: _questionNumber.toString(),
+                      decoration: _inputDecoration(''),
+                      keyboardType: TextInputType.number,
+                      onChanged: (v) {
+                        _questionNumber = int.tryParse(v) ?? 1;
+                        _markChanged();
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // Topics (expandable)
+                Expanded(
+                  child: _buildSection(
+                    'Topics',
+                    _buildOptimizedTopicSelector(),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Figure & Image Section
+            _buildSection(
+              'Figure & Image',
+              _buildFigureSection(),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Official Answer
+            _buildSection(
+              'Official Answer',
+              TextFormField(
+                controller: _officialAnswerController,
+                decoration: _inputDecoration('Enter official answer...'),
+                maxLines: 5,
+                onChanged: (val) {
+                  _markChanged();
+                  // Sync to MCQ selection if it matches an option label
+                  if (_isMCQ && val.trim().isNotEmpty) {
+                    final upperVal = val.trim().toUpperCase();
+                    final matchingOption = _options.firstWhere(
+                      (opt) => (opt['label'] as String?)?.toUpperCase() == upperVal,
+                      orElse: () => {},
+                    );
+                    if (matchingOption.isNotEmpty) {
+                      setState(() => _correctAnswer = matchingOption['label']);
+                    }
+                  }
+                },
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // AI Solution
+            _buildSection(
+              'AI Solution (Step-by-Step)',
+              TextFormField(
+                controller: _aiSolutionController,
+                decoration: _inputDecoration('AI generated solution...'),
+                maxLines: 6,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textPrimary.withOpacity(0.9),
+                ),
+                onChanged: (_) => _markChanged(),
+              ),
+            ),
+
+            // MCQ Options (if applicable)
+            if (_isMCQ) ...[
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildSection('MCQ Options', const SizedBox.shrink()),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        final nextLabel = String.fromCharCode(65 + _options.length);
+                        _options.add({'label': nextLabel, 'text': ''});
+                        _markChanged();
+                      });
+                    },
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add Option'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Column(
+                children: [
+                  for (int i = 0; i < _options.length; i++)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _options[i]['label'] == _correctAnswer
+                              ? Colors.green
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Radio<String>(
+                            value: _options[i]['label'] ?? '',
+                            groupValue: _correctAnswer,
+                            activeColor: Colors.green,
+                            onChanged: (val) {
+                              setState(() {
+                                _correctAnswer = val;
+                                // Sync to Official Answer field
+                                if (val != null && _isMCQ) {
+                                  _officialAnswerController.text = val;
+                                }
+                                _markChanged();
+                              });
+                            },
+                          ),
+                          SizedBox(
+                            width: 40,
+                            child: TextFormField(
+                              initialValue: _options[i]['label'],
+                              textAlign: TextAlign.center,
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                              ),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
+                              ),
+                              onChanged: (val) {
+                                _options[i]['label'] = val;
+                                _markChanged();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: _options[i]['text'],
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: 'Option text...',
+                                isDense: true,
+                              ),
+                              style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
+                              maxLines: null,
+                              onChanged: (val) {
+                                _options[i]['text'] = val;
+                                _markChanged();
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 16, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                if (_correctAnswer == _options[i]['label']) {
+                                  _correctAnswer = null;
+                                }
+                                _options.removeAt(i);
+                                _markChanged();
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStructuredForm() {
+    return Row(
+      children: [
+        // Left - Editor
+        Expanded(
+          flex: 5, // 50%
+          child: Column(
+            children: [
+               Expanded(
+                 child: ReorderableListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _structureBlocks.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                         if (oldIndex < newIndex) {
+                           newIndex -= 1;
+                         }
+                         final item = _structureBlocks.removeAt(oldIndex);
+                         _structureBlocks.insert(newIndex, item);
+                         _markChanged();
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      return _buildBlockPreview(index);
+                    },
+                 ),
+               ),
+               // Action Bar
+               Container(
+                 padding: const EdgeInsets.all(12),
+                 decoration: BoxDecoration(
+                   color: AppColors.surface,
+                   border: Border(top: BorderSide(color: AppColors.border)),
+                 ),
+                 child: Row(
+                   mainAxisAlignment: MainAxisAlignment.center,
+                   children: [
+                     ElevatedButton.icon(onPressed: _addTextBlock, icon: const Icon(Icons.text_fields), label: const Text('Text')),
+                     const SizedBox(width: 8),
+                     ElevatedButton.icon(onPressed: _addFigureBlock, icon: const Icon(Icons.image), label: const Text('Figure')),
+                     const SizedBox(width: 8),
+                     ElevatedButton.icon(onPressed: _addQuestionPartBlock, icon: const Icon(Icons.quiz), label: const Text('Part')),
+                   ],
+                 ),
+               ),
+            ],
+          ),
+        ),
+        
+        // Right - Metadata (Topics, Q#, etc.)
+        Container(width: 1, color: AppColors.border),
+        Expanded(
+          flex: 4, // 40%
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                 const Text('Metadata', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                 const SizedBox(height: 16),
+                 
+                 // Q Number
+                 TextFormField(
+                    initialValue: _questionNumber.toString(),
+                    decoration: _inputDecoration('Q Number'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (v) {
+                      _questionNumber = int.tryParse(v) ?? 1;
+                      _markChanged();
+                    },
+                 ),
+                 
+                 const SizedBox(height: 16),
+                 _buildSection('Topics', _buildOptimizedTopicSelector()),
+
+                 const SizedBox(height: 16),
+                 
+                 // AI & Official Answer Summary
+                 _buildSection(
+                    'AI Answer Overview',
+                    TextFormField(
+                      controller: _aiSolutionController,
+                      decoration: _inputDecoration('General AI Explanation...'),
+                      maxLines: 4,
+                      onChanged: (_) => _markChanged(),
+                    ),
+                 ),
+                 
+                 const SizedBox(height: 16),
+                 _buildSection(
+                    'Official Answer Note',
+                    TextFormField(
+                      controller: _officialAnswerController,
+                      decoration: _inputDecoration('Mark scheme notes...'),
+                      maxLines: 4,
+                      onChanged: (_) => _markChanged(),
+                    ),
+                 ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Fullscreen crop dialog with visual preview
@@ -1062,6 +1594,7 @@ class _CropDialogState extends State<_CropDialog> {
   bool _isLoading = true;
   bool _hasError = false;
   String? _imageUrl;
+  Uint8List? _imageBase64;
   String? _errorMessage;
 
   void notifyError(String msg) {
@@ -1116,18 +1649,27 @@ class _CropDialogState extends State<_CropDialog> {
         return;
       }
       
+      final imageBase64 = data['image_base64'] as String?;
       final imageUrl = data['image_url'] as String?;
-      if (imageUrl == null) {
-        notifyError('No image URL returned');
+
+      if (imageBase64 != null) {
+         debugPrint('✅ Page rendered (Base64)');
+         setState(() {
+            _imageBase64 = base64Decode(imageBase64);
+            _imageUrl = null;
+            _isLoading = false;
+         });
+      } else if (imageUrl != null) {
+          debugPrint('✅ Page rendered (URL): $imageUrl');
+          setState(() {
+            _imageUrl = imageUrl;
+            _imageBase64 = null;
+            _isLoading = false;
+          });
+      } else {
+        notifyError('No image data returned');
         setState(() => _isLoading = false);
-        return;
       }
-      
-      debugPrint('✅ Page rendered: $imageUrl');
-      setState(() {
-        _imageUrl = imageUrl;
-        _isLoading = false;
-      });
       
     } catch (e) {
       notifyError('Failed to render page: $e');
@@ -1337,7 +1879,18 @@ class _CropDialogState extends State<_CropDialog> {
             ),
 
           // Rendered page image (from pdf.co)
-          if (_imageUrl != null)
+          // Rendered page image (from pdf.co)
+          if (_imageBase64 != null)
+             Positioned.fill(
+               child: Image.memory(
+                  _imageBase64!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(child: Text('Failed to load image', style: TextStyle(color: Colors.red)));
+                  },
+               ),
+             )
+          else if (_imageUrl != null)
             Positioned.fill(
               child: Image.network(
                 _imageUrl!,
@@ -1347,9 +1900,7 @@ class _CropDialogState extends State<_CropDialog> {
                   return const Center(child: CircularProgressIndicator());
                 },
                 errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Text('Failed to load image', style: TextStyle(color: Colors.red)),
-                  );
+                  return const Center(child: Text('Failed to load image', style: TextStyle(color: Colors.red)));
                 },
               ),
             ),
@@ -1503,6 +2054,8 @@ class _CropDialogState extends State<_CropDialog> {
       ),
     );
   }
+
+
 }
 
 /// Painter for crop overlay

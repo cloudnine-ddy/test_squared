@@ -80,11 +80,30 @@ Deno.serve(async (req) => {
       )
     }
 
-    const pageBody = pdfCoJson.body; // Base64 content
+    let pageBody = pdfCoJson.body; // Base64 content
+
+    // Fallback: If no inline body, check for URL and download it
+    let targetUrl = pdfCoJson.url;
+    if (!targetUrl && Array.isArray(pdfCoJson.urls) && pdfCoJson.urls.length > 0) {
+        targetUrl = pdfCoJson.urls[0];
+    }
+
+    if (!pageBody && targetUrl) {
+        console.log(`PDF.co returned URL instead of body. Downloading: ${targetUrl}`);
+        const imgRes = await fetch(targetUrl);
+        if (imgRes.ok) {
+            const imgBuffer = await imgRes.arrayBuffer();
+            const u8 = new Uint8Array(imgBuffer);
+            let b = ''; const l = u8.length;
+            for(let i=0;i<l;i+=32768) b+=String.fromCharCode(...u8.subarray(i,i+32768));
+            pageBody = btoa(b);
+        }
+    }
 
     if (!pageBody) {
+      console.error('PDF.co response dump:', JSON.stringify(pdfCoJson));
       return new Response(
-        JSON.stringify({ error: 'No image body returned' }),
+        JSON.stringify({ error: 'No image body returned', provider_response: pdfCoJson }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

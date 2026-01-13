@@ -282,7 +282,8 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       });
     }
 
-    // Process in batches of 10 pages
+    // For Structured papers, we now use the batching logic just like standard papers
+    // but pointing to a different edge function.
     await _processPdfInBatches(
       paperId: newPaper['id'],
       pdfUrl: publicUrl,
@@ -304,7 +305,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     required String paperType,
     String? markSchemeUrl,
   }) async {
-    const int batchSize = 6; // Reduced from 10 to fit within 150s timeout
+    const int batchSize = 4; // Increased to 4 (structure only, no AI answers)
     final supabase = Supabase.instance.client;
     
     // First batch to get total page count
@@ -315,8 +316,10 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     }
 
     try {
+      final functionName = paperType == 'structured' ? 'process-structured-paper' : 'analyze-paper';
+      
       final firstBatch = await supabase.functions.invoke(
-        'analyze-paper',
+        functionName,
         body: {
           'paperId': paperId,
           'pdfUrl': pdfUrl,
@@ -331,16 +334,13 @@ class _UploadPaperViewState extends State<UploadPaperView> {
         throw Exception('First batch failed');
       }
 
-      final int totalPages = firstBatch.data['total_pages'] ?? batchSize;
-      final bool hasMore = firstBatch.data['has_more'] ?? false;
-
-      if (!hasMore) {
-        // PDF was small, completed in one batch
-        print('PDF analysis completed in single batch');
-        return;
+      int totalPages = firstBatch.data['total_pages'] ?? 100; // Default to larger if null to ensure loop runs check
+      if (firstBatch.data['total_pages'] != null) {
+          debugPrint('✅ Total pages detected: $totalPages');
       }
 
       // Process remaining batches
+      // Start loop from batchSize because 0..batchSize is already done
       for (int start = batchSize; start < totalPages; start += batchSize) {
         final end = (start + batchSize > totalPages) ? totalPages : start + batchSize;
         
@@ -353,8 +353,9 @@ class _UploadPaperViewState extends State<UploadPaperView> {
         print('[Batch] Processing pages ${start + 1} to $end of $totalPages');
 
         try {
+          final functionName = paperType == 'structured' ? 'process-structured-paper' : 'analyze-paper';
           final batchResponse = await supabase.functions.invoke(
-            'analyze-paper',
+            functionName,
             body: {
               'paperId': paperId,
               'pdfUrl': pdfUrl,
@@ -368,8 +369,12 @@ class _UploadPaperViewState extends State<UploadPaperView> {
           if (batchResponse.data?['success'] == true) {
             print('[Batch] Success: ${batchResponse.data['count']} questions extracted');
           } else {
-            print('[Batch] Warning: Batch $start-$end may have failed');
+             print('[Batch] Warning: ${batchResponse.data}');
           }
+
+          // Rate Limit Throttling for Gemini 2.0 Flash Exp (10 RPM) - Optimized to 2s
+          // Relying on retry logic for backpressure if limit is hit
+          await Future.delayed(const Duration(seconds: 2));
         } catch (e) {
           print('[Batch] Error processing pages $start-$end: $e');
           // Continue with next batch even if this one failed
@@ -380,6 +385,30 @@ class _UploadPaperViewState extends State<UploadPaperView> {
       }
 
       print('[Complete] All batches processed. Total pages: $totalPages');
+
+      // Process Mark Scheme (Structured Only)
+      if (paperType == 'structured' && markSchemeUrl != null) {
+        if (mounted) setState(() => _statusMessage = 'Processing Mark Scheme...');
+        print('[Mark Scheme] Starting extraction...');
+        
+        try {
+          final msResponse = await supabase.functions.invoke(
+            'process-mark-scheme',
+            body: {
+              'paperId': paperId,
+              'markSchemeUrl': markSchemeUrl,
+            },
+          );
+          
+          if (msResponse.data?['success'] == true) {
+             print('[Mark Scheme] Success: ${msResponse.data['message']}');
+          } else {
+             print('[Mark Scheme] Warning: ${msResponse.data}');
+          }
+        } catch (e) {
+          print('[Mark Scheme] Error: $e');
+        }
+      }
     } catch (e) {
       print('[Error] Batch processing failed: $e');
       rethrow;
@@ -688,7 +717,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: _paperType == 'objective' ? Colors.blue.withOpacity(0.2) : Colors.transparent,
+                                  color: _paperType == 'objective' ? Colors.blue.withValues(alpha: 0.2) : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: _paperType == 'objective' ? Colors.blue : Colors.transparent),
                                 ),
@@ -704,12 +733,28 @@ class _UploadPaperViewState extends State<UploadPaperView> {
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: _paperType == 'subjective' ? Colors.purple.withOpacity(0.2) : Colors.transparent,
+                                  color: _paperType == 'subjective' ? Colors.purple.withValues(alpha: 0.2) : Colors.transparent,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: _paperType == 'subjective' ? Colors.purple : Colors.transparent),
                                 ),
                                 alignment: Alignment.center,
-                                child: Text('Subjective (Written)', style: TextStyle(color: _paperType == 'subjective' ? Colors.purple : Colors.white54, fontWeight: FontWeight.bold)),
+                                child: Text('Subjective (Legacy)', style: TextStyle(color: _paperType == 'subjective' ? Colors.purple : Colors.white54, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _paperType = 'structured'),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: _paperType == 'structured' ? Colors.orange.withValues(alpha: 0.2) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: _paperType == 'structured' ? Colors.orange : Colors.transparent),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text('Smart Structured', style: TextStyle(color: _paperType == 'structured' ? Colors.orange : Colors.white54, fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ),

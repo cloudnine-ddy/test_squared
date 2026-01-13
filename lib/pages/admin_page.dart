@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/services/toast_service.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/app_colors.dart';
+import 'admin/structured_question_uploader.dart';
 
 class AdminPage extends StatefulWidget {
   const AdminPage({super.key});
@@ -35,6 +36,8 @@ class _AdminPageState extends State<AdminPage> {
   Uint8List? _selectedFileBytes;
 
   final List<String> _seasons = const ['March', 'June', 'November'];
+  final List<String> _paperTypes = const ['MCQ (Multiple Choice)', 'Structured (Multi-part)'];
+  String _selectedPaperType = 'MCQ (Multiple Choice)';
 
   @override
   void initState() {
@@ -262,8 +265,13 @@ class _AdminPageState extends State<AdminPage> {
       });
     }
 
+    // Choose Edge Function based on paper type
+    final edgeFunction = _selectedPaperType == 'Structured (Multi-part)'
+        ? 'process-structured-paper'
+        : 'analyze-paper';
+
     await supabase.functions.invoke(
-      'analyze-paper',
+      edgeFunction,
       body: {
         'paperId': newPaper['id'],
         'pdfUrl': publicUrl,
@@ -311,6 +319,14 @@ class _AdminPageState extends State<AdminPage> {
                                 color: AppColors.textPrimary,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Upload PDF papers for automatic question extraction',
+                              style: TextStyle(
+                                color: AppColors.textSecondary.withValues(alpha: 0.8),
+                                fontSize: 14,
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -421,6 +437,40 @@ class _AdminPageState extends State<AdminPage> {
                               },
                             ),
                             const SizedBox(height: 16),
+                            DropdownButtonFormField<String>(
+                              value: _selectedPaperType,
+                              decoration: InputDecoration(
+                                labelText: 'Paper Type',
+                                labelStyle: TextStyle(color: AppColors.textSecondary),
+                                filled: true,
+                                fillColor: AppColors.background,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                              ),
+                              items: _paperTypes
+                                  .map(
+                                    (type) => DropdownMenuItem<String>(
+                                      value: type,
+                                      child: Text(
+                                        type,
+                                        style: TextStyle(
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _selectedPaperType = value;
+                                  });
+                                }
+                              },
+                            ),
+                            const SizedBox(height: 16),
                             TextFormField(
                               controller: _variantController,
                               decoration: InputDecoration(
@@ -494,6 +544,38 @@ class _AdminPageState extends State<AdminPage> {
                                 ),
                               ),
                             ],
+                            const SizedBox(height: 24),
+                            const Divider(),
+                            const SizedBox(height: 24),
+                            // Structured Question Builder Button
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const StructuredQuestionUploader(),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.add_box, color: AppColors.primary),
+                              label: const Text(
+                                'Create Structured Question',
+                                style: TextStyle(color: AppColors.primary),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                side: const BorderSide(color: AppColors.primary, width: 2),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Manually create multi-part questions with text, images, and sub-questions',
+                              style: TextStyle(
+                                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       ),

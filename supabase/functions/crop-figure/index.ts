@@ -142,7 +142,10 @@ Deno.serve(async (req) => {
     console.log(`Downloaded image: ${imageBytes.length} bytes`)
 
     // Upload to Supabase Storage
-    const fileName = `figures/${questionId}.png`
+    // Use unique filename to allow multiple figures per question
+    const uniqueSuffix = `${Date.now()}-${Math.floor(Math.random() * 1000)}`
+    const fileName = `figures/${questionId}_${uniqueSuffix}.png`
+    
     const { error: uploadError } = await supabase.storage
       .from('exam-papers')
       .upload(fileName, imageBytes, {
