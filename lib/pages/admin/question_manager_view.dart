@@ -43,6 +43,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
   // Expansion state
   Set<String> _expandedSubjects = {};
   Set<String> _expandedPapers = {};
+  bool _isSidebarCollapsed = false; // Collapsible sidebar state
 
   // Editor callback for save
   GlobalKey<dynamic>? _editorKey;
@@ -404,14 +405,30 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
         backgroundColor: Colors.white,
         body: Row(
           children: [
-            // LEFT SIDEBAR (Navigation) - Wider for better UX
-            Container(
-              width: 320,
+            // LEFT SIDEBAR (Navigation) - Collapsible
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              width: _isSidebarCollapsed ? 48 : 320,
               decoration: const BoxDecoration(
                 color: Color(0xFFF7F6F3),
                 border: Border(right: BorderSide(color: Color(0xFFE9E9E7))),
               ),
-              child: Column(
+              child: _isSidebarCollapsed
+                  // Collapsed State - Just toggle button
+                  ? Column(
+                      children: [
+                        const SizedBox(height: 12),
+                        IconButton(
+                          onPressed: () => setState(() => _isSidebarCollapsed = false),
+                          icon: const Icon(Icons.chevron_right, size: 24),
+                          color: const Color(0xFF787774),
+                          tooltip: 'Expand Sidebar',
+                        ),
+                      ],
+                    )
+                  // Expanded State - Full sidebar
+                  : Column(
                 children: [
                   // Sidebar Header (Subject Filter + Progress)
                   Container(
@@ -426,6 +443,14 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                           children: [
                             const Text('Questions', style: TextStyle(color: Color(0xFF37352F), fontSize: 16, fontWeight: FontWeight.bold)),
                             const Spacer(),
+                            // Collapse button
+                            IconButton(
+                              onPressed: () => setState(() => _isSidebarCollapsed = true),
+                              icon: const Icon(Icons.chevron_left, size: 18),
+                              color: const Color(0xFF787774),
+                              tooltip: 'Collapse Sidebar',
+                              visualDensity: VisualDensity.compact,
+                            ),
                             // Refresh button
                             IconButton(
                               onPressed: _loadData,

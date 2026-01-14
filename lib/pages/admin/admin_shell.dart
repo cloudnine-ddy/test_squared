@@ -9,6 +9,7 @@ import '../../core/services/toast_service.dart';
 import 'upload_paper_view.dart';
 import 'question_manager_view.dart';
 import 'analytics_dashboard_view.dart';
+import 'user_management_view.dart';
 
 /// Enum for admin navigation items - add new items here for future features
 enum AdminSection {
@@ -16,8 +17,8 @@ enum AdminSection {
   uploadPaper,
   questionManager,
   questionPreview, // NEW: Admin preview of student question view
+  userManagement, // NEW: Search and manage user subscriptions
   // Add future sections here:
-  // userManagement,
   // settings,
 }
 
@@ -107,6 +108,8 @@ class _AdminShellState extends State<AdminShell> {
           if (mounted) context.go('/dashboard-preview');
         });
         return const Center(child: CircularProgressIndicator());
+      case AdminSection.userManagement:
+        return const UserManagementView();
       // Add future cases here:
     }
   }
@@ -121,6 +124,8 @@ class _AdminShellState extends State<AdminShell> {
         return 'Question Manager';
       case AdminSection.questionPreview:
         return 'Question Preview';
+      case AdminSection.userManagement:
+        return 'User Management';
       // Add future cases here
     }
   }
@@ -135,6 +140,8 @@ class _AdminShellState extends State<AdminShell> {
         return Icons.account_tree;
       case AdminSection.questionPreview:
         return Icons.visibility;
+      case AdminSection.userManagement:
+        return Icons.people_outline;
       // Add future cases here
     }
   }
@@ -248,8 +255,8 @@ class _AdminShellState extends State<AdminShell> {
                 _buildNavItem(AdminSection.uploadPaper),
                 _buildNavItem(AdminSection.questionManager),
                 _buildNavItem(AdminSection.questionPreview),
+                _buildNavItem(AdminSection.userManagement),
                 // Add more navigation items here as needed
-                // _buildNavItem(AdminSection.analytics),
               ],
             ),
           ),

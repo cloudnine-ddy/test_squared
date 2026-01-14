@@ -17,7 +17,7 @@ export async function handleStructuredQuestion(params: {
 }) {
   const { questionId, structuredAnswers, userId, timeSpent, hintsUsed, supabase, apiKey, corsHeaders } = params
 
-  const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
+  const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
   console.log(`🎯 Handling structured question: ${questionId}`)
   console.log(`📝 Total sub-parts to grade: ${structuredAnswers.length}`)

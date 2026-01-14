@@ -29,6 +29,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
   bool _isTyping = false;
+  bool _isToolsExpanded = false;
 
   // User's attempt context
   String? _userAnswer;
@@ -242,11 +243,8 @@ class _AIChatPanelState extends State<AIChatPanel> {
                 : _buildPremiumLock(),
           ),
 
-          // Quick prompts
-          if (widget.isPremium) _buildQuickPrompts(),
-
-          // Prominent Generate Button
-          if (widget.isPremium) _buildGenerateButton(),
+          // Collapsible AI Tools (Quick prompts + Generate)
+          if (widget.isPremium) _buildToolsSection(),
 
           // Input
           _buildInput(),
@@ -463,60 +461,157 @@ class _AIChatPanelState extends State<AIChatPanel> {
     );
   }
 
-  Widget _buildQuickPrompts() {
+  /// Collapsible AI Tools section (Quick Prompts + Generate button)
+  Widget _buildToolsSection() {
     final prompts = [
-      ('💡', 'Explain this question'),
-      ('🎯', 'Give me a hint'),
-      ('✅', 'Check my understanding'),
+      ('💡', 'Explain'),
+      ('🎯', 'Hint'),
+      ('✅', 'Check'),
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: _backgroundColor,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Quick Prompts',
-            style: _patrickHand(
-              color: Colors.grey,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: prompts.map((prompt) {
-              return InkWell(
-                onTap: () => _sendQuickPrompt(prompt.$2),
-                child: WiredCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    borderColor: _primaryColor.withValues(alpha: 0.3),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(prompt.$1, style: const TextStyle(fontSize: 14)), // Emoji can be standard font
-                        const SizedBox(width: 6),
-                        Text(
-                          prompt.$2,
-                          style: _patrickHand(fontSize: 14),
-                        ),
-                      ],
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: WiredCard(
+        padding: EdgeInsets.zero,
+        borderColor: _primaryColor.withValues(alpha: 0.2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header - always visible, tap to toggle
+            InkWell(
+              onTap: () => setState(() => _isToolsExpanded = !_isToolsExpanded),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.05),
+                  borderRadius: _isToolsExpanded
+                      ? const BorderRadius.vertical(top: Radius.circular(4))
+                      : BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome,
+                      color: Colors.amber[700],
+                      size: 18,
                     ),
-                  ),
-              );
-            }).toList(),
-          ),
-        ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'AI Tools',
+                        style: _patrickHand(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryColor,
+                        ),
+                      ),
+                    ),
+                    AnimatedRotation(
+                      turns: _isToolsExpanded ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: _primaryColor.withValues(alpha: 0.6),
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Expandable content
+            AnimatedCrossFade(
+              firstChild: const SizedBox.shrink(),
+              secondChild: Container(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Quick Prompts row
+                    Row(
+                      children: prompts.map((prompt) {
+                        return Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: InkWell(
+                              onTap: () => _sendQuickPrompt(
+                                prompt.$2 == 'Explain' ? 'Explain this question' :
+                                prompt.$2 == 'Hint' ? 'Give me a hint' :
+                                'Check my understanding'
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _backgroundColor,
+                                  border: Border.all(
+                                    color: _primaryColor.withValues(alpha: 0.2),
+                                    width: 1.5,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(prompt.$1, style: const TextStyle(fontSize: 13)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      prompt.$2,
+                                      style: _patrickHand(fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    // Generate button
+                    SizedBox(
+                      width: double.infinity,
+                      child: WiredButton(
+                        onPressed: () => _sendQuickPrompt('Generate similar question'),
+                        backgroundColor: Colors.amber[50],
+                        filled: true,
+                        borderColor: Colors.amber[600]!,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.auto_awesome, color: Colors.orange[600], size: 18),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Generate Similar Question',
+                              style: _patrickHand(
+                                color: Colors.orange[700],
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              crossFadeState: _isToolsExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 200),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildInput() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(
         color: _backgroundColor,
         border: Border(
@@ -541,53 +636,25 @@ class _AIChatPanelState extends State<AIChatPanel> {
                   hintStyle: _patrickHand(color: Colors.grey),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   border: InputBorder.none,
                 ),
-                style: _patrickHand(fontSize: 16),
+                style: _patrickHand(fontSize: 15),
                 maxLines: null,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
           WiredButton(
             onPressed: widget.isPremium ? () => _sendMessage() : () {},
             backgroundColor: widget.isPremium ? _primaryColor : Colors.grey,
             filled: true,
-            child: const Icon(Icons.send, size: 20, color: Colors.white),
+            padding: const EdgeInsets.all(10),
+            child: const Icon(Icons.send, size: 18, color: Colors.white),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildGenerateButton() {
-     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      color: _backgroundColor, // Match background
-      child: WiredButton(
-        onPressed: () => _sendQuickPrompt('Generate similar question'),
-        backgroundColor: Colors.amber[50],
-        filled: true,
-        borderColor: Colors.amber[600]!,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.auto_awesome, color: Colors.orange[600], size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'Generate Similar Question',
-              style: _patrickHand(
-                color: Colors.orange[700],
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

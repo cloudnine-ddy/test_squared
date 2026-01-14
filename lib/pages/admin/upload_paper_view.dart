@@ -386,10 +386,10 @@ class _UploadPaperViewState extends State<UploadPaperView> {
 
       print('[Complete] All batches processed. Total pages: $totalPages');
 
-      // Process Mark Scheme (Structured Only)
-      if (paperType == 'structured' && markSchemeUrl != null) {
-        if (mounted) setState(() => _statusMessage = 'Processing Mark Scheme...');
-        print('[Mark Scheme] Starting extraction...');
+      // Process Mark Scheme (Background Task)
+      if (markSchemeUrl != null) {
+        if (mounted) setState(() => _statusMessage = 'Starting Mark Scheme processing (Background)...');
+        print('[Mark Scheme] Starting extraction (Background)...');
 
         try {
           final msResponse = await supabase.functions.invoke(
@@ -401,7 +401,8 @@ class _UploadPaperViewState extends State<UploadPaperView> {
           );
 
           if (msResponse.data?['success'] == true) {
-             print('[Mark Scheme] Success: ${msResponse.data['message']}');
+             print('[Mark Scheme] Background Task Started: ${msResponse.data['message']}');
+             if (mounted) setState(() => _statusMessage = 'Mark Scheme processing in background.');
           } else {
              print('[Mark Scheme] Warning: ${msResponse.data}');
           }

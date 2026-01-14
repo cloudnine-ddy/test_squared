@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import 'pdf_crop_viewer.dart';
+import '../../../shared/wired/wired_widgets.dart'; // Add wired widgets
 
 class GeneratedQuestionCard extends StatefulWidget {
   final Map<String, dynamic> questionData;
@@ -26,6 +27,25 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
   bool _isSaved = false;
   bool? _isRecommended; // null = no vote, true = up, false = down
 
+  // Sketchy Theme Constants
+  static const _primaryColor = Color(0xFF2D3E50);
+  static const _backgroundColor = Color(0xFFFDFBF7);
+
+  TextStyle _patrickHand({
+    double fontSize = 16,
+    FontWeight fontWeight = FontWeight.normal,
+    Color? color,
+    double? height,
+  }) {
+    return TextStyle(
+      fontFamily: 'PatrickHand',
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? _primaryColor,
+      height: height,
+    );
+  }
+
   Future<List<String>> _fetchFolders() async {
     try {
       final userId = Supabase.instance.client.auth.currentUser?.id;
@@ -44,13 +64,13 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
 
       // Default folders if empty
       if (folders.isEmpty) {
-        return ['Hard Questions', 'Review Later', 'Exams'];
+        return []; // Let user create their own folder
       }
 
       folders.sort();
       return folders;
     } catch (e) {
-      return ['Hard Questions', 'Review Later', 'Exams']; // Fallback
+      return []; // Return empty on error, let user create folder
     }
   }
 
@@ -139,6 +159,11 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
 
   void _handleExpandPreview() {
     final heroTag = 'ai-card-${widget.questionIndex}';
+    final content = widget.questionData['content'] ?? '';
+    final marks = widget.questionData['total_marks'] ?? 
+                  widget.questionData['marks'] ?? 0;
+    final explanation = widget.questionData['ai_answer']?['explanation'] ?? 
+                        widget.questionData['explanation'];
 
     Navigator.of(context).push(
       PageRouteBuilder(
@@ -153,84 +178,220 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.9,
                 constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F0E1),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black26, blurRadius: 20, spreadRadius: 5),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(8),
+                child: WiredCard(
+                  backgroundColor: _backgroundColor,
+                  borderColor: _primaryColor,
+                  padding: const EdgeInsets.all(24),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header Row
+                        Row(
+                          children: [
+                            WiredCard(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                              borderColor: const Color(0xFF6366F1),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.auto_awesome, size: 14, color: Color(0xFF6366F1)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'AI Q${widget.questionIndex}',
+                                    style: _patrickHand(color: const Color(0xFF6366F1), fontSize: 14, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Text(
-                              'AI Generated Question #${widget.questionIndex}',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.amber.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Preview',
+                                style: _patrickHand(color: Colors.orange, fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
                             ),
+                            const Spacer(),
+                            if (marks > 0)
+                              Text(
+                                '$marks marks',
+                                style: _patrickHand(fontSize: 15, fontWeight: FontWeight.bold, color: _primaryColor.withValues(alpha: 0.6)),
+                              ),
+                            const SizedBox(width: 12),
+                            InkWell(
+                              onTap: () => Navigator.pop(context),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: _primaryColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Icon(Icons.close, color: _primaryColor, size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Question Content
+                        MarkdownBody(
+                          data: content,
+                          styleSheet: MarkdownStyleSheet(
+                            p: _patrickHand(fontSize: 17, height: 1.5),
+                            strong: _patrickHand(fontSize: 17, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                             decoration: BoxDecoration(
-                               color: Colors.orange.withOpacity(0.2),
-                               borderRadius: BorderRadius.circular(8),
-                               border: Border.all(color: Colors.orange, width: 0.5),
-                             ),
-                             child: const Text(
-                               'Preview',
-                               style: TextStyle(color: Colors.deepOrange, fontSize: 12, fontWeight: FontWeight.bold),
-                             ),
-                           ),
-                           const Spacer(),
-                           IconButton(
-                             icon: const Icon(Icons.close, color: Colors.grey),
-                             onPressed: () => Navigator.pop(context),
-                           ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // MCQ Options
+                        if (widget.questionData['type'] == 'mcq' && widget.questionData['options'] != null) ...[
+                          ...((widget.questionData['options'] as List).map((option) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: WiredCard(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                borderColor: _primaryColor.withValues(alpha: 0.15),
+                                backgroundColor: Colors.white.withValues(alpha: 0.5),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 30,
+                                      height: 30,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          option['label'] ?? '',
+                                          style: _patrickHand(fontWeight: FontWeight.bold, fontSize: 15),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        option['text'] ?? '',
+                                        style: _patrickHand(fontSize: 16),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          })),
+                          const SizedBox(height: 12),
                         ],
-                      ),
-                      const SizedBox(height: 16),
 
-                      // Content
-                      MarkdownBody(
-                        data: widget.questionData['content'] ?? '',
-                        styleSheet: MarkdownStyleSheet(
-                          p: const TextStyle(fontSize: 16, height: 1.6, color: Color(0xFF2D2D2D)),
-                          strong: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
+                        // Structured Question Parts
+                        if (widget.questionData['type'] == 'structured' && widget.questionData['structure_data'] != null) ...[
+                          ...((widget.questionData['structure_data'] as List).where((block) => block['type'] == 'question_part').map((part) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: WiredCard(
+                                padding: const EdgeInsets.all(14),
+                                borderColor: _primaryColor.withValues(alpha: 0.15),
+                                backgroundColor: Colors.white.withValues(alpha: 0.5),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '(${part['label']})',
+                                          style: _patrickHand(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF6366F1)),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          '${part['marks']} mk',
+                                          style: _patrickHand(color: Colors.grey, fontSize: 13),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      part['content'] ?? '',
+                                      style: _patrickHand(fontSize: 16, height: 1.4),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          })),
+                          const SizedBox(height: 12),
+                        ],
 
-                      const SizedBox(height: 24),
+                        // AI Explanation Section
+                        if (explanation != null) ...[
+                          WiredCard(
+                            padding: const EdgeInsets.all(14),
+                            backgroundColor: const Color(0xFFF0F4F8),
+                            borderColor: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.lightbulb, size: 18, color: Color(0xFF6366F1)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'AI Explanation',
+                                      style: _patrickHand(fontWeight: FontWeight.bold, fontSize: 17, color: const Color(0xFF6366F1)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                MarkdownBody(
+                                  data: explanation,
+                                  styleSheet: MarkdownStyleSheet(
+                                    p: _patrickHand(fontSize: 16, height: 1.4),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'AI generated — check with teacher for verification',
+                                  style: _patrickHand(fontSize: 13, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
 
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                             Navigator.pop(context); // Close preview
-                             _handleSaveQuestion(); // Trigger save
-                          },
-                          icon: const Icon(Icons.bookmark_add, size: 20),
-                          label: const Text('Save to Collection'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE8DCC8),
-                            foregroundColor: const Color(0xFF5D4037),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        // Save Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: WiredButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _handleSaveQuestion();
+                            },
+                            backgroundColor: _primaryColor,
+                            filled: true,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.bookmark_add, size: 20, color: Colors.white),
+                                const SizedBox(width: 10),
+                                Text(
+                                  'Save to Collection',
+                                  style: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -238,6 +399,7 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
           ),
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
+
           return FadeTransition(opacity: animation, child: child);
         },
       ),
@@ -257,117 +419,111 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
       tag: heroTag,
       child: Material(
         type: MaterialType.transparency,
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(top: 8),
+        child: WiredCard(
+          backgroundColor: _backgroundColor,
+          borderColor: _primaryColor.withValues(alpha: 0.2),
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F0E1), // Beige
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE8DCC8), width: 1),
-            boxShadow: [
-               BoxShadow(
-                 color: Colors.black.withOpacity(0.05),
-                 blurRadius: 4,
-                 offset: const Offset(0, 2),
-               )
-            ],
-          ),
-          child: SingleChildScrollView(
-            physics: const NeverScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Row
-                Row(
-                  children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row - Sketchy Style
+              Row(
+                children: [
+                  // AI Badge
+                  WiredCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    backgroundColor: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                    borderColor: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.auto_awesome, size: 12, color: Color(0xFF6366F1)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'AI Q${widget.questionIndex}',
+                          style: _patrickHand(
+                            color: const Color(0xFF6366F1),
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Preview Badge
+                  if (!_isSaved)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'AI Generated Question #${widget.questionIndex}',
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        'Preview',
+                        style: _patrickHand(color: Colors.orange, fontSize: 13, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    if (!_isSaved)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange, width: 0.5),
-                        ),
-                        child: const Text(
-                          'Preview',
-                          style: TextStyle(color: Colors.deepOrange, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
 
-                    if (!_isSaved) ...[
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: _handleExpandPreview,
-                        child: const Icon(Icons.fullscreen, color: Colors.deepOrange, size: 20),
+                  if (!_isSaved) ...[ 
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: _handleExpandPreview,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(Icons.open_in_full, color: Colors.grey, size: 16),
                       ),
-                    ],
-                    const Spacer(),
-                    if (marks > 0)
-                      Text(
-                        '$marks marks',
-                        style: const TextStyle(
-                          color: Color(0xFF8B6F47),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                    ),
                   ],
-                ),
-                const SizedBox(height: 12),
-
-                // Question Content
-                MarkdownBody(
-                  data: content,
-                  styleSheet: MarkdownStyleSheet(
-                    p: const TextStyle(
-                      color: Color(0xFF2D2D2D),
-                      fontSize: 15,
-                      height: 1.5,
-                    ),
-                    strong: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // MCQ Options (if MCQ type)
-                if (widget.questionData['type'] == 'mcq' && widget.questionData['options'] != null) ...[
-                  ...((widget.questionData['options'] as List).map((option) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE8DCC8)),
+                  const Spacer(),
+                  if (marks > 0)
+                    Text(
+                      '$marks marks',
+                      style: _patrickHand(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: _primaryColor.withValues(alpha: 0.6),
                       ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Question Content
+              MarkdownBody(
+                data: content,
+                styleSheet: MarkdownStyleSheet(
+                  p: _patrickHand(fontSize: 16, height: 1.5),
+                  strong: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // MCQ Options - Sketchy Style
+              if (widget.questionData['type'] == 'mcq' && widget.questionData['options'] != null) ...[
+                ...((widget.questionData['options'] as List).map((option) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: WiredCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      borderColor: _primaryColor.withValues(alpha: 0.15),
+                      backgroundColor: Colors.white.withValues(alpha: 0.5),
                       child: Row(
                         children: [
                           Container(
                             width: 28,
                             height: 28,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE8DCC8),
-                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Center(
                               child: Text(
                                 option['label'] ?? '',
-                                style: const TextStyle(
+                                style: _patrickHand(
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF5D4037),
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -376,192 +532,208 @@ class _GeneratedQuestionCardState extends State<GeneratedQuestionCard> {
                           Expanded(
                             child: Text(
                               option['text'] ?? '',
-                              style: const TextStyle(
-                                color: Color(0xFF2D2D2D),
-                                fontSize: 14,
-                              ),
+                              style: _patrickHand(fontSize: 15),
                             ),
                           ),
                         ],
                       ),
-                    );
-                  })),
-                  const SizedBox(height: 16),
-                ],
+                    ),
+                  );
+                })),
+                const SizedBox(height: 12),
+              ],
 
-                // Structured Question Parts (if structured type)
-                if (widget.questionData['type'] == 'structured' && widget.questionData['structure_data'] != null) ...[
-                  ...((widget.questionData['structure_data'] as List).where((block) => block['type'] == 'question_part').map((part) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
+              // Structured Question Parts - Sketchy Style
+              if (widget.questionData['type'] == 'structured' && widget.questionData['structure_data'] != null) ...[
+                ...((widget.questionData['structure_data'] as List).where((block) => block['type'] == 'question_part').map((part) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: WiredCard(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE8DCC8)),
-                      ),
+                      borderColor: _primaryColor.withValues(alpha: 0.15),
+                      backgroundColor: Colors.white.withValues(alpha: 0.5),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  'Part ${part['label']}',
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
+                              Text(
+                                '(${part['label']})',
+                                style: _patrickHand(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: const Color(0xFF6366F1),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const Spacer(),
                               Text(
-                                '[${part['marks']} mark${part['marks'] > 1 ? 's' : ''}]',
-                                style: const TextStyle(
-                                  color: Color(0xFF8B6F47),
-                                  fontSize: 11,
+                                '${part['marks']} mk',
+                                style: _patrickHand(
+                                  color: Colors.grey,
+                                  fontSize: 12,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
                             part['content'] ?? '',
-                            style: const TextStyle(
-                              color: Color(0xFF2D2D2D),
-                              fontSize: 14,
-                            ),
+                            style: _patrickHand(fontSize: 15, height: 1.4),
                           ),
                         ],
                       ),
-                    );
-                  })),
-                  const SizedBox(height: 16),
-                ],
-
-                // Dynamic Figure Rendering (Client-Side Crop)
-                if (widget.pdfUrl != null &&
-                    widget.questionData['ai_answer'] != null &&
-                    widget.questionData['ai_answer']['figure_location'] != null) ...[
-                   Builder(
-                     builder: (context) {
-                       final loc = widget.questionData['ai_answer']['figure_location'];
-                       return Padding(
-                         padding: const EdgeInsets.only(bottom: 16.0),
-                         child: PdfCropViewer(
-                           pdfUrl: widget.pdfUrl!,
-                           pageNumber: loc['page'] ?? 1,
-                           x: (loc['x_percent'] ?? 0).toDouble(),
-                           y: (loc['y_percent'] ?? 0).toDouble(),
-                           width: (loc['width_percent'] ?? 100).toDouble(),
-                           height: (loc['height_percent'] ?? 100).toDouble(),
-                         ),
-                       );
-                     }
-                   ),
-                ],
-
-                // Answer Section
-                if (_showAnswer) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'AI Explanation:',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
-                        ),
-                        const SizedBox(height: 6),
-                        MarkdownBody(data: explanation ?? 'No explanation available.'),
-
-                        const SizedBox(height: 12),
-                        const Divider(height: 16),
-                        const Text(
-                          'Note: AI generated questions do not have verified official answer keys.',
-                          style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-
-                // Footer Actions
-                Row(
-                  children: [
-                     TextButton.icon(
-                      onPressed: () => setState(() => _showAnswer = !_showAnswer),
-                      icon: Icon(_showAnswer ? Icons.visibility_off : Icons.visibility, size: 16),
-                      label: Text(
-                        _showAnswer ? 'Hide Answer' : 'Show Answer',
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-
-                const Divider(height: 24),
-
-                // Recommendation UI (Last section)
-                if (_isSaved && _showAnswer) ...[
-                   Row(
-                     children: [
-                       const Expanded(child: Text('Do you recommend this question to someone else?', style: TextStyle(fontSize: 12, color: Colors.grey))),
-                       const SizedBox(width: 8),
-                       IconButton(
-                         icon: Icon(_isRecommended == true ? Icons.thumb_up : Icons.thumb_up_outlined, size: 18),
-                         color: _isRecommended == true ? Colors.green : Colors.grey,
-                         onPressed: () => setState(() => _isRecommended = true),
-                         padding: EdgeInsets.zero,
-                         constraints: const BoxConstraints(),
-                       ),
-                       const SizedBox(width: 12),
-                       IconButton(
-                         icon: Icon(_isRecommended == false ? Icons.thumb_down : Icons.thumb_down_outlined, size: 18),
-                         color: _isRecommended == false ? Colors.red : Colors.grey,
-                         onPressed: () => setState(() => _isRecommended = false),
-                         padding: EdgeInsets.zero,
-                         constraints: const BoxConstraints(),
-                       ),
-                     ],
-                   ),
-                   const SizedBox(height: 12),
-                ],
-
-                // Save Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSavings ? null : (_isSaved ? null : _handleSaveQuestion),
-                    icon: _isSaving
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Icon(_isSaved ? Icons.check : Icons.bookmark_add, size: 18),
-                    label: Text(_isSaved ? 'Saved to Collection' : 'Save to Collection'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isSaved ? Colors.green : const Color(0xFFE8DCC8),
-                      foregroundColor: _isSaved ? Colors.white : const Color(0xFF5D4037),
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
+                  );
+                })),
+                const SizedBox(height: 12),
               ],
-            ),
+
+              // Dynamic Figure Rendering
+              if (widget.pdfUrl != null &&
+                  widget.questionData['ai_answer'] != null &&
+                  widget.questionData['ai_answer']['figure_location'] != null) ...[
+                 Builder(
+                   builder: (context) {
+                     final loc = widget.questionData['ai_answer']['figure_location'];
+                     return Padding(
+                       padding: const EdgeInsets.only(bottom: 16.0),
+                       child: PdfCropViewer(
+                         pdfUrl: widget.pdfUrl!,
+                         pageNumber: loc['page'] ?? 1,
+                         x: (loc['x_percent'] ?? 0).toDouble(),
+                         y: (loc['y_percent'] ?? 0).toDouble(),
+                         width: (loc['width_percent'] ?? 100).toDouble(),
+                         height: (loc['height_percent'] ?? 100).toDouble(),
+                       ),
+                     );
+                   }
+                 ),
+              ],
+
+              // Answer Section
+              if (_showAnswer) ...[
+                WiredCard(
+                  padding: const EdgeInsets.all(12),
+                  backgroundColor: const Color(0xFFF0F4F8),
+                  borderColor: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.lightbulb, size: 16, color: Color(0xFF6366F1)),
+                          const SizedBox(width: 8),
+                          Text(
+                            'AI Explanation',
+                            style: _patrickHand(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF6366F1)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      MarkdownBody(
+                        data: explanation ?? 'No explanation available.',
+                        styleSheet: MarkdownStyleSheet(
+                          p: _patrickHand(fontSize: 15, height: 1.4),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'AI generated — check with teacher for verification',
+                        style: _patrickHand(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Footer Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: WiredButton(
+                      onPressed: () => setState(() => _showAnswer = !_showAnswer),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _showAnswer ? Icons.visibility_off_outlined : Icons.visibility_outlined, 
+                            size: 18,
+                            color: _primaryColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _showAnswer ? 'Hide Answer' : 'Show Answer',
+                            style: _patrickHand(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: WiredDivider(),
+              ),
+
+              // Recommendation UI
+              if (_isSaved && _showAnswer) ...[
+                 Row(
+                   children: [
+                     Expanded(
+                       child: Text(
+                         'Recommend this question?', 
+                         style: _patrickHand(fontSize: 14, color: Colors.grey),
+                       ),
+                     ),
+                     IconButton(
+                       icon: Icon(
+                         _isRecommended == true ? Icons.thumb_up : Icons.thumb_up_outlined, 
+                         size: 20,
+                       ),
+                       color: _isRecommended == true ? const Color(0xFF10B981) : _primaryColor,
+                       onPressed: () => setState(() => _isRecommended = true),
+                     ),
+                     IconButton(
+                       icon: Icon(
+                         _isRecommended == false ? Icons.thumb_down : Icons.thumb_down_outlined, 
+                         size: 20,
+                       ),
+                       color: _isRecommended == false ? const Color(0xFFEF4444) : _primaryColor,
+                       onPressed: () => setState(() => _isRecommended = false),
+                     ),
+                   ],
+                 ),
+                 const SizedBox(height: 8),
+              ],
+
+              // Save Button
+              SizedBox(
+                width: double.infinity,
+                child: WiredButton(
+                  onPressed: _isSaved || _isSaving ? null : _handleSaveQuestion,
+                  backgroundColor: _isSaved ? const Color(0xFF10B981) : _primaryColor,
+                  filled: true,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: _isSaving
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(_isSaved ? Icons.check : Icons.bookmark_add, size: 18, color: Colors.white),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isSaved ? 'Saved to Library' : 'Save to Collection',
+                              style: _patrickHand(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -607,168 +779,203 @@ class _SaveDialogState extends State<_SaveDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.sidebar,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.bookmark, color: Colors.amber, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  'Bookmark Question',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            if (_isLoading)
-               const Center(child: CircularProgressIndicator())
-            else ...[
-              // Folder Selection
-              const Text(
-                'SELECT FOLDER',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 150),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
-                ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
-                  itemCount: _existingFolders.length,
-                  separatorBuilder: (_, __) => Divider(
-                    height: 1,
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                  itemBuilder: (context, index) {
-                    final folder = _existingFolders[index];
-                    final isSelected = _selectedFolder == folder && _newFolderController.text.isEmpty;
-                    return ListTile(
-                      dense: true,
-                      onTap: () {
-                        setState(() {
-                          _selectedFolder = folder;
-                          _newFolderController.clear();
-                        });
-                      },
-                      leading: Icon(
-                        Icons.folder,
-                        color: isSelected ? Colors.amber : Colors.grey,
-                        size: 20,
-                      ),
-                      title: Text(
-                        folder,
-                        style: TextStyle(
-                          color: isSelected ? Colors.amber : Colors.white,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      trailing: isSelected
-                        ? const Icon(Icons.check, color: Colors.amber, size: 18)
-                        : null,
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Create New Folder
-              const Text(
-                'CREATE NEW FOLDER',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.0,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _newFolderController,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Enter folder name...',
-                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                  prefixIcon: Icon(Icons.create_new_folder, color: Colors.white.withOpacity(0.3), size: 20),
-                  filled: true,
-                  fillColor: Colors.white.withOpacity(0.05),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.amber),
-                  ),
-                ),
-                onChanged: (val) {
-                  if (val.isNotEmpty && _selectedFolder != null) {
-                    setState(() => _selectedFolder = null);
-                  }
-                },
-              ),
-
-              const SizedBox(height: 24),
-
-              // Actions
+      backgroundColor: Colors.transparent, // Use WiredCard background
+      elevation: 0,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: WiredCard(
+          backgroundColor: const Color(0xFFFDFBF7),
+          borderColor: const Color(0xFF2D3E50),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                  WiredCard(
+                    padding: const EdgeInsets.all(8),
+                    backgroundColor: Colors.amber.withValues(alpha: 0.1),
+                    borderColor: Colors.amber,
+                    child: const Icon(Icons.bookmark, color: Colors.amber, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () {
-                      String finalFolder = _newFolderController.text.trim();
-                      if (finalFolder.isEmpty) {
-                        finalFolder = _selectedFolder ?? 'Hard Questions';
-                      }
-                      Navigator.pop(context, finalFolder);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  Text(
+                    'Bookmark Question',
+                    style: TextStyle(
+                      fontFamily: 'PatrickHand',
+                      color: const Color(0xFF2D3E50),
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: const Text('Save Bookmark', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+
+              if (_isLoading)
+                 const Center(child: CircularProgressIndicator())
+              else ...[
+                // Folder Selection (only if folders exist)
+                if (_existingFolders.isNotEmpty) ...[
+                  Text(
+                    'SELECT EXISTING FOLDER',
+                    style: TextStyle(
+                      fontFamily: 'PatrickHand',
+                      color: Colors.grey[600],
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 180),
+                    child: WiredCard(
+                      padding: EdgeInsets.zero,
+                      borderColor: const Color(0xFF2D3E50).withValues(alpha: 0.2),
+                      backgroundColor: Colors.white.withValues(alpha: 0.5),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: _existingFolders.length,
+                        separatorBuilder: (_, __) => const WiredDivider(),
+                        itemBuilder: (context, index) {
+                          final folder = _existingFolders[index];
+                          final isSelected = _selectedFolder == folder && _newFolderController.text.isEmpty;
+                          return ListTile(
+                            dense: true,
+                            onTap: () {
+                              setState(() {
+                                _selectedFolder = folder;
+                                _newFolderController.clear();
+                              });
+                            },
+                            leading: Icon(
+                              Icons.folder,
+                              color: isSelected ? Colors.amber[700] : Colors.grey,
+                              size: 20,
+                            ),
+                            title: Text(
+                              folder,
+                              style: TextStyle(
+                                fontFamily: 'PatrickHand',
+                                fontSize: 16,
+                                color: isSelected ? Colors.amber[900] : const Color(0xFF2D3E50),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                            trailing: isSelected
+                              ? Icon(Icons.check, color: Colors.amber[700], size: 18)
+                              : null,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ] else ...[
+                  // Empty state - no folders yet
+                  WiredCard(
+                    padding: const EdgeInsets.all(16),
+                    borderColor: Colors.amber.withValues(alpha: 0.3),
+                    backgroundColor: Colors.amber.withValues(alpha: 0.05),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.amber[700], size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No folders yet! Create your first folder below.',
+                            style: TextStyle(
+                              fontFamily: 'PatrickHand',
+                              fontSize: 15,
+                              color: Colors.amber[800],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+
+                // Create New Folder
+                Text(
+                  'CREATE NEW FOLDER',
+                  style: TextStyle(
+                    fontFamily: 'PatrickHand',
+                    color: Colors.grey[600],
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                WiredCard(
+                  padding: EdgeInsets.zero,
+                  borderColor: const Color(0xFF2D3E50).withValues(alpha: 0.2),
+                  backgroundColor: Colors.white,
+                  child: TextField(
+                    controller: _newFolderController,
+                    style: const TextStyle(fontFamily: 'PatrickHand', fontSize: 16, color: Color(0xFF2D3E50)),
+                    decoration: InputDecoration(
+                      hintText: 'Enter folder name...',
+                      hintStyle: TextStyle(fontFamily: 'PatrickHand', fontSize: 16, color: Colors.grey.withValues(alpha: 0.5)),
+                      prefixIcon: Icon(Icons.create_new_folder, color: Colors.grey.withValues(alpha: 0.5), size: 20),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      filled: false,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(fontFamily: 'PatrickHand', color: Colors.grey[600], fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    WiredButton(
+                      onPressed: () {
+                        final folder = _newFolderController.text.isNotEmpty
+                            ? _newFolderController.text
+                            : _selectedFolder;
+                        Navigator.pop(context, folder);
+                      },
+                      backgroundColor: const Color(0xFF2D3E50),
+                      filled: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                      child: Text(
+                        'Confirm',
+                        style: TextStyle(
+                          fontFamily: 'PatrickHand',
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

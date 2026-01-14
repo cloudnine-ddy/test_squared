@@ -5,7 +5,7 @@ import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1'
 // Extracts multi-part questions, creates JSONB block structure, and detects/crops figures
 // Version 1.1: Added figure cropping integration
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent'
 const MAX_RETRIES = 3
 
 interface StructuredQuestionResponse {

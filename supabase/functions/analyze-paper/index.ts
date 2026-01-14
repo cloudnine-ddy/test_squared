@@ -9,8 +9,8 @@ import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1'
 // - Parallel mark scheme processing
 // - Both MCQ and Structured get: crop, answers, AI solution
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
-const BATCH_SIZE = 10
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent'
+const BATCH_SIZE = 5 // Reduced from 10 to avoid token limits & timeouts
 const BATCH_OVERLAP = 1 // Overlap 1 page between batches
 const MAX_RETRIES = 3
 const PARALLEL_BATCH_SIZE = 5 // For mark scheme processing
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { paperId, pdfUrl, markSchemeUrl, paperType } = await req.json()
+    const { paperId, pdfUrl, markSchemeUrl, paperType, startPage, endPage } = await req.json()
     const isObjective = paperType === 'objective'
 
     console.log(`[V9.0] Paper type: "${paperType}", MCQ=${isObjective}`)
@@ -116,33 +116,35 @@ Deno.serve(async (req) => {
 
     const srcDoc = await PDFDocument.load(pdfArrayBuffer)
     const totalPages = srcDoc.getPageCount()
-    console.log(`Total Pages: ${totalPages}. Processing with ${BATCH_OVERLAP}-page overlap...`)
+    console.log(`Total Pages: ${totalPages}`)
 
     let allQuestions: CompactQuestion[] = []
 
-    // BATCH LOOP WITH OVERLAP
-    for (let i = 0; i < totalPages; i += (BATCH_SIZE - BATCH_OVERLAP)) {
-        const startPage = i + 1
-        const endPage = Math.min(i + BATCH_SIZE, totalPages)
-
-        // Skip if this batch would be just 1-2 pages at the end (already covered)
-        if (startPage >= totalPages) break
-
-        console.log(`Processing Batch: Pages ${startPage}-${endPage}...`)
+    // Helper to process a specific range of pages
+    const processBatch = async (batchStartIdx: number, batchEndIdx: number) => {
+        const startPageDisplay = batchStartIdx + 1
+        const endPageDisplay = batchEndIdx // Exclusive index effectively becomes inclusive page num if 0-based start, wait: 0-based index 5 is Page 6. 
+        // Logic: Indices [0, 1, 2] -> Pages 1, 2, 3.
+        // Client sends start=0, end=6. Indices: 0, 1, 2, 3, 4, 5.
+        
+        console.log(`Processing Batch: Pages ${startPageDisplay}-${batchEndIdx}...`)
 
         // Create Sub-PDF
         const subDoc = await PDFDocument.create()
         const pageIndices = []
-        for (let j = 0; j < (endPage - startPage + 1); j++) pageIndices.push(i + j)
+        for (let j = batchStartIdx; j < batchEndIdx; j++) {
+            if (j < totalPages) pageIndices.push(j)
+        }
+
+        if (pageIndices.length === 0) return
 
         const copiedPages = await subDoc.copyPages(srcDoc, pageIndices)
         copiedPages.forEach(p => subDoc.addPage(p))
         const subPdfBytes = await subDoc.saveAsBase64()
 
         // DYNAMIC SUBJECT-BASED PROMPT
-        // Both MCQ and Structured now extract figures and provide rationale
         const prompt = isObjective
-          ? `You are a ${subjectName} MCQ exam analyzer (Batch pages ${startPage}-${endPage}).
+          ? `You are a ${subjectName} MCQ exam analyzer (Batch pages ${startPageDisplay}-${batchEndIdx}).
 CRITICAL: Any question mentioning "diagram", "figure", "shows", "below" = HAS FIGURE. Estimate figure bounding box.
 OUTPUT JSON (COMPACT ARRAY):
 { "d": [ [1, "Content", ["topic-uuid"], "mcq", 1, [["A","Option A text"]], "B", "Explanation why B is correct", "Layout notes", "Figure description", [1,20,30,50,40]] ] }
@@ -153,24 +155,19 @@ RULES:
 3. SOLVE each question - provide correct answer (index 6) and explanation (index 7)
 4. Figure coordinates are PERCENTAGES relative to page. [page, x%, y%, width%, height%]
 5. For questions WITHOUT figures, use null for index 10`
-          : `You are a ${subjectName} structured question analyzer (Batch pages ${startPage}-${endPage}).
+          : `You are a ${subjectName} structured question analyzer (Batch pages ${startPageDisplay}-${batchEndIdx}).
 CRITICAL: Any question with diagrams, graphs, tables = HAS FIGURE. Estimate bounding box.
 OUTPUT JSON (COMPACT ARRAY):
 { "d": [ [1, "Full question text", ["topic-uuid"], "structured", 6, null, null, "Key points for answer", "Layout notes", "Figure description", [1,20,30,50,40]] ] }
 TOPICS: ${topicsJson}
 RULES:
-1. Extract ALL structured questions from these pages
-2. Use compact array format strictly
-3. For index 7, provide key points/expected answer structure
-4. Figure coordinates are PERCENTAGES. [page, x%, y%, width%, height%]
-5. For questions WITHOUT figures, use null for index 10
-6. Include sub-parts in the content (a, b, c, etc.)
-7. IMPORTANT: The content field should ONLY contain the actual question text. IGNORE:
-   - Dotted lines for student answers (................)
-   - Empty answer spaces
-   - Page numbers, barcodes, copyright text
-   - "[Turn over]" markers
-   Example: For "(a) State the function of X. ..............." extract only "(a) State the function of X."`
+1. Extract ALL structured questions.
+2. COMPACT ARRAY FORMAT ONLY.
+3. Index 7: Key answer points.
+4. Fig coords: [page, x%, y%, w%, h%]. No fig? null.
+5. Content: QUESTION TEXT ONLY. Ignore dots/empty lines/turn over/copyright.
+6. Sub-parts (a,b,c) must be in content.
+7. CRITICAL: Do NOT output markdown. Do NOT truncate JSON.`
 
         // Gemini Call with RETRY
         try {
@@ -183,34 +180,96 @@ RULES:
                 })
             })
 
-            if (!geminiRes.ok) throw new Error(`Gemini Error Batch ${startPage}-${endPage}: ${await geminiRes.text()}`)
+            if (!geminiRes.ok) throw new Error(`Gemini Error: ${await geminiRes.text()}`)
             const geminiJson = await geminiRes.json()
             let rawText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || ''
             if (rawText.includes('```')) rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim()
 
+            // ROBUST JSON EXTRACTION & REPAIR
             let rawData: any = {}
-            try { rawData = JSON.parse(rawText) } catch(e) {
-                 let repaired = rawText.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (m) => m.replace(/\n/g, '\\n'))
-                 try { rawData = JSON.parse(repaired) } catch(err) { console.warn(`Batch ${startPage}-${endPage} parse fail`, err) }
+            try {
+                rawData = JSON.parse(rawText)
+            } catch(e) {
+                try {
+                    const jsonMatch = rawText.match(/\{[\s\S]*"d"\s*:[\s\S]*\}/)
+                    if (jsonMatch) rawData = JSON.parse(jsonMatch[0])
+                    else throw new Error("No JSON block found")
+                } catch (err2) {
+                    console.warn(`Batch parse fail, attempting aggressive repair.`)
+                    function balanceJSON(jsonStr: string): string { 
+                        let stack = [];
+                        let inString = false;
+                        let escaped = false;
+                        for (let i = 0; i < jsonStr.length; i++) {
+                            const char = jsonStr[i];
+                            if (!inString && (char === '{' || char === '[')) stack.push(char);
+                            else if (!inString && char === '}' && stack[stack.length - 1] === '{') stack.pop();
+                            else if (!inString && char === ']' && stack[stack.length - 1] === '[') stack.pop();
+                            else if (char === '"' && !escaped) inString = !inString;
+                            escaped = (char === '\\' && !escaped);
+                        }
+                        while (stack.length > 0) {
+                            const last = stack.pop();
+                            if (last === '{') jsonStr += '}';
+                            if (last === '[') jsonStr += ']';
+                        }
+                        return jsonStr;
+                    }
+                    let repaired = rawText.trim();
+                    try {
+                        rawData = JSON.parse(balanceJSON(repaired))
+                    } catch (e3) {
+                         const lastClosing = Math.max(repaired.lastIndexOf('}'), repaired.lastIndexOf(']'));
+                         if (lastClosing > 10) {
+                             try { rawData = JSON.parse(repaired.substring(0, lastClosing + 1)); } catch(e4) {}
+                         }
+                    }
+                }
             }
 
             const batchQs = (rawData.d || rawData.questions || (Array.isArray(rawData) ? rawData : [])) as CompactQuestion[]
             if (batchQs.length) {
-                console.log(`Batch ${startPage}-${endPage}: Extracted ${batchQs.length} questions`)
+                console.log(`Batch ${startPageDisplay}-${batchEndIdx}: Extracted ${batchQs.length} questions`)
 
-                // ADJUST PAGE NUMBERS for offset
-                const offsetQs = batchQs.map(q => {
-                   const newQ: CompactQuestion = [...q]
-                   if (Array.isArray(newQ[10]) && newQ[10].length >= 1) {
-                        newQ[10][0] = newQ[10][0] + (startPage - 1)
-                   }
-                   return newQ
-                }) as CompactQuestion[]
+                const offsetQs = batchQs
+                    .filter(q => Array.isArray(q))
+                    .map(q => {
+                       const newQ: CompactQuestion = [...q]
+                       if (Array.isArray(newQ[10]) && newQ[10].length >= 1) {
+                            // Adjust relative to batch start
+                            newQ[10][0] = newQ[10][0] + (startPageDisplay - 1)
+                       }
+                       return newQ
+                    }) as CompactQuestion[]
 
                 allQuestions = [...allQuestions, ...offsetQs]
             }
         } catch (batchErr) {
-            console.error(`Error processing batch ${startPage}-${endPage}:`, batchErr)
+            console.error(`Error processing batch:`, batchErr)
+        }
+    }
+
+    // MAIN EXECUTION LOGIC
+    // Check if client provided specific batch range (req.body.startPage / endPage)
+    // Note: Request json was parsed into { ... startPage, endPage ... } earlier?
+    // We need to re-parse or rely on variable access.
+    // Deno `req.json()` consumes body? Yes. We parsed it at start.
+    // We need to cast the initial props.
+
+    // Using values parsed at top of function
+    // MAIN EXECUTION LOGIC
+    if (startPage !== undefined && endPage !== undefined) {
+         // CLIENT-DRIVEN SINGLE BATCH MODE (Prevents Worker Limit by distributing load)
+         console.log(`Processing Single Requested Batch: ${startPage} to ${endPage}`)
+         await processBatch(startPage, endPage)
+    } else {
+         // LEGACY LOOP MODE (Only if no specific batch requested)
+         console.log("Legacy Mode: Processing Full Paper Loop")
+         for (let i = 0; i < totalPages; i += (BATCH_SIZE - BATCH_OVERLAP)) {
+            const sp = i + 1
+            if (sp > totalPages) break
+            const ep = Math.min(i + BATCH_SIZE, totalPages)
+            await processBatch(i, ep)
         }
     }
 
@@ -285,159 +344,58 @@ RULES:
 
     console.log(`Transformed ${uniqueQuestions.length} unique questions.`)
 
-    // Step 7: Batch Insert
-    const { data: insertedQuestions, error: insertError } = await supabase.from('questions').insert(uniqueQuestions).select('id, question_number')
+    // Step 7: Batch Upsert (IDEMPOTENT)
+    const { data: insertedQuestions, error: insertError } = await supabase
+        .from('questions')
+        .upsert(uniqueQuestions, { onConflict: 'paper_id,question_number', ignoreDuplicates: false })
+        .select('id, question_number')
+
     if (insertError) throw insertError
 
-    // Step 8: Crop Figures - FOR BOTH MCQ AND STRUCTURED
+    // Step 8: Crop Figures - CONCURRENT BATCHED PROCESSING
     let figsCropped = 0
     const questionsWithFigures = uniqueQuestions.filter(q => q.ai_answer.has_figure)
+    
     if (insertedQuestions && questionsWithFigures.length) {
-        console.log(`Processing ${questionsWithFigures.length} figures (both MCQ and Structured)...`)
-        for (const q of questionsWithFigures) {
-            const insertedQ = insertedQuestions.find(iq => iq.question_number === q.question_number)
-            if (!insertedQ) continue
+        console.log(`Processing ${questionsWithFigures.length} figures...`)
+        
+        // Process in batches of 5 to avoid overwhelming Supabase/Rate Limits
+        // but faster than sequential
+        const CROP_BATCH_SIZE = 5;
+        for (let i = 0; i < questionsWithFigures.length; i += CROP_BATCH_SIZE) {
+             const batch = questionsWithFigures.slice(i, i + CROP_BATCH_SIZE);
+             await Promise.all(batch.map(async (q) => {
+                 const insertedQ = insertedQuestions.find(iq => iq.question_number === q.question_number)
+                 if (!insertedQ) return
 
-            try {
-                const cropRes = await fetchWithRetry(`${supabaseUrl}/functions/v1/crop-figure`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}`, 'apikey': supabaseKey },
-                    body: JSON.stringify({
-                        pdfUrl, questionId: insertedQ.id, page: q.ai_answer.figure_location.page,
-                        bbox: {
-                            x: q.ai_answer.figure_location.x_percent, y: q.ai_answer.figure_location.y_percent,
-                            width: q.ai_answer.figure_location.width_percent, height: q.ai_answer.figure_location.height_percent
-                        }
-                    })
-                })
-                if (cropRes.ok) figsCropped++
-            } catch (e) { console.warn(`Crop failed Q${q.question_number}`, e) }
+                 try {
+                     const cropRes = await fetchWithRetry(`${supabaseUrl}/functions/v1/crop-figure`, {
+                         method: 'POST',
+                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseKey}`, 'apikey': supabaseKey },
+                         body: JSON.stringify({
+                             pdfUrl, questionId: insertedQ.id, page: q.ai_answer.figure_location.page,
+                             bbox: {
+                                 x: q.ai_answer.figure_location.x_percent, y: q.ai_answer.figure_location.y_percent,
+                                 width: q.ai_answer.figure_location.width_percent, height: q.ai_answer.figure_location.height_percent
+                             }
+                         })
+                     }, 2) // Reduced retries for speed
+                     if (cropRes.ok) figsCropped++
+                 } catch (e) {
+                     console.warn(`Crop failed Q${q.question_number}`, e)
+                 }
+             }));
+             // Small delay between batches
+             if (i + CROP_BATCH_SIZE < questionsWithFigures.length) await new Promise(r => setTimeout(r, 500));
         }
-    }
-
-    // Step 9: Mark Scheme - PARALLEL PROCESSING for BOTH types
-    let answersExtracted = 0
-    if (hasMarkScheme && insertedQuestions) {
-        console.log('Processing Mark Scheme with parallel batches...')
-        try {
-            const msRes = await fetch(markSchemeUrl)
-            if (msRes.ok) {
-                const msBlob = await msRes.blob()
-                const msArrayBuffer = await msBlob.arrayBuffer()
-
-                function toBase64(u8: Uint8Array) {
-                   let b = ''; const l=u8.length;
-                   for(let i=0;i<l;i+=32768) b+=String.fromCharCode(...u8.subarray(i,i+32768));
-                   return btoa(b);
-                }
-                const msBase64 = toBase64(new Uint8Array(msArrayBuffer))
-
-                const msPrompt = `You are extracting OFFICIAL ANSWERS from a mark scheme PDF.
-Extract answers for ALL questions (MCQ and structured).
-
-OUTPUT JSON:
-{ "answers": [
-  {"question_number": 1, "sub_part": "a", "official_answer": "cell A / sperm cell", "marks": 1},
-  {"question_number": 1, "sub_part": "b(i)", "official_answer": "contains genetic information; controls cell activities", "marks": 2}
-] }
-
-RULES:
-1. For MCQ: official_answer is the letter (A, B, C, D)
-2. For structured: official_answer is the full marking point text
-3. Use sub_part for questions with parts (a, b, c, bi, bii, etc.)
-4. If a question has no sub-parts, omit sub_part
-5. Include ALL questions, even if marks are unclear (default to 1)
-6. Combine multiple marking points with semicolons`
-
-                const msGemini = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: msPrompt }, { inline_data: { mime_type: 'application/pdf', data: msBase64 } }] }],
-                        generationConfig: { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: "application/json" }
-                    })
-                })
-
-                if (msGemini.ok) {
-                    const msJson = await msGemini.json()
-                    const msText = msJson.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
-                    const msParsed = JSON.parse(msText.replace(/```json|```/g, '').trim())
-                    const answers = msParsed.answers || []
-
-                    // PARALLEL PROCESSING in batches of PARALLEL_BATCH_SIZE
-                    for (let i = 0; i < answers.length; i += PARALLEL_BATCH_SIZE) {
-                        const batch = answers.slice(i, i + PARALLEL_BATCH_SIZE)
-
-                        await Promise.all(batch.map(async (ans: any) => {
-                            const qMatch = insertedQuestions.find(q => q.question_number === ans.question_number)
-                            if (!qMatch) return
-
-                            const originalQ = uniqueQuestions.find(q => q.question_number === ans.question_number)
-                            if (!originalQ) return
-
-                            // Generate AI Solution for BOTH MCQ and Structured
-                            const solPrompt = originalQ.type === 'mcq'
-                              ? `You are a ${subjectName} tutor. Provide a concise explanation of why "${ans.official_answer}" is correct.
-
-Question: ${originalQ.content || 'See paper'}
-Correct Answer: ${ans.official_answer}
-
-Write EXACTLY 4-5 sentences explaining the scientific reasoning.
-CRITICAL RULES:
-- Start directly with the explanation
-- NO preambles like "Okay, let's break down...", "The answer is...", "Let me explain...", "Sure..."
-- NO headings like "**The Big Idea:**" or "**Why this works:**"
-- Just pure scientific explanation
-- Keep it concise and focused on key concepts`
-                              : `You are a ${subjectName} tutor. Write a concise model answer for this structured question.
-
-Question: ${originalQ.content || 'See paper'}
-Marking Points: ${ans.official_answer}
-Marks: ${ans.marks || 'unknown'}
-
-Write a model answer as a student would write it (4-5 sentences maximum). Include all marking points as prose.
-CRITICAL RULES:
-- Start directly with the answer content
-- NO preambles or explanations about the marking scheme
-- Write as if you are the student answering in an exam
-- Concise and focused`
-
-                            const solRes = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
-                                method: 'POST',
-                                headers: {'Content-Type': 'application/json'},
-                                body: JSON.stringify({ contents: [{ parts: [{ text: solPrompt }] }] })
-                            })
-
-                            let solText = null
-                            if (solRes.ok) {
-                                const solJson = await solRes.json()
-                                solText = solJson.candidates?.[0]?.content?.parts?.[0]?.text
-                            }
-
-                            const existingRational = originalQ.ai_answer?.ai_solution
-
-                            await supabase.from('questions').update({
-                                official_answer: ans.official_answer,
-                                marks: ans.marks,
-                                ai_answer: {
-                                    ...originalQ.ai_answer,
-                                    marks: ans.marks,
-                                    ai_solution: solText || existingRational
-                                }
-                            }).eq('id', qMatch.id)
-                            answersExtracted++
-                        }))
-                    }
-                }
-            }
-        } catch (e) { console.warn("Mark scheme error", e) }
     }
 
     return new Response(JSON.stringify({
         success: true,
         message: `Extracted ${uniqueQuestions.length} questions`,
         figures_cropped: figsCropped,
-        answers_extracted: answersExtracted
+        answers_extracted: 0, // Handled asynchronously by process-mark-scheme now
+        warnings: questionsWithFigures.length > figsCropped ? "Some figures failed to crop" : null
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {

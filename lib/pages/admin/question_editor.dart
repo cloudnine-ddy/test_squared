@@ -675,35 +675,275 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Widget _buildBlockPreview(int index) {
     final block = _structureBlocks[index];
+    
+    // Determine block type color and icon
+    Color blockColor;
+    IconData blockIcon;
+    String blockTitle;
+    String blockSubtitle;
+    
+    if (block is TextBlock) {
+      blockColor = const Color(0xFF6366F1); // Indigo for text
+      blockIcon = Icons.text_fields;
+      blockTitle = 'Text Block';
+      blockSubtitle = block.content.length > 50 
+          ? '${block.content.substring(0, 50)}...' 
+          : block.content;
+    } else if (block is FigureBlock) {
+      blockColor = const Color(0xFF10B981); // Green for figures
+      blockIcon = Icons.image;
+      blockTitle = 'Figure: ${block.figureLabel}';
+      blockSubtitle = block.url != null ? 'Image attached' : 'No image (click to crop)';
+    } else if (block is QuestionPartBlock) {
+      blockColor = const Color(0xFFF59E0B); // Amber for question parts
+      blockIcon = Icons.quiz;
+      blockTitle = 'Part (${block.label}) — ${block.marks} marks';
+      blockSubtitle = block.content.length > 50 
+          ? '${block.content.substring(0, 50)}...' 
+          : block.content;
+    } else {
+      blockColor = const Color(0xFF787774);
+      blockIcon = Icons.help_outline;
+      blockTitle = 'Unknown Block';
+      blockSubtitle = '';
+    }
 
     return Container(
-      key: ValueKey(block),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFFE9E9E7)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-      child: ListTile(
-        title: Text('${block.type.toUpperCase()} Block', style: const TextStyle(color: Color(0xFF37352F), fontSize: 13, fontWeight: FontWeight.w600)),
-        subtitle: _buildBlockContent(block),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (block is QuestionPartBlock)
-              IconButton(
-                icon: const Icon(Icons.edit, color: Color(0xFF787774), size: 18),
-                onPressed: () => _openQuestionPartDialog(existingBlock: block, index: index),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          leading: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.drag_handle, color: Color(0xFFE9E9E7), size: 18),
+              const SizedBox(width: 8),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: blockColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(blockIcon, color: blockColor, size: 16),
               ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Color(0xFF787774), size: 18),
-              onPressed: () => _removeBlock(index),
+            ],
+          ),
+          title: Text(
+            blockTitle,
+            style: const TextStyle(
+              color: Color(0xFF37352F),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+          subtitle: Text(
+            blockSubtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: const Color(0xFF787774),
+              fontSize: 12,
+            ),
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (block is QuestionPartBlock)
+                IconButton(
+                  icon: Icon(Icons.edit_outlined, color: blockColor, size: 18),
+                  onPressed: () => _openQuestionPartDialog(existingBlock: block, index: index),
+                  tooltip: 'Edit Part',
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (block is FigureBlock)
+                IconButton(
+                  icon: Icon(Icons.crop, color: blockColor, size: 18),
+                  onPressed: () => _editFigureCrop(index),
+                  tooltip: 'Edit Crop',
+                  visualDensity: VisualDensity.compact,
+                ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                onPressed: () => _removeBlock(index),
+                tooltip: 'Delete',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            _buildExpandedBlockContent(block, index),
           ],
         ),
-        leading: const Icon(Icons.drag_handle, color: Color(0xFFE9E9E7), size: 20),
       ),
     );
+  }
+
+  /// Builds the expanded content for each block type
+  Widget _buildExpandedBlockContent(ExamContentBlock block, int index) {
+    if (block is TextBlock) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F6F3),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE9E9E7)),
+        ),
+        child: Text(
+          block.content,
+          style: const TextStyle(fontSize: 13, color: Color(0xFF37352F)),
+        ),
+      );
+    } else if (block is FigureBlock) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F6F3),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFE9E9E7)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text('Label: ', style: TextStyle(color: Color(0xFF787774), fontSize: 12)),
+                    Text(block.figureLabel, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  ],
+                ),
+                if (block.description != null && block.description!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(block.description!, style: const TextStyle(fontSize: 12, color: Color(0xFF787774))),
+                ],
+                const SizedBox(height: 8),
+                if (block.url != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      block.url!,
+                      height: 120,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 60,
+                        color: Colors.grey[200],
+                        child: const Center(child: Text('Image load error', style: TextStyle(fontSize: 11))),
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                        SizedBox(width: 8),
+                        Text('No image attached. Click "Edit Crop" to add.', style: TextStyle(fontSize: 12, color: Colors.orange)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      );
+    } else if (block is QuestionPartBlock) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F6F3),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFE9E9E7)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Part (${block.label})',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFF59E0B)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF37352F).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${block.marks} marks',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF37352F)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('Question:', style: TextStyle(fontSize: 11, color: Color(0xFF787774), fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Text(block.content, style: const TextStyle(fontSize: 13, color: Color(0xFF37352F))),
+            if (block.officialAnswer != null && block.officialAnswer!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('Official Answer:', style: TextStyle(fontSize: 11, color: Color(0xFF787774), fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                ),
+                child: Text(block.officialAnswer!, style: const TextStyle(fontSize: 12, color: Color(0xFF10B981))),
+              ),
+            ],
+            if (block.aiAnswer != null && block.aiAnswer!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Text('AI Solution:', style: TextStyle(fontSize: 11, color: Color(0xFF787774), fontWeight: FontWeight.w500)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                ),
+                child: Text(block.aiAnswer!, style: const TextStyle(fontSize: 12, color: Color(0xFF6366F1)), maxLines: 5, overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Future<void> _editFigureCrop(int index) async {
@@ -1711,108 +1951,96 @@ class _QuestionEditorState extends State<QuestionEditor> {
   }
 
   Widget _buildStructuredForm() {
-    return Row(
+    return Column(
       children: [
-        // Left - Editor
+        // Scrollable content area (Metadata + Blocks)
         Expanded(
-          flex: 5, // 50%
-          child: Column(
-            children: [
-               Expanded(
-                 child: ReorderableListView.builder(
+          child: Form(
+            key: _formKey,
+            child: CustomScrollView(
+              slivers: [
+                // Metadata Section (Q# + Topics) - scrolls with content
+                SliverToBoxAdapter(
+                  child: Container(
                     padding: const EdgeInsets.all(16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Q Number (compact)
+                        SizedBox(
+                          width: 70,
+                          child: TextFormField(
+                            initialValue: _questionNumber.toString(),
+                            decoration: _inputDecoration('Q#').copyWith(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            keyboardType: TextInputType.number,
+                            onChanged: (v) {
+                              _questionNumber = int.tryParse(v) ?? 1;
+                              _markChanged();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Topics (expanded)
+                        Expanded(
+                          child: _buildOptimizedTopicSelector(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Divider
+                const SliverToBoxAdapter(
+                  child: Divider(height: 1, color: Color(0xFFE9E9E7)),
+                ),
+
+                // Block List - using SliverReorderableList for smooth scrolling
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverReorderableList(
                     itemCount: _structureBlocks.length,
                     onReorder: (oldIndex, newIndex) {
                       setState(() {
-                         if (oldIndex < newIndex) {
-                           newIndex -= 1;
-                         }
-                         final item = _structureBlocks.removeAt(oldIndex);
-                         _structureBlocks.insert(newIndex, item);
-                         _markChanged();
+                        if (oldIndex < newIndex) {
+                          newIndex -= 1;
+                        }
+                        final item = _structureBlocks.removeAt(oldIndex);
+                        _structureBlocks.insert(newIndex, item);
+                        _markChanged();
                       });
                     },
                     itemBuilder: (context, index) {
-                      return _buildBlockPreview(index);
+                      return ReorderableDragStartListener(
+                        key: ValueKey(_structureBlocks[index]),
+                        index: index,
+                        child: _buildBlockPreview(index),
+                      );
                     },
-                 ),
-               ),
-               // Action Bar
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFF7F6F3),
-                    border: Border(top: BorderSide(color: Color(0xFFE9E9E7))),
                   ),
-                 child: Row(
-                   mainAxisAlignment: MainAxisAlignment.center,
-                   children: [
-                      _buildActionBarButton(_addTextBlock, Icons.text_fields, 'Text'),
-                      const SizedBox(width: 8),
-                      _buildActionBarButton(_addFigureBlock, Icons.image, 'Figure'),
-                      const SizedBox(width: 8),
-                      _buildActionBarButton(_addQuestionPartBlock, Icons.quiz, 'Part'),
-                   ],
-                 ),
-               ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
 
-        // Right - Metadata (Topics, Q#, etc.)
-        Container(width: 1, color: const Color(0xFFE9E9E7)),
-        Expanded(
-          flex: 4, // 40%
-          child: Form(
-            key: _formKey,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   const Text('Metadata', style: TextStyle(color: Color(0xFF37352F), fontSize: 13, fontWeight: FontWeight.w600)),
-                   const SizedBox(height: 16),
-
-                   // Q Number
-                   TextFormField(
-                      initialValue: _questionNumber.toString(),
-                      decoration: _inputDecoration('Q Number'),
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) {
-                        _questionNumber = int.tryParse(v) ?? 1;
-                        _markChanged();
-                      },
-                   ),
-
-                   const SizedBox(height: 16),
-                   _buildSection('Topics', _buildOptimizedTopicSelector()),
-
-                   const SizedBox(height: 16),
-
-                   // AI & Official Answer Summary
-                   _buildSection(
-                      'AI Answer Overview',
-                      TextFormField(
-                        controller: _aiSolutionController,
-                        decoration: _inputDecoration('General AI Explanation...'),
-                        maxLines: 4,
-                        onChanged: (_) => _markChanged(),
-                      ),
-                   ),
-
-                   const SizedBox(height: 16),
-                   _buildSection(
-                      'Official Answer Note',
-                      TextFormField(
-                        controller: _officialAnswerController,
-                        decoration: _inputDecoration('Mark scheme notes...'),
-                        maxLines: 4,
-                        onChanged: (_) => _markChanged(),
-                      ),
-                   ),
-                ],
-              ),
-            ),
+        // Bottom - Action Bar (fixed)
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF7F6F3),
+            border: Border(top: BorderSide(color: Color(0xFFE9E9E7))),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildActionBarButton(_addTextBlock, Icons.text_fields, 'Text'),
+              const SizedBox(width: 8),
+              _buildActionBarButton(_addFigureBlock, Icons.image, 'Figure'),
+              const SizedBox(width: 8),
+              _buildActionBarButton(_addQuestionPartBlock, Icons.quiz, 'Part'),
+            ],
           ),
         ),
       ],
