@@ -340,152 +340,125 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ),
                           WiredDivider(color: _primaryColor, thickness: 1.5),
                           const SizedBox(height: 16),
-                          // Profile Row
-                          Builder(
-                            builder: (context) {
-                              final user = Supabase.instance.client.auth.currentUser;
-                              final userName = user?.userMetadata?['full_name'] as String? ?? 'Student';
-                              final userEmail = user?.email ?? 'No email';
-                              final avatarText = userName.isNotEmpty ? userName[0].toUpperCase() : 'S';
+                          
+                          // Profile and Exiting Preview
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: InkWell(
+                              onTap: widget.previewMode ? () => context.go('/admin') : null,
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: widget.previewMode 
+                                      ? _primaryColor.withValues(alpha: 0.1) 
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Builder(
+                                  builder: (context) {
+                                    final user = Supabase.instance.client.auth.currentUser;
+                                    final userName = user?.userMetadata?['full_name'] as String? ?? 'Student';
+                                    final userEmail = user?.email ?? 'No email';
+                                    final avatarText = userName.isNotEmpty ? userName[0].toUpperCase() : 'S';
 
-                              return Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor: _primaryColor,
-                                    child: Text(
-                                      avatarText,
-                                      style: _patrickHand(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
+                                    return Row(
                                       children: [
-                                        Text(
-                                          widget.previewMode ? 'Admin Preview' : userName,
-                                          style: _patrickHand(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
+                                        CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: _primaryColor,
+                                          child: Text(
+                                            avatarText,
+                                            style: _patrickHand(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
                                           ),
-                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        Text(
-                                          widget.previewMode ? 'View as Student' : userEmail,
-                                          style: _patrickHand(
-                                            fontSize: 13,
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                widget.previewMode ? 'Admin Preview' : userName,
+                                                style: _patrickHand(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                widget.previewMode ? 'Exit Preview' : userEmail,
+                                                style: _patrickHand(
+                                                  fontSize: 13,
+                                                  color: _primaryColor.withValues(alpha: 0.6),
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (widget.previewMode)
+                                          Icon(
+                                            Icons.logout_rounded,
                                             color: _primaryColor.withValues(alpha: 0.6),
+                                            size: 18,
                                           ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
+                                        if (!widget.previewMode)
+                                          PopupMenuButton<String>(
+                                            icon: Icon(
+                                              Icons.more_vert_rounded,
+                                              color: _primaryColor.withValues(alpha: 0.6),
+                                              size: 24,
+                                            ),
+                                            color: Colors.white,
+                                            elevation: 4,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                              side: BorderSide(
+                                                  color: _primaryColor.withValues(alpha: 0.8), width: 1.5),
+                                            ),
+                                            itemBuilder: (context) => [
+                                              PopupMenuItem(
+                                                value: 'logout',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.logout,
+                                                      color: _primaryColor,
+                                                      size: 20,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Text(
+                                                      'Logout',
+                                                      style: _patrickHand(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.red[400],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                            onSelected: (value) async {
+                                              if (value == 'logout') {
+                                                await AuthService().signOut();
+                                                if (mounted) {
+                                                  context.go('/');
+                                                }
+                                              }
+                                            },
+                                          ),
                                       ],
-                                    ),
-                                  ),
-                              if (!widget.previewMode)
-                              PopupMenuButton<String>(
-                                icon: Icon(
-                                  Icons.more_vert_rounded,
-                                  color: _primaryColor.withValues(alpha: 0.6),
-                                  size: 24,
+                                    );
+                                  },
                                 ),
-                                color: Colors.white,
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                  side: BorderSide(color: _primaryColor.withValues(alpha: 0.8), width: 1.5),
-                                ),
-                                itemBuilder: (context) => [
-                                    /* 
-                                    // TODO: Re-enable when Dark Mode and Accessibility are ready
-                                    PopupMenuItem(
-                                      value: 'theme',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            ref.watch(themeModeProvider) == ThemeMode.dark
-                                                ? Icons.light_mode
-                                                : Icons.dark_mode,
-                                            color: _primaryColor,
-                                            size: 20,
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            ref.watch(themeModeProvider) == ThemeMode.dark
-                                                ? 'Light Mode'
-                                                : 'Dark Mode',
-                                            style: _patrickHand(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  PopupMenuItem(
-                                    value: 'accessibility',
-                                    child: Row(
-                                      children: [
-                                          Icon(
-                                            Icons.accessibility_new,
-                                            color: _primaryColor,
-                                            size: 20,
-                                          ),
-                                        const SizedBox(width: 12),
-                                          Text(
-                                            'Accessibility',
-                                            style: _patrickHand(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  */
-                                  PopupMenuItem(
-                                    value: 'logout',
-                                    child: Row(
-                                      children: [
-                                          Icon(
-                                            Icons.logout,
-                                            color: _primaryColor,
-                                            size: 20,
-                                          ),
-                                        const SizedBox(width: 12),
-                                          Text(
-                                            'Logout',
-                                            style: _patrickHand(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.red[400],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                onSelected: (value) async {
-                                  if (value == 'theme') {
-                                    ref.read(themeModeProvider.notifier).toggleTheme();
-                                  } else if (value == 'accessibility') {
-                                    context.push('/settings/accessibility');
-                                  } else if (value == 'logout') {
-                                    await AuthService().signOut();
-                                    if (mounted) {
-                                      context.go('/');
-                                    }
-                                  }
-                                },
                               ),
-                                ],
-                              );
-                            },
+                            ),
                           ),
                         ],
                       ),
@@ -493,7 +466,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ],
                 ),
               ),
-
               // Main Content Area
               Expanded(
                 child: _selectedSubjectName != null && _selectedSubjectId != null
@@ -507,52 +479,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
             ],
           ),
-          
-          // Floating Back to Admin button (only in preview mode)
-          if (widget.previewMode)
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () => context.go('/admin'),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.arrow_back, color: Colors.white, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Back to Admin',
-                          style: _patrickHand(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -736,7 +662,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                       }
                                     } catch (e) {
                                       // Silently fail - we don't want to show error for this check
-                                      print('Error checking topics: \$e');
+                                      print('Error checking topics: $e');
                                     }
                                   },
                                   child: WiredCard(
@@ -843,4 +769,3 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 }
-

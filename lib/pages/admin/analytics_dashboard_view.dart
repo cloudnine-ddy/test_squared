@@ -55,9 +55,9 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF37352F)))
           : RefreshIndicator(
               onRefresh: _loadData,
               child: SingleChildScrollView(
@@ -68,12 +68,12 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
                     const Text(
                       'Admin Dashboard',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
+                        color: Color(0xFF37352F),
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     
                     // Usage Stats
                     _buildUsageStats(),
@@ -99,9 +99,10 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
         const Text(
           'Usage Statistics',
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+            color: Color(0xFF37352F),
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 16),
@@ -111,11 +112,11 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
               child: _buildStatCard(
                 'Total Users',
                 _overallStats['total_users']?.toString() ?? '0',
-                Icons.people,
+                Icons.people_outline,
                 Colors.blue,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildStatCard(
                 'Active (7d)',
@@ -124,43 +125,43 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
                 Colors.green,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildStatCard(
                 'Active (30d)',
                 _overallStats['active_users_30d']?.toString() ?? '0',
-                Icons.calendar_today,
+                Icons.calendar_today_outlined,
                 Colors.purple,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: _buildStatCard(
-                'Total Attempts',
+                'Attempts',
                 _overallStats['total_attempts']?.toString() ?? '0',
-                Icons.quiz,
+                Icons.quiz_outlined,
                 Colors.orange,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildStatCard(
                 'Avg Score',
                 '${(_overallStats['avg_platform_score'] ?? 0).toStringAsFixed(1)}%',
-                Icons.star,
+                Icons.star_outline,
                 Colors.amber,
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Expanded(
               child: _buildStatCard(
                 'Bookmarks',
                 _overallStats['total_bookmarks']?.toString() ?? '0',
-                Icons.bookmark,
+                Icons.bookmark_outline,
                 Colors.red,
               ),
             ),
@@ -172,12 +173,12 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: const Color(0xFFE9E9E7),
         ),
       ),
       child: Column(
@@ -185,32 +186,28 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
+              Icon(icon, color: const Color(0xFF787774), size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF787774),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Icon(icon, color: color, size: 20),
               ),
-              const Spacer(),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
+              color: Color(0xFF37352F),
+              fontSize: 20,
               fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 12,
             ),
           ),
         ],
@@ -220,12 +217,12 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
 
   Widget _buildContentMetrics() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: const Color(0xFFE9E9E7),
         ),
       ),
       child: Column(
@@ -234,15 +231,18 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
           const Text(
             'Content Metrics',
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              color: Color(0xFF37352F),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           _buildMetricRow('Subjects', _contentMetrics['total_subjects']?.toString() ?? '0'),
+          const Divider(height: 1, color: Color(0xFFE9E9E7)),
           _buildMetricRow('Papers', _contentMetrics['total_papers']?.toString() ?? '0'),
+          const Divider(height: 1, color: Color(0xFFE9E9E7)),
           _buildMetricRow('Questions', _contentMetrics['total_questions']?.toString() ?? '0'),
+          const Divider(height: 1, color: Color(0xFFE9E9E7)),
           _buildMetricRow('With Figures', _contentMetrics['questions_with_figures']?.toString() ?? '0'),
         ],
       ),
@@ -251,22 +251,22 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
 
   Widget _buildMetricRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.7),
-              fontSize: 14,
+            style: const TextStyle(
+              color: Color(0xFF787774),
+              fontSize: 13,
             ),
           ),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 16,
+              color: Color(0xFF37352F),
+              fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -281,12 +281,12 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: const Color(0xFFE9E9E7),
         ),
       ),
       child: Column(
@@ -295,9 +295,9 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
           const Text(
             'Topic Popularity',
             style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              color: Color(0xFF37352F),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 16),
@@ -307,7 +307,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
             final users = topic['unique_users'] as int;
             
             return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -318,25 +318,29 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView> {
                         child: Text(
                           name,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                            color: Color(0xFF37352F),
+                            fontSize: 13,
                           ),
                         ),
                       ),
                       Text(
-                        '$attempts attempts • $users users',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 12,
+                        '$attempts attempts',
+                        style: const TextStyle(
+                          color: Color(0xFF787774),
+                          fontSize: 11,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  LinearProgressIndicator(
-                    value: attempts / (_topicPopularity.first['attempt_count'] as int),
-                    backgroundColor: Colors.white.withValues(alpha: 0.1),
-                    valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: LinearProgressIndicator(
+                      value: attempts / (_topicPopularity.first['attempt_count'] as int),
+                      minHeight: 4,
+                      backgroundColor: const Color(0xFFF7F6F3),
+                      valueColor: const AlwaysStoppedAnimation(Color(0xFF37352F)),
+                    ),
                   ),
                 ],
               ),

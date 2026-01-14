@@ -125,11 +125,11 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.sidebar,
-        title: const Text('Delete Paper', style: TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: Colors.white,
+        title: const Text('Delete Paper', style: TextStyle(color: Color(0xFF37352F))),
         content: Text(
           'Delete "$paperLabel" and all its questions?\nThis cannot be undone.',
-          style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.7)),
+          style: const TextStyle(color: Color(0xFF787774)),
         ),
         actions: [
           TextButton(
@@ -187,11 +187,11 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.sidebar,
-        title: const Text('Delete Question', style: TextStyle(color: AppColors.textPrimary)),
-        content: Text(
+        backgroundColor: Colors.white,
+        title: const Text('Delete Question', style: TextStyle(color: Color(0xFF37352F))),
+        content: const Text(
           'Delete this question? This cannot be undone.',
-          style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.7)),
+          style: TextStyle(color: Color(0xFF787774)),
         ),
         actions: [
           TextButton(
@@ -401,35 +401,35 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
       onKeyEvent: _handleKeyEvent,
       autofocus: true,
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.white,
         body: Row(
           children: [
             // LEFT SIDEBAR (Navigation) - Wider for better UX
             Container(
-              width: 360, // Increased from 320
-              decoration: BoxDecoration(
-                color: AppColors.sidebar,
-                border: Border(right: BorderSide(color: AppColors.border)),
+              width: 320,
+              decoration: const BoxDecoration(
+                color: Color(0xFFF7F6F3),
+                border: Border(right: BorderSide(color: Color(0xFFE9E9E7))),
               ),
               child: Column(
                 children: [
                   // Sidebar Header (Subject Filter + Progress)
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border(bottom: BorderSide(color: AppColors.border)),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Color(0xFFE9E9E7))),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Text('Question Manager', style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                            const Text('Questions', style: TextStyle(color: Color(0xFF37352F), fontSize: 16, fontWeight: FontWeight.bold)),
                             const Spacer(),
                             // Refresh button
                             IconButton(
                               onPressed: _loadData,
-                              icon: const Icon(Icons.refresh, size: 20, color: AppColors.textSecondary),
+                              icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF787774)),
                               tooltip: 'Refresh',
                             ),
                           ],
@@ -440,13 +440,14 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                           isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Subject',
-                            labelStyle: const TextStyle(color: AppColors.textSecondary),
+                            labelStyle: const TextStyle(color: Color(0xFF787774), fontSize: 12),
                             filled: true,
-                            fillColor: AppColors.surface,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                           ),
-                          items: _subjects.map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary)))).toList(),
+                          items: _subjects.map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF37352F), fontSize: 14)))).toList(),
                           onChanged: (v) {
                             setState(() {
                               _selectedSubjectId = v;
@@ -465,14 +466,15 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                                   controller: _jumpController,
                                   decoration: InputDecoration(
                                     hintText: 'Jump to Q#...',
-                                    hintStyle: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.6), fontSize: 13),
+                                    hintStyle: const TextStyle(color: Color(0xFF787774), fontSize: 12),
                                     filled: true,
-                                    fillColor: AppColors.surface,
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textSecondary),
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF787774)),
                                   ),
-                                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                                  style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                                   keyboardType: TextInputType.number,
                                   onSubmitted: (v) {
                                     final num = int.tryParse(v);
@@ -503,16 +505,16 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                   // Paper List
                   Expanded(
                     child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF37352F)))
                       : _buildPaperList(),
                   ),
 
                   // Keyboard shortcuts hint
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface.withValues(alpha: 0.5),
-                      border: Border(top: BorderSide(color: AppColors.border)),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF7F6F3),
+                      border: Border(top: BorderSide(color: Color(0xFFE9E9E7))),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -536,16 +538,9 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                         Container(
                           height: 64,
                           padding: const EdgeInsets.symmetric(horizontal: 24),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            border: Border(bottom: BorderSide(color: AppColors.border)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            border: Border(bottom: BorderSide(color: Color(0xFFE9E9E7))),
                           ),
                           child: Row(
                             children: [
@@ -562,23 +557,23 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                                   _getCurrentQuestionNumber(),
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 16),
+                              const SizedBox(width: 12),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     _getPaperLabel(_selectedPaperId!),
-                                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 15),
+                                    style: const TextStyle(color: Color(0xFF37352F), fontWeight: FontWeight.bold, fontSize: 14),
                                   ),
                                   Text(
                                     _getQuestionPosition(),
-                                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                    style: const TextStyle(color: Color(0xFF787774), fontSize: 11),
                                   ),
                                 ],
                               ),
@@ -596,20 +591,21 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                               // Navigation buttons
                               Container(
                                 decoration: BoxDecoration(
-                                  color: AppColors.background,
-                                  borderRadius: BorderRadius.circular(8),
+                                  color: const Color(0xFFF7F6F3),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFE9E9E7)),
                                 ),
                                 child: Row(
                                   children: [
                                     IconButton(
                                       onPressed: () => _navigateRelative(-1),
-                                      icon: const Icon(Icons.chevron_left, color: AppColors.textPrimary),
+                                      icon: const Icon(Icons.chevron_left, color: Color(0xFF37352F), size: 18),
                                       tooltip: 'Previous (↑)',
                                     ),
-                                    Container(width: 1, height: 24, color: AppColors.border),
+                                    Container(width: 1, height: 20, color: const Color(0xFFE9E9E7)),
                                     IconButton(
                                       onPressed: () => _navigateRelative(1),
-                                      icon: const Icon(Icons.chevron_right, color: AppColors.textPrimary),
+                                      icon: const Icon(Icons.chevron_right, color: Color(0xFF37352F), size: 18),
                                       tooltip: 'Next (↓)',
                                     ),
                                   ],
@@ -637,8 +633,9 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(16),
+                              color: const Color(0xFFF7F6F3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE9E9E7)),
                             ),
                             child: Column(
                               children: [
@@ -646,12 +643,12 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                                 const SizedBox(height: 16),
                                 Text(
                                   'Select a question from the sidebar',
-                                  style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.7), fontSize: 18),
+                                  style: TextStyle(color: const Color(0xFF37352F).withValues(alpha: 0.7), fontSize: 16),
                                 ),
                                 const SizedBox(height: 8),
-                                Text(
+                                const Text(
                                   'Use ↑↓ keys to navigate between questions',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                                  style: TextStyle(color: Color(0xFF787774), fontSize: 13),
                                 ),
                               ],
                             ),
@@ -733,11 +730,11 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.folder_open, size: 48, color: AppColors.textSecondary.withValues(alpha: 0.3)),
+            Icon(Icons.folder_open, size: 40, color: const Color(0xFF787774).withValues(alpha: 0.3)),
             const SizedBox(height: 12),
-            const Text('No papers found', style: TextStyle(color: AppColors.textSecondary)),
+            const Text('No papers found', style: TextStyle(color: Color(0xFF787774))),
             const SizedBox(height: 4),
-            Text('Select a subject above', style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7), fontSize: 12)),
+            Text('Select a subject above', style: TextStyle(color: const Color(0xFF787774).withValues(alpha: 0.7), fontSize: 11)),
           ],
         ),
       );
@@ -758,27 +755,28 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
         return ExpansionTile(
           initiallyExpanded: isActive,
           maintainState: true,
-          collapsedIconColor: AppColors.textSecondary,
-          iconColor: AppColors.primary,
-          backgroundColor: AppColors.background.withValues(alpha: 0.5),
+          collapsedIconColor: const Color(0xFF787774),
+          iconColor: const Color(0xFF37352F),
+          backgroundColor: Colors.white.withValues(alpha: 0.5),
           onExpansionChanged: (expanded) {
             if (expanded) {
               setState(() => _selectedPaperId = paperId);
             }
           },
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           title: Text(
             '${paper['year']} ${paper['season']} V${paper['variant']}',
             style: TextStyle(
-              color: isActive ? AppColors.primary : AppColors.textPrimary,
+              color: isActive ? const Color(0xFF37352F) : const Color(0xFF787774),
               fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
-              fontSize: 14,
+              fontSize: 13,
             ),
           ),
           subtitle: Row(
             children: [
               Text(
-                '${questions.length} Questions',
-                style: TextStyle(color: AppColors.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+                '${questions.length} Qs',
+                style: TextStyle(color: const Color(0xFF787774).withValues(alpha: 0.7), fontSize: 11),
               ),
               if (questionsWithImage > 0) ...[
                 const SizedBox(width: 8),

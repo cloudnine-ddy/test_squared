@@ -161,7 +161,7 @@ class _AdminShellState extends State<AdminShell> {
           // Divider
           Container(
             width: 1,
-            color: AppColors.sidebar.withValues(alpha: 0.5),
+            color: const Color(0xFFE9E9E7),
           ),
           // Main content
           Expanded(
@@ -179,7 +179,7 @@ class _AdminShellState extends State<AdminShell> {
 
   Widget _buildSidebar() {
     return Container(
-      color: AppColors.sidebar, // Deep dark blue
+      color: const Color(0xFFF7F6F3), // Notion Sidebar Grey
       child: Column(
         children: [
           // Header
@@ -209,8 +209,8 @@ class _AdminShellState extends State<AdminShell> {
                   const Text(
                     'Admin Portal',
                     style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
+                      color: Color(0xFF37352F),
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -258,7 +258,7 @@ class _AdminShellState extends State<AdminShell> {
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
-                Divider(color: Colors.white.withValues(alpha: 0.1)),
+                Divider(color: const Color(0xFFE9E9E7)),
                 const SizedBox(height: 8),
                 // Theme toggle button
                 /*
@@ -305,14 +305,9 @@ class _AdminShellState extends State<AdminShell> {
             ),
             decoration: BoxDecoration(
               color: isSelected
-                  ? const Color(0xFF6366F1).withValues(alpha: 0.2)
+                  ? const Color(0xFF37352F).withValues(alpha: 0.05)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              border: isSelected
-                  ? Border.all(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.3),
-                    )
-                  : null,
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: _isSidebarExpanded
@@ -322,9 +317,9 @@ class _AdminShellState extends State<AdminShell> {
                 Icon(
                   icon,
                   color: isSelected
-                      ? const Color(0xFF818CF8)
-                      : Colors.white.withValues(alpha: 0.6),
-                  size: 22,
+                      ? const Color(0xFF37352F)
+                      : const Color(0xFF787774),
+                  size: 20,
                 ),
                 if (_isSidebarExpanded) ...[
                   const SizedBox(width: 12),
@@ -332,10 +327,11 @@ class _AdminShellState extends State<AdminShell> {
                     title,
                     style: TextStyle(
                       color: isSelected
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.7),
+                          ? const Color(0xFF37352F)
+                          : const Color(0xFF787774),
                       fontWeight:
                           isSelected ? FontWeight.w600 : FontWeight.w400,
+                      fontSize: 14,
                     ),
                   ),
                 ],
@@ -437,13 +433,13 @@ class _AdminShellState extends State<AdminShell> {
 
   Widget _buildTopBar() {
     return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: AppColors.sidebar,
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
         border: Border(
           bottom: BorderSide(
-            color: Colors.white.withValues(alpha: 0.05),
+            color: Color(0xFFE9E9E7),
           ),
         ),
       ),
@@ -458,7 +454,8 @@ class _AdminShellState extends State<AdminShell> {
             },
             icon: Icon(
               _isSidebarExpanded ? Icons.menu_open : Icons.menu,
-              color: Colors.white.withValues(alpha: 0.7),
+              color: const Color(0xFF787774),
+              size: 20,
             ),
             tooltip: _isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar',
           ),
@@ -467,8 +464,8 @@ class _AdminShellState extends State<AdminShell> {
           Text(
             _getSectionTitle(_currentSection),
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
+              color: Color(0xFF37352F),
+              fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -477,10 +474,10 @@ class _AdminShellState extends State<AdminShell> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFF37352F).withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                color: const Color(0xFFE9E9E7),
               ),
             ),
             child: Row(
@@ -488,15 +485,15 @@ class _AdminShellState extends State<AdminShell> {
               children: [
                 const Icon(
                   Icons.verified_user,
-                  color: Color(0xFF818CF8),
-                  size: 16,
+                  color: Color(0xFF787774),
+                  size: 14,
                 ),
                 const SizedBox(width: 6),
-                Text(
+                const Text(
                   'Admin',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontSize: 13,
+                    color: Color(0xFF37352F),
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

@@ -4,12 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/services/toast_service.dart';
-import '../../core/services/pdf_helper.dart';
-import '../../features/past_papers/widgets/pdf_crop_viewer.dart';
 import 'package:test_squared/features/past_papers/models/question_blocks.dart'; // ExamContentBlocks
 
 /// Full Question Editor - Edit all fields of a question
@@ -61,6 +58,11 @@ class _QuestionEditorState extends State<QuestionEditor> {
   double _figureY = 30;
   double _figureWidth = 40;
   double _figureHeight = 30;
+
+  // Figure preview (rendered from PDF page)
+  Uint8List? _figurePreviewImage;
+  bool _isRenderingPreview = false;
+  bool _hasPreviewError = false;
 
   // Structured fields
   bool _isStructured = false;
@@ -188,6 +190,73 @@ class _QuestionEditorState extends State<QuestionEditor> {
       if (mounted) {
         ToastService.showError('Failed to load question: $e');
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  /// Renders the current figure page as an image for preview
+  Future<void> _renderFigurePreview() async {
+    final pdfUrl = _paper?['pdf_url'];
+    if (pdfUrl == null || !_hasFigure) return;
+
+    setState(() {
+      _isRenderingPreview = true;
+      _hasPreviewError = false;
+    });
+
+    try {
+      debugPrint('🖼️ Rendering figure preview for page $_figurePage...');
+
+      final response = await _supabase.functions.invoke(
+        'render-page',
+        body: {
+          'pdfUrl': pdfUrl,
+          'page': _figurePage,
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.status != 200) {
+        debugPrint('Render failed: HTTP ${response.status}');
+        setState(() {
+          _hasPreviewError = true;
+          _isRenderingPreview = false;
+        });
+        return;
+      }
+
+      final data = response.data;
+      if (data['error'] != null) {
+        debugPrint('Render error: ${data['error']}');
+        setState(() {
+          _hasPreviewError = true;
+          _isRenderingPreview = false;
+        });
+        return;
+      }
+
+      final imageBase64 = data['image_base64'] as String?;
+      if (imageBase64 != null) {
+        debugPrint('✅ Figure preview rendered successfully');
+        setState(() {
+          _figurePreviewImage = base64Decode(imageBase64);
+          _isRenderingPreview = false;
+          _hasPreviewError = false;
+        });
+      } else {
+        setState(() {
+          _hasPreviewError = true;
+          _isRenderingPreview = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to render figure preview: $e');
+      if (mounted) {
+        setState(() {
+          _hasPreviewError = true;
+          _isRenderingPreview = false;
+        });
       }
     }
   }
@@ -368,16 +437,18 @@ class _QuestionEditorState extends State<QuestionEditor> {
       builder: (context) {
         final controller = TextEditingController();
         return AlertDialog(
-          title: const Text('Add Text Block'),
+          title: const Text('Add Text Block', style: TextStyle(color: Color(0xFF37352F), fontSize: 16, fontWeight: FontWeight.w600)),
+          backgroundColor: Colors.white,
           content: TextField(
             controller: controller,
             maxLines: 3,
-            decoration: const InputDecoration(hintText: 'Enter text content...', border: OutlineInputBorder()),
+            decoration: _inputDecoration('Enter text content...'),
+            style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF787774))),
             ),
             ElevatedButton(
               onPressed: () {
@@ -389,6 +460,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
                   Navigator.pop(context);
                 }
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF37352F),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
               child: const Text('Add'),
             ),
           ],
@@ -405,28 +482,35 @@ class _QuestionEditorState extends State<QuestionEditor> {
         final labelController = TextEditingController(text: 'Figure ${_structureBlocks.whereType<FigureBlock>().length + 1}');
         final descController = TextEditingController();
         return AlertDialog(
-          title: const Text('Add Figure Block'),
+          title: const Text('Add Figure Block', style: TextStyle(color: Color(0xFF37352F), fontSize: 16, fontWeight: FontWeight.w600)),
+          backgroundColor: Colors.white,
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: urlController,
-                decoration: const InputDecoration(labelText: 'Image URL', hintText: 'https://...', border: OutlineInputBorder()),
+                decoration: _inputDecoration('Image URL (https://...)'),
+                style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: labelController,
-                decoration: const InputDecoration(labelText: 'Figure Label', hintText: 'Figure 1', border: OutlineInputBorder()),
+                decoration: _inputDecoration('Figure Label (e.g. Figure 1)'),
+                style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: descController,
-                decoration: const InputDecoration(labelText: 'Description (optional)', border: OutlineInputBorder()),
+                decoration: _inputDecoration('Description (optional)'),
+                style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Color(0xFF787774))),
+            ),
             ElevatedButton(
               onPressed: () {
                 if (labelController.text.isNotEmpty) {
@@ -441,6 +525,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
                   Navigator.pop(context);
                 }
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF37352F),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
               child: const Text('Add'),
             ),
           ],
@@ -468,31 +558,37 @@ class _QuestionEditorState extends State<QuestionEditor> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(existingBlock == null ? 'Add Question Part' : 'Edit Question Part'),
+              title: Text(existingBlock == null ? 'Add Question Part' : 'Edit Question Part', style: const TextStyle(color: Color(0xFF37352F), fontSize: 16, fontWeight: FontWeight.w600)),
+              backgroundColor: Colors.white,
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: labelController,
-                      decoration: const InputDecoration(labelText: 'Part Label', border: OutlineInputBorder()),
+                      decoration: _inputDecoration('Part Label (e.g. a))'),
+                      style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: contentController,
                       maxLines: 2,
-                      decoration: const InputDecoration(labelText: 'Question Text', border: OutlineInputBorder()),
+                      decoration: _inputDecoration('Question Text'),
+                      style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                     ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: marksController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Marks', border: OutlineInputBorder()),
+                      decoration: _inputDecoration('Marks'),
+                      style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: inputType,
-                      decoration: const InputDecoration(labelText: 'Input Type', border: OutlineInputBorder()),
+                      decoration: _inputDecoration('Input Type'),
+                      dropdownColor: Colors.white,
+                      style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                       items: const [
                         DropdownMenuItem(value: 'text_area', child: Text('Text Area')),
                         DropdownMenuItem(value: 'fill_in_blanks', child: Text('Fill in Blanks')),
@@ -504,27 +600,24 @@ class _QuestionEditorState extends State<QuestionEditor> {
                     TextField(
                       controller: officialAnswerController,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Official Answer / Mark Scheme',
-                        border: OutlineInputBorder(),
-                        hintText: 'Explanation from mark scheme...'
-                      ),
+                      decoration: _inputDecoration('Official Answer / Mark Scheme'),
+                      style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                     ),
                      const SizedBox(height: 12),
                     TextField(
                       controller: aiAnswerController,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'AI Answer / Explanation',
-                        border: OutlineInputBorder(),
-                        hintText: 'AI generated explanation...'
-                      ),
+                      decoration: _inputDecoration('AI Answer / Explanation'),
+                      style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                     ),
                   ],
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Color(0xFF787774))),
+                ),
                 ElevatedButton(
                   onPressed: () {
                     if (labelController.text.isNotEmpty && contentController.text.isNotEmpty) {
@@ -549,6 +642,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       Navigator.pop(context);
                     }
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF37352F),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
                   child: Text(existingBlock == null ? 'Add' : 'Save'),
                 ),
               ],
@@ -577,27 +676,32 @@ class _QuestionEditorState extends State<QuestionEditor> {
   Widget _buildBlockPreview(int index) {
     final block = _structureBlocks[index];
 
-    return Card(
+    return Container(
       key: ValueKey(block),
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFE9E9E7)),
+      ),
       child: ListTile(
-        title: Text('${block.type.toUpperCase()} Block'),
+        title: Text('${block.type.toUpperCase()} Block', style: const TextStyle(color: Color(0xFF37352F), fontSize: 13, fontWeight: FontWeight.w600)),
         subtitle: _buildBlockContent(block),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (block is QuestionPartBlock)
               IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blue),
+                icon: const Icon(Icons.edit, color: Color(0xFF787774), size: 18),
                 onPressed: () => _openQuestionPartDialog(existingBlock: block, index: index),
               ),
             IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete, color: Color(0xFF787774), size: 18),
               onPressed: () => _removeBlock(index),
             ),
           ],
         ),
-        leading: const Icon(Icons.drag_handle),
+        leading: const Icon(Icons.drag_handle, color: Color(0xFFE9E9E7), size: 20),
       ),
     );
   }
@@ -747,7 +851,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
       child: Focus(
         autofocus: true,
         child: Container(
-          color: AppColors.background,
+          color: Colors.white,
           child: Column(
             children: [
               // Header
@@ -786,17 +890,17 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 final topic = _allTopics.firstWhere((t) => t['id'] == id, orElse: () => {'name': 'Unknown'});
                 return Chip(
                   label: Text(topic['name'], style: const TextStyle(fontSize: 11)),
-                  backgroundColor: AppColors.primary.withOpacity(0.1),
-                  labelStyle: const TextStyle(color: AppColors.primary),
-                  deleteIcon: const Icon(Icons.close, size: 12, color: AppColors.primary),
+                  backgroundColor: const Color(0xFF37352F).withValues(alpha: 0.05),
+                  labelStyle: const TextStyle(color: Color(0xFF37352F)),
+                  deleteIcon: const Icon(Icons.close, size: 12, color: Color(0xFF787774)),
                   onDeleted: () {
                     setState(() {
                       _selectedTopicIds.remove(id);
                       _markChanged();
                     });
                   },
-                  side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  side: const BorderSide(color: Color(0xFFE9E9E7)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                 );
@@ -811,9 +915,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
+              color: const Color(0xFFF7F6F3),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFE9E9E7)),
             ),
             child: Row(
               children: [
@@ -825,8 +929,8 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 const SizedBox(width: 8),
                 Text(
                   _isTopicsExpanded ? 'Hide topic selector' : 'Add topics (${_allTopics.length} available)',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
+                  style: const TextStyle(
+                    color: Color(0xFF787774),
                     fontSize: 13,
                   ),
                 ),
@@ -835,13 +939,13 @@ class _QuestionEditorState extends State<QuestionEditor> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFF37352F).withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
                       '${_selectedTopicIds.length} selected',
-                      style: TextStyle(
-                        color: AppColors.primary,
+                      style: const TextStyle(
+                        color: Color(0xFF37352F),
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
@@ -861,9 +965,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
             margin: const EdgeInsets.only(top: 8),
             height: 200, // Reduced from 300
             decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFE9E9E7)),
             ),
             child: Column(
               children: [
@@ -890,8 +994,8 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       final isSelected = _selectedTopicIds.contains(topic['id']);
                       return CheckboxListTile(
                         value: isSelected,
-                        title: Text(topic['name'] ?? '', style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
-                        activeColor: AppColors.primary,
+                        title: Text(topic['name'] ?? '', style: const TextStyle(color: Color(0xFF37352F), fontSize: 13)),
+                        activeColor: const Color(0xFF37352F),
                         checkColor: Colors.white,
                         dense: true,
                         visualDensity: VisualDensity.compact,
@@ -923,10 +1027,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: AppColors.border,
+          color: const Color(0xFFE9E9E7),
         ),
       ),
       child: Column(
@@ -948,9 +1052,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
               const SizedBox(width: 8),
               Text(
                 'Has Figure',
-                style: TextStyle(
-                  color: AppColors.textPrimary.withOpacity(0.8),
-                  fontWeight: FontWeight.bold,
+                style: const TextStyle(
+                  color: Color(0xFF37352F),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
             ],
@@ -966,9 +1071,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: AppColors.border,
+                    color: const Color(0xFFE9E9E7),
                   ),
                 ),
                 child: ClipRRect(
@@ -984,16 +1089,129 @@ class _QuestionEditorState extends State<QuestionEditor> {
               ),
               const SizedBox(height: 16),
             ] else if (_paper != null && _paper!['pdf_url'] != null) ...[
-              // Client-side PDF Crop Preview
+              // Image-based preview (uses render-page Edge Function)
               Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: PdfCropViewer(
-                  pdfUrl: _paper!['pdf_url'],
-                  pageNumber: _figurePage,
-                  x: _figureX,
-                  y: _figureY,
-                  width: _figureWidth,
-                  height: _figureHeight,
+                child: Container(
+                  height: 300,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE9E9E7)),
+                  ),
+                  child: _isRenderingPreview
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 12),
+                              Text('Rendering page...', style: TextStyle(color: Colors.grey)),
+                            ],
+                          ),
+                        )
+                      : _hasPreviewError
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.error_outline, color: Colors.orange, size: 40),
+                                  const SizedBox(height: 8),
+                                  const Text('Preview not available', style: TextStyle(color: Colors.grey)),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton.icon(
+                                    onPressed: _renderFigurePreview,
+                                    icon: const Icon(Icons.refresh, size: 16),
+                                    label: const Text('Retry'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF37352F),
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _figurePreviewImage != null
+                              ? LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    // A4 aspect ratio
+                                    const aspectRatio = 595 / 842;
+                                    final containerW = constraints.maxWidth;
+                                    final containerH = constraints.maxHeight;
+                                    
+                                    double imgW = containerW;
+                                    double imgH = imgW / aspectRatio;
+                                    if (imgH > containerH) {
+                                      imgH = containerH;
+                                      imgW = imgH * aspectRatio;
+                                    }
+                                    
+                                    // Crop rectangle
+                                    final cropLeft = (_figureX / 100) * imgW;
+                                    final cropTop = (_figureY / 100) * imgH;
+                                    final cropWidth = (_figureWidth / 100) * imgW;
+                                    final cropHeight = (_figureHeight / 100) * imgH;
+                                    
+                                    return Center(
+                                      child: SizedBox(
+                                        width: imgW,
+                                        height: imgH,
+                                        child: Stack(
+                                          children: [
+                                            // Page image
+                                            Positioned.fill(
+                                              child: Image.memory(
+                                                _figurePreviewImage!,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            ),
+                                            // Crop overlay
+                                            Positioned.fill(
+                                              child: CustomPaint(
+                                                painter: _CropOverlayPainter(
+                                                  cropRect: Rect.fromLTWH(cropLeft, cropTop, cropWidth, cropHeight),
+                                                ),
+                                              ),
+                                            ),
+                                            // Crop border
+                                            Positioned(
+                                              left: cropLeft,
+                                              top: cropTop,
+                                              width: cropWidth,
+                                              height: cropHeight,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  border: Border.all(color: const Color(0xFF6366F1), width: 2),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                )
+                              : Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.image_outlined, color: Colors.grey, size: 40),
+                                      const SizedBox(height: 8),
+                                      const Text('Click to load preview', style: TextStyle(color: Colors.grey)),
+                                      const SizedBox(height: 12),
+                                      ElevatedButton.icon(
+                                        onPressed: _renderFigurePreview,
+                                        icon: const Icon(Icons.visibility, size: 16),
+                                        label: const Text('Load Preview'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF6366F1),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                 ),
               ),
             ],
@@ -1005,6 +1223,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                   child: _buildSlider('Page', _figurePage.toDouble(), 1, 20, (v) {
                     setState(() {
                       _figurePage = v.round();
+                      _figurePreviewImage = null; // Clear preview on page change
                       _markChanged();
                     });
                   }),
@@ -1058,12 +1277,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
 
   Widget _buildHeader(String paperInfo) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.sidebar,
+        color: const Color(0xFFF7F6F3),
         border: Border(
           bottom: BorderSide(
-            color: AppColors.border,
+            color: const Color(0xFFE9E9E7),
           ),
         ),
       ),
@@ -1072,7 +1291,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
           IconButton(
             onPressed: widget.onClose,
             icon: const Icon(Icons.arrow_back),
-            color: AppColors.textPrimary,
+            color: const Color(0xFF37352F),
           ),
           const SizedBox(width: 12),
           Column(
@@ -1081,8 +1300,8 @@ class _QuestionEditorState extends State<QuestionEditor> {
               Text(
                 'Question $_questionNumber',
                 style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 18,
+                  color: Color(0xFF37352F),
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -1106,9 +1325,9 @@ class _QuestionEditorState extends State<QuestionEditor> {
               ),
               child: const Text(
                 'Unsaved changes',
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.orange,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
             ),
@@ -1116,8 +1335,8 @@ class _QuestionEditorState extends State<QuestionEditor> {
           if (widget.onDelete != null)
             IconButton(
               onPressed: widget.onDelete,
-              icon: const Icon(Icons.delete_outline),
-              color: Colors.red.withValues(alpha: 0.7),
+              icon: const Icon(Icons.delete_outline, size: 20),
+              color: const Color(0xFF787774),
               tooltip: 'Delete question',
             ),
           const SizedBox(width: 8),
@@ -1132,8 +1351,11 @@ class _QuestionEditorState extends State<QuestionEditor> {
                 : const Icon(Icons.save),
             label: Text(_isSaving ? 'Saving...' : 'Save'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
+              backgroundColor: const Color(0xFF37352F),
               foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             ),
           ),
         ],
@@ -1147,10 +1369,10 @@ class _QuestionEditorState extends State<QuestionEditor> {
       children: [
         Text(
           title,
-          style: TextStyle(
-            color: AppColors.textPrimary.withValues(alpha: 0.8),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+          style: const TextStyle(
+            color: Color(0xFF787774),
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
           ),
         ),
         const SizedBox(height: 8),
@@ -1159,23 +1381,43 @@ class _QuestionEditorState extends State<QuestionEditor> {
     );
   }
 
+  Widget _buildActionBarButton(VoidCallback onPressed, IconData icon, String label) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF37352F),
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: const BorderSide(color: Color(0xFFE9E9E7)),
+        ),
+      ),
+    );
+  }
+
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.textSecondary),
+      hintStyle: const TextStyle(color: Color(0xFF787774), fontSize: 13),
       filled: true,
-      fillColor: AppColors.background,
+      fillColor: const Color(0xFFF7F6F3),
+      isDense: true,
+      contentPadding: const EdgeInsets.all(12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.border, width: 1.5),
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFFE9E9E7)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.border, width: 1.5),
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFFE9E9E7)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.primary, width: 2),
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color(0xFF37352F), width: 1),
       ),
     );
   }
@@ -1245,8 +1487,8 @@ class _QuestionEditorState extends State<QuestionEditor> {
             min: min,
             max: max,
             onChanged: onChanged,
-            activeColor: const Color(0xFF6366F1),
-            inactiveColor: AppColors.border,
+            activeColor: const Color(0xFF37352F),
+            inactiveColor: const Color(0xFFE9E9E7),
           ),
         ),
       ],
@@ -1387,12 +1629,12 @@ class _QuestionEditorState extends State<QuestionEditor> {
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: _options[i]['label'] == _correctAnswer
-                              ? Colors.green
-                              : AppColors.border,
+                              ? const Color(0xFF37352F)
+                              : const Color(0xFFE9E9E7),
                         ),
                       ),
                       child: Row(
@@ -1400,7 +1642,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
                           Radio<String>(
                             value: _options[i]['label'] ?? '',
                             groupValue: _correctAnswer,
-                            activeColor: Colors.green,
+                            activeColor: const Color(0xFF37352F),
                             onChanged: (val) {
                               setState(() {
                                 _correctAnswer = val;
@@ -1412,35 +1654,29 @@ class _QuestionEditorState extends State<QuestionEditor> {
                               });
                             },
                           ),
-                          SizedBox(
-                            width: 40,
-                            child: TextFormField(
-                              initialValue: _options[i]['label'],
-                              textAlign: TextAlign.center,
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                isDense: true,
-                              ),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: _options[i]['label'] == _correctAnswer ? Colors.green : AppColors.textPrimary,
-                              ),
-                              onChanged: (val) {
-                                _options[i]['label'] = val;
-                                _markChanged();
-                              },
+                          const SizedBox(width: 4),
+                          Text(
+                            _options[i]['label'] ?? '',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: _options[i]['label'] == _correctAnswer 
+                                ? const Color(0xFF37352F) 
+                                : const Color(0xFF787774),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 20),
                           Expanded(
                             child: TextFormField(
                               initialValue: _options[i]['text'],
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 hintText: 'Option text...',
+                                hintStyle: TextStyle(color: Color(0xFF787774), fontSize: 13),
                                 isDense: true,
+                                contentPadding: EdgeInsets.symmetric(vertical: 8),
                               ),
-                              style: TextStyle(color: AppColors.textPrimary.withOpacity(0.9)),
+                              style: const TextStyle(color: Color(0xFF37352F), fontSize: 13),
                               maxLines: null,
                               onChanged: (val) {
                                 _options[i]['text'] = val;
@@ -1502,20 +1738,20 @@ class _QuestionEditorState extends State<QuestionEditor> {
                  ),
                ),
                // Action Bar
-               Container(
-                 padding: const EdgeInsets.all(12),
-                 decoration: BoxDecoration(
-                   color: AppColors.surface,
-                   border: Border(top: BorderSide(color: AppColors.border)),
-                 ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF7F6F3),
+                    border: Border(top: BorderSide(color: Color(0xFFE9E9E7))),
+                  ),
                  child: Row(
                    mainAxisAlignment: MainAxisAlignment.center,
                    children: [
-                     ElevatedButton.icon(onPressed: _addTextBlock, icon: const Icon(Icons.text_fields), label: const Text('Text')),
-                     const SizedBox(width: 8),
-                     ElevatedButton.icon(onPressed: _addFigureBlock, icon: const Icon(Icons.image), label: const Text('Figure')),
-                     const SizedBox(width: 8),
-                     ElevatedButton.icon(onPressed: _addQuestionPartBlock, icon: const Icon(Icons.quiz), label: const Text('Part')),
+                      _buildActionBarButton(_addTextBlock, Icons.text_fields, 'Text'),
+                      const SizedBox(width: 8),
+                      _buildActionBarButton(_addFigureBlock, Icons.image, 'Figure'),
+                      const SizedBox(width: 8),
+                      _buildActionBarButton(_addQuestionPartBlock, Icons.quiz, 'Part'),
                    ],
                  ),
                ),
@@ -1524,7 +1760,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
         ),
 
         // Right - Metadata (Topics, Q#, etc.)
-        Container(width: 1, color: AppColors.border),
+        Container(width: 1, color: const Color(0xFFE9E9E7)),
         Expanded(
           flex: 4, // 40%
           child: Form(
@@ -1534,7 +1770,7 @@ class _QuestionEditorState extends State<QuestionEditor> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   const Text('Metadata', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                   const Text('Metadata', style: TextStyle(color: Color(0xFF37352F), fontSize: 13, fontWeight: FontWeight.w600)),
                    const SizedBox(height: 16),
 
                    // Q Number
@@ -1699,16 +1935,16 @@ class _CropDialogState extends State<_CropDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog.fullscreen(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       child: Column(
         children: [
           // Header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.sidebar,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF7F6F3),
               border: Border(
-                bottom: BorderSide(color: AppColors.border),
+                bottom: BorderSide(color: Color(0xFFE9E9E7)),
               ),
             ),
             child: Row(
@@ -1716,14 +1952,14 @@ class _CropDialogState extends State<_CropDialog> {
                 IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  color: AppColors.textPrimary,
+                  color: const Color(0xFF37352F),
                 ),
                 const SizedBox(width: 12),
                 const Text(
                   'Crop Figure',
                   style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 18,
+                    color: Color(0xFF37352F),
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1741,8 +1977,10 @@ class _CropDialogState extends State<_CropDialog> {
                   icon: const Icon(Icons.check),
                   label: const Text('Apply & Crop'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: const Color(0xFF37352F),
                     foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                   ),
                 ),
               ],
@@ -1779,10 +2017,10 @@ class _CropDialogState extends State<_CropDialog> {
                 Container(
                   width: 280,
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.sidebar,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF7F6F3),
                     border: Border(
-                      left: BorderSide(color: AppColors.border),
+                      left: BorderSide(color: Color(0xFFE9E9E7)),
                     ),
                   ),
                   child: Column(
@@ -1791,9 +2029,10 @@ class _CropDialogState extends State<_CropDialog> {
                       // Page selector
                       Text(
                         'Page',
-                        style: TextStyle(
-                          color: AppColors.textPrimary.withValues(alpha: 0.8),
+                        style: const TextStyle(
+                          color: Color(0xFF37352F),
                           fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1809,7 +2048,7 @@ class _CropDialogState extends State<_CropDialog> {
                               _renderPageAsImage();
                             } : null,
                             icon: const Icon(Icons.remove),
-                            color: Colors.white,
+                            color: const Color(0xFF37352F),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -1817,16 +2056,17 @@ class _CropDialogState extends State<_CropDialog> {
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.border,
-                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE9E9E7)),
                             ),
                             child: Text(
                               '$_page',
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.bold,
+                                style: const TextStyle(
+                                  color: Color(0xFF37352F),
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
                           ),
                           IconButton(
                             onPressed: () {
@@ -1838,7 +2078,7 @@ class _CropDialogState extends State<_CropDialog> {
                               _renderPageAsImage();
                             },
                             icon: const Icon(Icons.add),
-                            color: Colors.white,
+                            color: const Color(0xFF37352F),
                           ),
                         ],
                       ),
@@ -1971,10 +2211,11 @@ class _CropDialogState extends State<_CropDialog> {
                   border: Border.all(color: const Color(0xFF6366F1), width: 2),
                 ),
                 child: Center(
-                  child: Icon(
-                    Icons.open_with,
-                    color: AppColors.textPrimary,
-                  ),
+                    child: const Icon(
+                      Icons.open_with,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                 ),
               ),
             ),
@@ -2029,12 +2270,12 @@ class _CropDialogState extends State<_CropDialog> {
           });
         },
         child: Container(
-          width: 12,
-          height: 12,
+          width: 14,
+          height: 14,
           decoration: BoxDecoration(
-            color: const Color(0xFF6366F1),
-            borderRadius: BorderRadius.circular(2),
-            border: Border.all(color: Colors.white, width: 1),
+            color: const Color(0xFF37352F),
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: Colors.white, width: 1.5),
           ),
         ),
       ),
@@ -2052,11 +2293,11 @@ class _CropDialogState extends State<_CropDialog> {
             children: [
               Text(
                 label,
-                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.6), fontSize: 12),
+                style: const TextStyle(color: Color(0xFF787774), fontSize: 13),
               ),
               Text(
                 '${value.toStringAsFixed(0)}%',
-                style: TextStyle(color: AppColors.textPrimary.withValues(alpha: 0.8), fontSize: 12),
+                style: const TextStyle(color: Color(0xFF37352F), fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -2065,8 +2306,8 @@ class _CropDialogState extends State<_CropDialog> {
             min: 0,
             max: 100,
             onChanged: onChanged,
-            activeColor: const Color(0xFF6366F1),
-            inactiveColor: AppColors.border,
+            activeColor: const Color(0xFF37352F),
+            inactiveColor: const Color(0xFFE9E9E7),
           ),
         ],
       ),
