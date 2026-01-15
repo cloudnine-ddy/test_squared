@@ -26,45 +26,45 @@ class WiredBorderPainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.miter;
 
     final random = math.Random(seed);
-    
+
     // ROUGH.JS Algorithm Adaptation
     // Draw FOUR lines for each side to simulate sketchy messy stroke and cover gaps
-    
+
     // Top
     for(int i=0; i<4; i++) _drawRoughLine(canvas, paint, Offset(0, 0), Offset(size.width, 0), random);
-    
+
     // Right
     for(int i=0; i<4; i++) _drawRoughLine(canvas, paint, Offset(size.width, 0), Offset(size.width, size.height), random);
 
     // Bottom
     for(int i=0; i<4; i++) _drawRoughLine(canvas, paint, Offset(size.width, size.height), Offset(0, size.height), random);
-    
+
     // Left
     for(int i=0; i<4; i++) _drawRoughLine(canvas, paint, Offset(0, size.height), Offset(0, 0), random);
   }
 
   void _drawRoughLine(Canvas canvas, Paint paint, Offset start, Offset end, math.Random random) {
     final path = Path();
-    
+
     // Roughness parameters - INCREASED for more hand-drawn look
     const roughness = 1.5; // Increased for more visible wobble
     const bowing = 0.4; // Increased for more curve
-    
+
     // Random offsets for start/end points
     final diff = end - start;
     final length = diff.distance;
-    
+
     // Midpoint displacement (Bowing)
     final mid = (start + end) / 2;
     final fallbackAngle = math.atan2(diff.dy, diff.dx);
     final normalAngle = fallbackAngle + math.pi / 2;
-    
+
     // Scale bowing by length
     double bowMagnitude = length * 0.005; // More visible bowing
     if (bowMagnitude > 4.0) bowMagnitude = 4.0; // Higher cap
-    
+
     final computedBowing = (random.nextDouble() - 0.5) * bowing * bowMagnitude * 30;
-    final clampedBowing = computedBowing.clamp(-5.0, 5.0); 
+    final clampedBowing = computedBowing.clamp(-5.0, 5.0);
 
     // Control point for curve
     final c = mid + Offset(
@@ -78,7 +78,7 @@ class WiredBorderPainter extends CustomPainter {
 
     path.moveTo(s.dx, s.dy);
     path.quadraticBezierTo(c.dx, c.dy, e.dx, e.dy);
-    
+
     canvas.drawPath(path, paint);
   }
 
@@ -161,10 +161,10 @@ class _WiredButtonState extends State<WiredButton> {
   Widget build(BuildContext context) {
     Color bgColor;
     // Default hover color if not provided
-    final defaultHoverColor = const Color(0xFFE8E0D0); 
-    
+    final defaultHoverColor = const Color(0xFFE8E0D0);
+
     if (widget.filled) {
-      bgColor = _isHovered 
+      bgColor = _isHovered
           ? (widget.backgroundColor?.withAlpha(220) ?? AppColors.primary.withAlpha(220))
           : (widget.backgroundColor ?? AppColors.primary);
     } else {
@@ -187,7 +187,7 @@ class _WiredButtonState extends State<WiredButton> {
             child: Container(
               padding: widget.padding,
               color: bgColor,
-              child: Center(child: widget.child),
+              child: widget.child,
             ),
           ),
         ),
@@ -202,7 +202,7 @@ class WiredDivider extends StatelessWidget {
   final double thickness;
 
   const WiredDivider({
-    super.key, 
+    super.key,
     this.color = AppColors.textSecondary,
     this.thickness = 1.5,
   });
@@ -223,7 +223,7 @@ class WiredDividerPainter extends CustomPainter {
   final Axis axis;
 
   WiredDividerPainter({
-    required this.color, 
+    required this.color,
     required this.thickness,
     this.seed = 42,
     this.axis = Axis.horizontal,
@@ -239,7 +239,7 @@ class WiredDividerPainter extends CustomPainter {
 
     final random = math.Random(seed);
     final path = Path();
-    
+
     if (axis == Axis.horizontal) {
       path.moveTo(0, size.height / 2);
       double x = 0;
@@ -303,7 +303,7 @@ class WiredShapeBorder extends OutlinedBorder {
       strokeWidth: width,
       seed: seed,
     );
-    
+
     canvas.save();
     canvas.translate(rect.left, rect.top);
     painter.paint(canvas, rect.size);

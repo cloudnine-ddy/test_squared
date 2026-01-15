@@ -305,7 +305,7 @@ class _UploadPaperViewState extends State<UploadPaperView> {
     required String paperType,
     String? markSchemeUrl,
   }) async {
-    const int batchSize = 6; // Increased from 4 to reduce fragmentation and improve accuracy
+    const int batchSize = 5; // Changed to 5 for better accuracy
     final supabase = Supabase.instance.client;
 
     // First batch to get total page count

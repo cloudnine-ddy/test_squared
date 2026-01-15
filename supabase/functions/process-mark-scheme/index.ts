@@ -6,9 +6,9 @@ import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1'
 // Supports both MCQ and Structured Papers.
 // Runs in background to prevent client timeouts.
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent'
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
 const MAX_RETRIES = 5
-const CONCURRENCY_LIMIT = 5 // Increased concurrency for speed (5 workers)
+const CONCURRENCY_LIMIT = 1 // Sequential processing to respect 10 RPM limit
 
 async function fetchWithRetry(url: string, options: RequestInit, retries = MAX_RETRIES): Promise<Response> {
   for (let i = 0; i < retries; i++) {
@@ -40,23 +40,24 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[Request] Starting Mark Scheme processing for ${paperId}`)
+    console.log(`[Request] Mark Scheme URL: ${markSchemeUrl}`)
 
-    // BACKGROUND PROCESSING
-    const processingPromise = (async () => {
-        try {
-            const supabase = createClient(
-                Deno.env.get('SUPABASE_URL') ?? '',
-                Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-            )
-            const apiKey = Deno.env.get('GEMINI_API_KEY')
-            if (!apiKey) throw new Error('GEMINI_API_KEY missing')
+    // SYNCHRONOUS PROCESSING (for debugging - see logs)
+    try {
+        const supabase = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
+        const apiKey = Deno.env.get('GEMINI_API_KEY')
+        if (!apiKey) throw new Error('GEMINI_API_KEY missing')
+        console.log('[Step 1] Credentials loaded')
 
             // 1. Fetch Questions (ALL types)
             const { data: questions, error: qError } = await supabase
                 .from('questions')
                 .select('id, question_number, structure_data, content, type, ai_answer, official_answer')
                 .eq('paper_id', paperId)
-            
+
             if (qError || !questions || !questions.length) {
                 console.log("No questions found, aborting background task.")
                 return
@@ -78,17 +79,24 @@ Deno.serve(async (req) => {
 
             // 3. Extract Answers with Gemini
             // Prompt optimized to handle BOTH MCQ and Structured formats
-            const prompt = `EXTRACT OFFICIAL ANSWERS.
+            const prompt = `EXTRACT OFFICIAL ANSWERS from this Cambridge IGCSE Mark Scheme.
+
 OUTPUT JSON:
-{ "answers": [ 
-  {"question_number": 1, "sub_part": "a", "official_answer": "cell A", "marks": 1},
-  {"question_number": 2, "official_answer": "B", "marks": 1} 
+{ "answers": [
+  {"question_number": 1, "sub_part": "(a)(i)", "official_answer": "Sun", "marks": 1},
+  {"question_number": 1, "sub_part": "(a)(ii)", "official_answer": "8", "marks": 2},
+  {"question_number": 1, "sub_part": "(b)(i)", "official_answer": "area at the same time", "marks": 1}
 ] }
+
 RULES:
-1. MCQ: Answer is letter (A,B,C,D).
-2. Structured: Answer is key marking points.
-3. Sub-parts: "a", "b(i)". If none, omit sub_part.
-4. Marks: Default 1 if unclear.`;
+1. question_number: The main question number (1, 2, 3...).
+2. sub_part: EXACT label from the Question column, e.g. "(a)(i)", "(a)(ii)", "(b)(i)", "(c)(iii)".
+   - Use the format shown in the mark scheme (parentheses style).
+   - For "1(a)(i)" extract sub_part as "(a)(i)".
+3. official_answer: Key marking points from the Answer column. Combine multiple points with semicolons.
+4. marks: Number from the Marks column.
+5. Extract ALL rows from the mark scheme table.
+6. For MCQ papers: Answer is just the letter (A, B, C, D).`;
 
             const geminiRes = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
                 method: 'POST',
@@ -113,13 +121,21 @@ RULES:
                 } catch(e2) { console.warn("MS Parse Failed", e2) }
             }
             console.log(`Extracted ${extractedAnswers.length} official answers.`)
+            // DEBUG: Log sample extracted answers
+            if (extractedAnswers.length > 0) {
+                console.log('Sample extracted answers:', JSON.stringify(extractedAnswers.slice(0, 3)));
+            } else {
+                console.log('WARNING: No answers extracted from mark scheme!');
+                console.log('Raw Gemini response (first 500 chars):', rawText.substring(0, 500));
+            }
 
             // 4. Build Work Queue
             const workQueue: any[] = []
-            
+
             for (const q of questions) {
                 // Filter answers for this question
                 const qAnswers = extractedAnswers.filter((a: any) => String(a.question_number) === String(q.question_number));
+                console.log(`Q${q.question_number}: Found ${qAnswers.length} MS answers, ${(q.structure_data || []).filter((b: any) => b.type === 'question_part').length} question_parts`);
 
                 if (q.type === 'mcq') {
                     // Start with exact match logic, but fall back to the first answer available if no specific subpart logic applies
@@ -145,7 +161,7 @@ RULES:
                     // Structured - Match Blocks
                     const blocks = (q.structure_data || []) as any[];
                     let qModified = false;
-                    
+
                     for (const block of blocks) {
                         if (block.type === 'question_part') {
                             const cleanBlockLabel = (block.label || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -159,7 +175,7 @@ RULES:
                                 block.official_answer = match.official_answer;
                                 block.marks = match.marks || block.marks;
                                 qModified = true;
-                                
+
                                 workQueue.push({
                                     type: 'structured',
                                     qId: q.id, // We group updates later? No, we update blocks in memory and push 'explanation' task
@@ -187,22 +203,22 @@ RULES:
                     const aiPrompt = task.type === 'mcq'
                         ? `Explain why "${task.official_answer}" is correct for: "${task.question_content}". 3 sentences max.`
                         : `Model answer for: "${task.question_content}". Points: "${task.official_answer}". 3 sentences max.`;
-                    
+
                     try {
                          const solRes = await fetchWithRetry(`${GEMINI_API_URL}?key=${apiKey}`, {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
                                 body: JSON.stringify({ contents: [{ parts: [{ text: aiPrompt }] }] })
                             }, 1);
-                         
+
                          if (solRes.ok) {
                              const solJson = await solRes.json();
                              const text = solJson.candidates?.[0]?.content?.parts?.[0]?.text;
-                             
+
                              if (task.type === 'mcq') {
                                  task.ai_solution = text; // Temporary storage
                              } else {
-                                 task.blockReference.ai_answer = text;
+                                 task.blockReference.ai_explanation = text; // Use separate field to preserve ai_answer
                              }
                          }
                     } catch (e) { /* Ignore */ }
@@ -214,7 +230,7 @@ RULES:
             // Group by Question again
              // For MCQ: update 'official_answer', 'marks', 'ai_answer'
              // For Structured: update 'structure_data'
-            
+
             // Re-iterate questions which now have mutated data or queued tasks completed
             for (const q of questions) {
                 if (q.type === 'mcq') {
@@ -248,17 +264,13 @@ RULES:
             console.log(`[Success] Updated ${updates.length} questions.`);
 
         } catch (err) {
-            console.error("[Background Error]", err)
+            console.error("[Processing Error]", err)
+            return new Response(JSON.stringify({ error: String(err), success: false }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
-    });
-
-    // Invoke Background Task
-    // @ts-ignore
-    EdgeRuntime.waitUntil(processingPromise)
 
     return new Response(JSON.stringify({
         success: true,
-        message: 'Mark scheme processing started in background',
+        message: 'Mark scheme processing completed',
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (error) {

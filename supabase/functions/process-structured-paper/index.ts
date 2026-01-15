@@ -5,7 +5,7 @@ import { PDFDocument } from 'https://esm.sh/pdf-lib@1.17.1'
 // Extracts multi-part questions, creates JSONB block structure, and detects/crops figures
 // Version 1.1: Added figure cropping integration
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent'
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent'
 const MAX_RETRIES = 3
 
 interface StructuredQuestionResponse {
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabaseKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim()
     const supabase = createClient(supabaseUrl, supabaseKey)
     const apiKey = Deno.env.get('GEMINI_API_KEY')
 
@@ -200,6 +200,7 @@ Deno.serve(async (req) => {
     // Gemini prompt with BBOX REQUEST and AI ANSWER GENERATION
     const prompt = `You are a ${subjectName} exam analyzer extracting STRUCTURED QUESTIONS from this specific batch of pages.
 CRITICAL: Process the exam paper sequentially. EXTRACT FIGURES and diagrams carefully.
+CRITICAL: Ensure all JSON strings are single-line. Escape newlines as \\n.
 
 OUTPUT FORMAT: Strict JSON Object containing a "questions" array.
 Each question object must represent the full question flow as an ordered list of "blocks".
@@ -220,7 +221,7 @@ BLOCK TYPES:
      * NEVER use just "(i)" or "(ii)" alone - ALWAYS prepend the parent part letter
    - "content": Question text.
    - "marks": Number of marks (MUST be > 0 for question_part).
-   - "ai_answer": GENERATE a concise, accurate answer based on the question and mark scheme if visible.
+   - "ai_answer": GENERATE a clear, comprehensive model answer in 2-3 sentences. Include key concepts and reasoning.
 
 CRITICAL RULE FOR 0-MARK PARTS:
 - If you see a part like "(b)" that is just introductory text with 0 marks (e.g., "A new species was introduced to an ecosystem."), treat it as a "text" block, NOT a "question_part".
@@ -256,7 +257,7 @@ RULES:
 6. Group all parts (a, b, i, ii) under their parent Question Number.
 7. CRITICAL: Keep JSON output valid and within token limits.
 8. SUMMARIZE long "text" blocks. Do not copy entire reading passages word-for-word if they exceed 50 words. Just give the gist.
-9. GENERATE ai_answers for ALL question_part blocks. Make them concise and accurate.
+9. GENERATE ai_answers for ALL question_part blocks. Each answer should be 2-3 sentences explaining the concept with reasoning. Be thorough but concise.
 10. CRITICAL: ONLY extract questions that are ACTUALLY PRESENT in these pages. Do NOT hallucinate or invent question numbers.
 11. If a question is split across pages (starts in this batch but continues beyond), still extract it with the parts visible in this batch.
 12. LABEL FORMAT: When you see "1 (a) (i)" in the paper, extract label as "(a)(i)". When you see "1 (b) (ii)", extract as "(b)(ii)". ALWAYS include parent context.
@@ -298,27 +299,91 @@ Extract ALL structured questions from this batch.`;
 
       // REPAIR STRATEGY:
       // 1. Double-escape backslashes that might be single
-      // 2. Escape unescaped newlines/tabs inside strings
+      // 2. Escape unescaped newlines/tabs inside strings using robust JSON string regex
 
-      let repaired = rawText;
+      // 3. Robust State Machine Repair for Unescaped Control Characters
+      let result = '';
+      let inString = false;
+      let isEscaped = false;
 
-      // Naive repair for unescaped newlines inside double quotes
-      // We assume strings don't contain \" yet for simplicity of this heuristic regex
-      repaired = repaired.replace(/(".*?")/gs, (match) => {
-          // Inside a string, replace literal line breaks with \n
-          return match.replace(/\r?\n/g, '\\n').replace(/\t/g, '\\t');
-      });
+      for (let i = 0; i < rawText.length; i++) {
+        const char = rawText[i];
+        const charCode = char.charCodeAt(0);
+
+        if (inString) {
+          if (isEscaped) {
+            // Previous char was backslash, so this char is escaped. Reset.
+            isEscaped = false;
+            result += char;
+          } else {
+            if (char === '\\') {
+              isEscaped = true;
+              result += char;
+            } else if (char === '"') {
+              inString = false;
+              result += char;
+            } else if (charCode < 32 || charCode === 127) {
+              // Escape ALL control characters (ASCII 0-31 and 127)
+              if (char === '\n') {
+                result += '\\n';
+              } else if (char === '\r') {
+                // Skip carriage returns
+              } else if (char === '\t') {
+                result += '\\t';
+              } else if (char === '\b') {
+                result += '\\b';
+              } else if (char === '\f') {
+                result += '\\f';
+              } else {
+                // Use unicode escape for other control chars
+                result += '\\u' + charCode.toString(16).padStart(4, '0');
+              }
+            } else {
+              result += char;
+            }
+          }
+        } else {
+          // Not in string
+          if (char === '"') {
+            inString = true;
+          }
+          result += char;
+        }
+      }
+      const repaired = result;
 
       try {
         parsedData = JSON.parse(repaired)
         console.log('JSON repair successful')
       } catch (e2) {
         console.error('Failed to parse Gemini response after repair:', e2)
-        // Check for truncation
-        if (rawText.length > 50000) {
-             console.error('Possible truncation detected (Output length: ' + rawText.length + ')');
+
+        // TRUNCATION REPAIR: Try to close truncated JSON
+        let truncRepair = repaired;
+        // If we ended inside a string, close it
+        if (inString) {
+          truncRepair += '"';
         }
-        return new Response(JSON.stringify({ error: 'Failed to parse AI response (Invalid JSON from model)', raw_length: rawText.length }), { status: 500, headers: corsHeaders })
+        // Count open brackets and close them
+        const openBraces = (truncRepair.match(/\{/g) || []).length;
+        const closeBraces = (truncRepair.match(/\}/g) || []).length;
+        const openBrackets = (truncRepair.match(/\[/g) || []).length;
+        const closeBrackets = (truncRepair.match(/\]/g) || []).length;
+
+        // Close arrays first, then objects
+        for (let i = 0; i < (openBrackets - closeBrackets); i++) truncRepair += ']';
+        for (let i = 0; i < (openBraces - closeBraces); i++) truncRepair += '}';
+
+        try {
+          parsedData = JSON.parse(truncRepair);
+          console.log('Truncation repair successful! Salvaged partial data.');
+        } catch (e3) {
+          console.error('Truncation repair also failed:', e3);
+          if (rawText.length > 50000) {
+            console.error('Possible truncation detected (Output length: ' + rawText.length + ')');
+          }
+          return new Response(JSON.stringify({ error: 'Failed to parse AI response (Invalid JSON from model)', raw_length: rawText.length }), { status: 500, headers: corsHeaders })
+        }
       }
     }
 

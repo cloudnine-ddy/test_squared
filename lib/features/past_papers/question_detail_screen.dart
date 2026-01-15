@@ -211,7 +211,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         if (folder == null) {
           return; // User cancelled
         }
-        
+
         await _bookmarkRepo.addBookmark(widget.questionId, folder: folder);
         setState(() {
           _isBookmarked = true;
@@ -227,7 +227,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       );
     }
   }
-  
+
   Future<String?> _showFolderSelectionDialog() async {
     final folders = await _bookmarkRepo.getFolders();
     final TextEditingController newFolderController = TextEditingController();
@@ -963,7 +963,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     return Scaffold(
       backgroundColor: _backgroundColor,
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
@@ -972,47 +972,169 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               width: 1.5,
             ),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            )
+          ],
         ),
-        height: 80,
         child: SafeArea(
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Previous Button
-              Expanded(
-                child: WiredButton(
-                  onPressed: _prevQuestionId == null ? () {} : () { // WiredButton doesn't support null callback for disable style automatically same way
-                     final uri = Uri(
-                       path: '/question/$_prevQuestionId',
-                       queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
-                     );
-                     context.pushReplacement(uri.toString());
-                  },
-                  backgroundColor: _prevQuestionId == null ? Colors.grey.shade100 : Colors.white,
-                  filled: true,
-                  borderColor: _prevQuestionId == null ? Colors.grey.shade300 : _primaryColor,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                       Icon(Icons.arrow_back_rounded, size: 22, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
-                       const SizedBox(width: 8),
-                       Text(
-                         'Previous',
-                         style: _patrickHand(
-                           fontSize: 18,
-                           color: _prevQuestionId == null ? Colors.grey : _primaryColor,
-                           fontWeight: FontWeight.bold,
-                        ),
-                       ),
-                    ],
+               // 1. Status Info (if applicable)
+               if (_isViewingPreviousAnswer || _answerSubmitted) ...[
+                  Builder(
+                    builder: (context) {
+                       final attemptedAt = _previousAttempt != null
+                            ? DateTime.parse(_previousAttempt!['attempted_at'])
+                            : DateTime.now();
+                       final timeAgo = _previousAttempt != null
+                            ? _formatTimeAgo(attemptedAt)
+                            : 'Just now';
+                       final score = _previousAttempt != null
+                            ? _previousAttempt!['score'] as int?
+                            : (_aiFeedback?['score'] as int?);
+
+                       return Padding(
+                         padding: const EdgeInsets.only(bottom: 12),
+                         child: Row(
+                           mainAxisAlignment: MainAxisAlignment.center,
+                           children: [
+                             Icon(
+                               _isViewingPreviousAnswer ? Icons.history : Icons.check_circle,
+                               size: 16,
+                               color: _isViewingPreviousAnswer ? Colors.blue : Colors.green
+                             ),
+                             const SizedBox(width: 8),
+                             Text(
+                               '${_isViewingPreviousAnswer ? "Previous Attempt" : "Saved"} • $timeAgo${score != null ? " • Score: $score%" : ""}',
+                               style: _patrickHand(
+                                 color: Colors.grey.shade700,
+                                 fontWeight: FontWeight.bold,
+                                 fontSize: 14
+                               ),
+                             ),
+                           ],
+                         ),
+                       );
+                    }
                   ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Next Button
-              Expanded(
-                child: Directionality(
-                  textDirection: TextDirection.rtl, // To put icon on right
-                  child: WiredButton(
+               ],
+
+              // 2. Navigation Buttons
+              Row(
+                children: [
+                  // Previous Button (Compact)
+                  WiredButton(
+                    onPressed: _prevQuestionId == null ? () {} : () {
+                       final uri = Uri(
+                         path: '/question/$_prevQuestionId',
+                         queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
+                       );
+                       context.pushReplacement(uri.toString());
+                    },
+                    backgroundColor: _prevQuestionId == null ? Colors.grey.shade100 : Colors.white,
+                    filled: true,
+                    borderColor: _prevQuestionId == null ? Colors.grey.shade300 : _primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    child: Icon(Icons.arrow_back_rounded, size: 20, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Middle Action Button (Submit/Retry/Check)
+                  Expanded(
+                    child: Builder(
+                      builder: (context) {
+                        bool enabled = true;
+                        String label = 'Submit';
+                        Color color = Colors.blue;
+                        VoidCallback? onPressed;
+
+                        if (_answerSubmitted) {
+                           label = 'Retry';
+                           color = Colors.orange;
+                           onPressed = _retryQuestion;
+                        } else if (_isCheckingAnswer) {
+                           label = 'Checking...';
+                           color = Colors.blue;
+                           enabled = false;
+                           onPressed = null;
+                        } else {
+                           if (_question!.isMCQ) {
+                             enabled = _selectedMcqAnswer != null;
+                             onPressed = enabled ? _checkMcqAnswer : null;
+                           } else if (_question!.isStructured) {
+                             // Simplify: always enable logic, let check handle validation
+                             onPressed = _checkStructuredAnswer;
+                           } else {
+                             enabled = _studentAnswerController.text.trim().isNotEmpty;
+                             onPressed = enabled ? _checkAnswer : null;
+                           }
+                        }
+
+                        // Only show on 'Your Answer' tab (index 0)
+                        if (_tabController.index != 0) {
+                          // Maybe show "Back to Question"? Or just disabled?
+                          // Let's show "View Question" to jump back to tab 0
+                          return Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 250),
+                              child: WiredButton(
+                                onPressed: () => _tabController.animateTo(0),
+                                backgroundColor: Colors.white,
+                                filled: true,
+                                borderColor: _primaryColor,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                 child: Center(
+                                    child: Text(
+                                      'Answer Question',
+                                      style: _patrickHand(color: _primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                 ),
+                              ),
+                            ),
+                          );
+                        }
+
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 300),
+                            child: WiredButton(
+                              onPressed: onPressed,
+                              backgroundColor: enabled ? color : Colors.grey.shade200,
+                              filled: true,
+                              borderColor: enabled ? color : Colors.grey.shade300,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isCheckingAnswer)
+                                    const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  else
+                                    Text(
+                                      label,
+                                      style: _patrickHand(
+                                        color: enabled ? Colors.white : Colors.grey,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  // Next Button (Compact)
+                  WiredButton(
                     onPressed: _nextQuestionId == null
                         ? () {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1024,36 +1146,23 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             );
                           }
                         : () {
-                           final uri = Uri(
-                             path: '/question/$_nextQuestionId',
-                             queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
-                           );
-                           context.pushReplacement(uri.toString());
+                            final uri = Uri(
+                              path: '/question/$_nextQuestionId',
+                              queryParameters: widget.topicId != null ? {'topicId': widget.topicId} : null,
+                            );
+                            context.pushReplacement(uri.toString());
                         },
-                    backgroundColor: _nextQuestionId == null ? Colors.white : _primaryColor,
+                    backgroundColor: _nextQuestionId == null ? Colors.white : Colors.white,
                     filled: true,
-                    borderColor: _primaryColor,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _nextQuestionId == null ? Icons.check_circle_outline : Icons.arrow_back_rounded, // RTL flips this
-                          size: 22,
-                          color: _nextQuestionId == null ? _primaryColor : Colors.white
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _nextQuestionId == null ? 'Completed' : 'Next',
-                          style: _patrickHand(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: _nextQuestionId == null ? _primaryColor : Colors.white
-                          ),
-                        ),
-                      ],
+                    borderColor: _nextQuestionId == null ? _primaryColor : _primaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    child: Icon(
+                      _nextQuestionId == null ? Icons.check : Icons.arrow_forward_rounded,
+                      size: 20,
+                      color: _primaryColor
                     ),
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -1129,6 +1238,37 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     ),
                   ),
                 ),
+                title: _question != null ? Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _primaryColor,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Q${_question!.questionNumber}',
+                        style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                    if (_question!.hasPaperInfo) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 4, height: 4,
+                        decoration: BoxDecoration(color: _primaryColor.withValues(alpha: 0.4), shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _question!.paperLabel,
+                          style: _patrickHand(color: _primaryColor.withValues(alpha: 0.6), fontSize: 14),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ]
+                  ],
+                ) : null,
+                centerTitle: false,
                 actions: [
                   // Note button
                   Stack(
@@ -1167,11 +1307,6 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     ],
                   ),
                   const SizedBox(width: 12),
-                  // Bookmark button - Assuming BookmarkButton handles its own style or is generic enough.
-                  // If BookmarkButton needs update, we might need a wrapper or it might look okay.
-                  // For now keeping it as is or wrapping in a container if needed.
-                  // Actually, better to wrap it in a pseudo-wired style if it's just an icon button internal.
-                  // Let's assume BookmarkButton is robust enough or just leave it for now.
                   // Bookmark button
                   Container(
                     width: 44,
@@ -1221,57 +1356,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ],
               ),
 
-              // Question Header Card
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: WiredCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Question number badge
-                        Row(
-                          children: [
-                            WiredCard(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                              backgroundColor: _primaryColor,
-                              borderColor: _primaryColor,
-                              child: Text(
-                                'Question ${_question!.questionNumber}',
-                                style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            const Spacer(),
-                            if (_question!.hasPaperInfo)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Text(
-                                  _question!.paperLabel,
-                                  style: _patrickHand(
-                                    color: _primaryColor.withValues(alpha: 0.6),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0), // Add padding around text
-                          child: FormattedQuestionText(
-                            content: _question!.content,
-                            fontSize: 18,
-                            textColor: _primaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              // Question Header Card REMOVED (Moved to AppBar)
 
               // Figure Card
-              if (_question!.hasFigure || (_question!.pdfUrl != null && _question!.aiAnswerRaw?['figure_location'] != null))
+              if ((_question!.hasFigure || (_question!.pdfUrl != null && _question!.aiAnswerRaw?['figure_location'] != null)) && !_question!.isStructured)
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -1343,10 +1431,6 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      // Attempt Status Badge (show if viewing previous answer OR just submitted)
-                      if (_previousAttempt != null || _answerSubmitted)
-                        _buildAttemptStatusBadge(),
-
                       // Main tabbed card
                       _buildTabbedCard(),
                     ],
@@ -1384,8 +1468,20 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Widget _buildTabbedCard() {
-    return WiredCard(
-      height: 600, // Fixed height for tab view
+    // Dynamic height based on screen size to avoid overflows and maximize space
+    final double cardHeight = MediaQuery.of(context).size.height * 0.75;
+
+    // Check for structured figures
+    List<FigureBlock> figures = [];
+    if (_question!.isStructured && _question!.structureData != null) {
+      figures = _question!.structureData!
+          .whereType<FigureBlock>()
+          .toList();
+    }
+
+    // Base card content (Tabs + View)
+    final tabbedContent = WiredCard(
+      height: null, // Let parent Expanded handle height
       child: Column(
         children: [
             const SizedBox(height: 5), // Small gap between border and tabs
@@ -1421,6 +1517,31 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 _buildAiSolutionTab(),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+
+    // If no figures, return just the card
+    if (figures.isEmpty) {
+      return SizedBox(
+        height: cardHeight,
+        child: tabbedContent,
+      );
+    }
+
+    // 4. Return Column Layout (Push logic instead of Stack logic)
+    return SizedBox(
+      height: cardHeight,
+      child: Column(
+        children: [
+          // Top: Sticky Figures (if any)
+          if (figures.isNotEmpty)
+            CollapsibleFiguresPanel(figures: figures),
+
+          // Bottom: The Tabs and Content (Takes remaining space)
+          Expanded(
+            child: tabbedContent,
           ),
         ],
       ),
@@ -1470,9 +1591,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     required bool isExpanded,
     required String tabType, // 'answer', 'official', or 'ai'
   }) {
-    final hasAnswer = _structuredAnswers[part.label] != null && 
+    final hasAnswer = _structuredAnswers[part.label] != null &&
                      (_structuredAnswers[part.label] as String?)?.isNotEmpty == true;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: WiredCard(
@@ -1565,7 +1686,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ),
               ),
             ),
-            
+
             // Expandable content
             if (isExpanded) ...[
               Container(
@@ -1624,7 +1745,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ],
         );
-      
+
       case 'official':
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1680,7 +1801,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ],
         );
-      
+
       case 'ai':
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1741,15 +1862,75 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
           ],
         );
-      
+
       default:
         return const SizedBox.shrink();
     }
   }
 
   Widget _buildAnswerTab() {
-    final isPremium = ref.watch(isPremiumProvider); // Check premium status
+    final isPremium = ref.watch(isPremiumProvider);
 
+    // For structured questions, we use the SmartQuestionRenderer with Sticky Headers
+    if (_question!.isStructured && _question!.structureData != null) {
+      return Column(
+        children: [
+          // Score badge (if feedback available)
+          if (_aiFeedback != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 120), // Prevent unbounded expansion
+                child: WiredCard(
+                  backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : Colors.orange.withValues(alpha: 0.1),
+                  borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min, // Ensure it tries to be minimal
+                    children: [
+                      Icon(
+                        (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle : Icons.info_outline,
+                        color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Score: ${_aiFeedback!['score']}%',
+                          style: _patrickHand(
+                            color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // The Sticky Renderer takes up the remaining space
+          Expanded(
+            child: SmartQuestionRenderer(
+              blocks: _question!.structureData!,
+              onAnswersChanged: (answers) {
+                 _structuredAnswers = answers;
+              },
+              isSubmitted: _answerSubmitted,
+              savedAnswers: _structuredAnswers,
+              perPartFeedback: _aiFeedback?['perPartResults'],
+              showSolutions: false,
+            ),
+          ),
+
+        ],
+      );
+    }
+
+    // Default view for MCQ and Unstructured
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1757,33 +1938,45 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         children: [
           // Score badge if submitted
           if (_aiFeedback != null) ...[
-            WiredCard(
-              backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
-                  ? Colors.green.withValues(alpha: 0.1)
-                  : Colors.orange.withValues(alpha: 0.1),
-              borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
-              child: Row(
-                children: [
-                  Icon(
-                    (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle : Icons.info_outline,
-                    color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Score: ${_aiFeedback!['score']}%',
-                      style: _patrickHand(
-                        color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 120),
+              child: WiredCard(
+                backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : Colors.orange.withValues(alpha: 0.1),
+                borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle : Icons.info_outline,
+                      color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Score: ${_aiFeedback!['score']}%',
+                        style: _patrickHand(
+                          color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.orange,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
                       ),
                     ),
-                  ),
-                  // Removed top Retry button as per request
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
+          ],
+
+          // Question Content (Restoring missing text)
+          if (_question!.content.isNotEmpty) ...[
+             Text(
+               _question!.content,
+               style: _patrickHand(fontSize: 20, height: 1.5, color: AppColors.textPrimary),
+             ),
+             const SizedBox(height: 24),
           ],
 
           // MCQ Options or Text Input
@@ -1803,7 +1996,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               if (isWrong) borderColor = Colors.red;
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12), // Reduced to 12
+                padding: const EdgeInsets.only(bottom: 12),
                 child: GestureDetector(
                   onTap: _answerSubmitted ? null : () {
                      setState(() {
@@ -1814,12 +2007,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     borderColor: isSelected ? borderColor : _primaryColor.withValues(alpha: 0.3),
                     backgroundColor: isSelected ? Colors.blue.withValues(alpha: 0.05) : Colors.white,
                     borderWidth: isSelected ? 2.5 : 1.5,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Tighter padding
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       children: [
                         // Option Label (A, B, C...)
                         Container(
-                          width: 38, // Reduced to 38
+                          width: 38,
                           height: 38,
                           decoration: BoxDecoration(
                             color: isSelected ? borderColor.withValues(alpha: 0.1) : Colors.transparent,
@@ -1839,7 +2032,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                         style: _patrickHand(
                                           color: isSelected ? Colors.blue : _primaryColor,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 17, // Reduced to 17
+                                          fontSize: 17,
                                         ),
                                       ),
                           ),
@@ -1862,115 +2055,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               );
             })),
             const SizedBox(height: 16),
-            // Check MCQ button + Retry
-            Row(
-              children: [
-                Expanded(
-                  child: WiredButton(
-                  onPressed: (_answerSubmitted || _selectedMcqAnswer == null) ? null : _checkMcqAnswer,
-                  backgroundColor: (_answerSubmitted || _selectedMcqAnswer == null) ? Colors.grey.shade200 : Colors.blue,
-                  filled: true,
-                  borderColor: (_answerSubmitted || _selectedMcqAnswer == null) ? Colors.grey.shade400 : Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14), // Reduced button padding
-                  child: Center(
-                      child: Text(
-                      _answerSubmitted ? 'Submitted ✓' : 'Submit Answer',
-                      style: _patrickHand(
-                          color: (_answerSubmitted || _selectedMcqAnswer == null) ? Colors.grey : Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_answerSubmitted) ...[
-                  const SizedBox(width: 12),
-                  WiredButton(
-                     onPressed: () {
-                      setState(() {
-                        _answerSubmitted = false;
-                        _selectedMcqAnswer = null;
-                      });
-                    },
-                    backgroundColor: Colors.orange,
-                    filled: true,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), // Consistent reduced padding
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                         const Icon(Icons.refresh, size: 18, color: Colors.white),
-                         const SizedBox(width: 6),
-                         Text('Retry', style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ] else if (_question!.isStructured && _question!.structureData != null) ...[
-            // Structured question with accordion-style expandable parts
-            ...(_question!.structureData!.whereType<QuestionPartBlock>().toList().asMap().entries.map((entry) {
-              final index = entry.key;
-              final part = entry.value;
-              final isExpanded = _expandedPartIndices.contains(index);
-              
-              return _buildExpandablePartCard(
-                index: index,
-                part: part,
-                isExpanded: isExpanded,
-                tabType: 'answer',
-              );
-            })),
-            const SizedBox(height: 16),
-            // Submit button for structured questions
-            SizedBox(
-              width: double.infinity,
-              child: WiredButton(
-                onPressed: (_answerSubmitted || _structuredAnswers.isEmpty || _isCheckingAnswer)
-                    ? null
-                    : _checkStructuredAnswer,
-                backgroundColor: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey.shade300 : Colors.blue,
-                filled: true,
-                borderColor: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey.shade400 : Colors.blue,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Center(
-                    child: _isCheckingAnswer
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Grading...',
-                                style: _patrickHand(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            _answerSubmitted ? 'Submitted ✓' : 'Check Answer',
-                            style: _patrickHand(
-                              color: (_answerSubmitted || _structuredAnswers.isEmpty) ? Colors.grey : Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ),
+            // MCQ Action Buttons REMOVED (Moved to BottomNavBar)
           ] else ...[
             // Text input for written questions
             WiredCard(
@@ -1992,30 +2077,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ),
             const SizedBox(height: 16),
             // Check button for written
-            SizedBox(
-              width: double.infinity,
-              child: WiredButton(
-                onPressed: (_answerSubmitted || _isCheckingAnswer) ? null : _checkAnswer,
-                backgroundColor: (_answerSubmitted || _isCheckingAnswer) ? Colors.grey.shade300 : Colors.blue,
-                filled: true,
-                borderColor: (_answerSubmitted || _isCheckingAnswer) ? Colors.grey.shade400 : Colors.blue,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Center(
-                    child: _isCheckingAnswer
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(
-                            _answerSubmitted ? 'Answer Checked ✓' : 'Check My Answer',
-                            style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                  ),
-                ),
-              ),
-            ),
+            // Written Check Button REMOVED (Moved to BottomNavBar)
           ],
 
           // Feedback
@@ -2256,7 +2318,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               final index = entry.key;
               final part = entry.value;
               final isExpanded = _expandedPartIndices.contains(index);
-              
+
               return _buildExpandablePartCard(
                 index: index,
                 part: part,
@@ -2451,7 +2513,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               final index = entry.key;
               final part = entry.value;
               final isExpanded = _expandedPartIndices.contains(index);
-              
+
               return _buildExpandablePartCard(
                 index: index,
                 part: part,
