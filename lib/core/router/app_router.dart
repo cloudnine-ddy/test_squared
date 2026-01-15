@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../features/landing/landing_page.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/auth/forgot_password_page.dart';
 import '../../features/auth/reset_password_page.dart';
 import '../../features/dashboard/dashboard_screen.dart';
+import '../../features/dashboard/dashboard_shell.dart';
 import '../../features/past_papers/topic_detail_screen.dart';
 import '../../features/past_papers/question_detail_screen.dart';
 import '../../features/past_papers/question_detail_screen_with_chat.dart';
@@ -26,13 +28,50 @@ import '../../main.dart' show isPasswordRecoverySession;
 final goRouter = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
-    // If this is a password recovery session, redirect to reset-password page
-    if (isPasswordRecoverySession && state.matchedLocation != '/reset-password') {
+    final supabase = Supabase.instance.client;
+    final user = supabase.auth.currentUser;
+    final isLoggedIn = user != null;
+    final path = state.matchedLocation;
+
+    // 1. Password Recovery logic
+    if (isPasswordRecoverySession && path != '/reset-password') {
       return '/reset-password';
     }
+
+    // 2. Auth Redirects
+    // If logged in, don't allow access to landing/login/signup (redirect to dashboard)
+    if (isLoggedIn && (path == '/' || path == '/login' || path == '/signup')) {
+      return '/dashboard';
+    }
+
+    // If NOT logged in, don't allow access to protected routes
+    final protectedRoutes = [
+      '/dashboard', 
+      '/premium', 
+      '/checkout', 
+      '/progress', 
+      '/bookmarks', 
+      '/search',
+      '/topic',
+      '/question',
+      '/paper'
+    ];
+    
+    if (!isLoggedIn) {
+      bool isProtected = false;
+      for (var route in protectedRoutes) {
+        if (path.startsWith(route)) {
+          isProtected = true;
+          break;
+        }
+      }
+      if (isProtected) return '/login';
+    }
+
     return null;
   },
   routes: [
+    // Public Routes
     GoRoute(
       path: '/',
       builder: (context, state) => const LandingPage(),
@@ -54,16 +93,59 @@ final goRouter = GoRouter(
       builder: (context, state) => const ResetPasswordPage(),
     ),
     GoRoute(
-      path: '/dashboard',
-      builder: (context, state) => const DashboardScreen(),
+      path: '/vending',
+      builder: (context, state) => const VendingPage(),
+    ),
+
+    // Dashboard Shell (Protected Routes)
+    ShellRoute(
+      builder: (context, state, child) => DashboardShell(child: child),
+      routes: [
+        GoRoute(
+          path: '/dashboard',
+          builder: (context, state) {
+            final subjectId = state.uri.queryParameters['subjectId'];
+            final subjectName = state.uri.queryParameters['subjectName'];
+            return DashboardScreen(
+              initialSubjectId: subjectId,
+              initialSubjectName: subjectName,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/premium',
+          builder: (context, state) => const PremiumPage(),
+        ),
+        GoRoute(
+          path: '/checkout/:planType',
+          builder: (context, state) {
+            final planType = state.pathParameters['planType'] ?? 'pro';
+            return CheckoutPage(planType: planType);
+          },
+        ),
+        GoRoute(
+          path: '/progress',
+          builder: (context, state) => const ProgressDashboardScreen(),
+        ),
+        GoRoute(
+          path: '/bookmarks',
+          builder: (context, state) => const BookmarksScreen(),
+        ),
+        GoRoute(
+          path: '/search',
+          builder: (context, state) => const SearchScreen(),
+        ),
+      ],
+    ),
+
+    // Non-Shell Protected Routes (e.g. Admin, Details)
+    GoRoute(
+      path: '/admin',
+      builder: (context, state) => const AdminShell(),
     ),
     GoRoute(
       path: '/dashboard-preview',
       builder: (context, state) => const DashboardScreen(previewMode: true),
-    ),
-    GoRoute(
-      path: '/admin',
-      builder: (context, state) => const AdminShell(),
     ),
     GoRoute(
       path: '/topic/:topicId',
@@ -91,29 +173,6 @@ final goRouter = GoRouter(
       },
     ),
     GoRoute(
-      path: '/progress',
-      builder: (context, state) => const ProgressDashboardScreen(),
-    ),
-    GoRoute(
-      path: '/bookmarks',
-      builder: (context, state) => const BookmarksScreen(),
-    ),
-    GoRoute(
-      path: '/search',
-      builder: (context, state) => const SearchScreen(),
-    ),
-    GoRoute(
-      path: '/premium',
-      builder: (context, state) => const PremiumPage(),
-    ),
-    GoRoute(
-      path: '/checkout/:planType',
-      builder: (context, state) {
-        final planType = state.pathParameters['planType'] ?? 'pro';
-        return CheckoutPage(planType: planType);
-      },
-    ),
-    GoRoute(
       path: '/papers/year/:year/subject/:subjectId',
       builder: (context, state) {
         final year = int.parse(state.pathParameters['year']!);
@@ -138,10 +197,6 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/settings/accessibility',
       builder: (context, state) => const AccessibilitySettingsScreen(),
-    ),
-    GoRoute(
-      path: '/vending',
-      builder: (context, state) => const VendingPage(),
     ),
   ],
 );
