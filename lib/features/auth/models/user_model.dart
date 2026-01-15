@@ -8,6 +8,7 @@ class UserModel {
   final DateTime? premiumUntil;
   final DateTime? createdAt;
   final int freeChecksRemaining;
+  final String? paymentReceiptUrl;
 
   const UserModel({
     required this.id,
@@ -18,6 +19,7 @@ class UserModel {
     this.premiumUntil,
     this.createdAt,
     this.freeChecksRemaining = 5,
+    this.paymentReceiptUrl,
   });
 
   /// Check if user has active premium access
@@ -96,6 +98,7 @@ class UserModel {
           ? DateTime.parse(json['created_at'] as String)
           : null,
       freeChecksRemaining: json['free_checks_remaining'] as int? ?? 5,
+      paymentReceiptUrl: json['payment_receipt_url'] as String?,
     );
   }
 
@@ -108,6 +111,7 @@ class UserModel {
       'premium_until': premiumUntil?.toIso8601String(),
       'created_at': createdAt?.toIso8601String(),
       'free_checks_remaining': freeChecksRemaining,
+      'payment_receipt_url': paymentReceiptUrl,
     };
   }
 
@@ -128,6 +132,7 @@ class UserModel {
       premiumUntil: premiumUntil ?? this.premiumUntil,
       createdAt: createdAt ?? this.createdAt,
       freeChecksRemaining: freeChecksRemaining ?? this.freeChecksRemaining,
+      paymentReceiptUrl: paymentReceiptUrl ?? this.paymentReceiptUrl,
     );
   }
 }

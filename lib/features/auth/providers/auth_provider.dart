@@ -25,7 +25,7 @@ final currentUserProvider = FutureProvider<UserModel?>((ref) async {
     final supabase = ref.watch(supabaseClientProvider);
     final response = await supabase
         .from('profiles')
-        .select('id, email, role, subscription_tier, premium_until, created_at, free_checks_remaining')
+        .select('id, email, role, subscription_tier, premium_until, created_at, free_checks_remaining, payment_receipt_url')
         .eq('id', authState.id)
         .maybeSingle();
 
