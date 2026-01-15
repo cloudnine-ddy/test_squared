@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../shared/wired/wired_widgets.dart';
 import 'widgets/ai_chat_panel.dart';
 import 'question_detail_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wrapper that adds split-screen layout with AI chat to question detail
 class QuestionDetailScreenWithChat extends ConsumerStatefulWidget {
@@ -28,6 +29,42 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
   static const double _minLeftRatio = 0.3;
   static const double _maxLeftRatio = 0.8;
   static const double _dividerWidth = 8.0;
+  static const String _ratioPrefKey = 'question_split_ratio';
+  static const String _chatVisiblePrefKey = 'chat_visible_state';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLayoutSettings();
+  }
+
+  Future<void> _loadLayoutSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    
+    final savedRatio = prefs.getDouble(_ratioPrefKey);
+    final savedChatVisible = prefs.getBool(_chatVisiblePrefKey);
+
+    if (mounted) {
+      setState(() {
+        if (savedRatio != null) {
+          _splitRatio = savedRatio.clamp(_minLeftRatio, _maxLeftRatio);
+        }
+        if (savedChatVisible != null) {
+          _showChat = savedChatVisible;
+        }
+      });
+    }
+  }
+
+  Future<void> _saveSplitRatio(double ratio) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_ratioPrefKey, ratio);
+  }
+
+  Future<void> _saveChatVisibility(bool visible) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_chatVisiblePrefKey, visible);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +119,7 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
                         _splitRatio = newRatio.clamp(_minLeftRatio, _maxLeftRatio);
                       });
                     },
+                    onHorizontalDragEnd: (_) => _saveSplitRatio(_splitRatio),
                     child: Container(
                       width: _dividerWidth,
                       color: const Color(0xFFFDFBF7),
@@ -130,7 +168,10 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
                                   child: AIChatPanel(
                                     questionId: widget.questionId,
                                     isPremium: isPremium,
-                                    onClose: () => setState(() => _showChat = false),
+                                    onClose: () {
+                                      setState(() => _showChat = false);
+                                      _saveChatVisibility(false);
+                                    },
                                   ),
                                 ),
                              ],
@@ -149,7 +190,10 @@ class _QuestionDetailScreenWithChatState extends ConsumerState<QuestionDetailScr
               padding: const EdgeInsets.only(bottom: 90, right: 16),
               child: UnconstrainedBox( // Force natural size
                 child: WiredButton(
-                  onPressed: () => setState(() => _showChat = true),
+                  onPressed: () {
+                    setState(() => _showChat = true);
+                    _saveChatVisibility(true);
+                  },
                   backgroundColor: const Color(0xFF2D3E50),
                   filled: true,
                   borderColor: const Color(0xFF2D3E50),

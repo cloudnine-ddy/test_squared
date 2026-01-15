@@ -527,6 +527,7 @@ class _TopicDetailScreenState extends State<TopicDetailScreen> with SingleTicker
             paperName: paperName,
             latestAttempt: latestAttempt,
             topicId: widget.topicId,
+            onReturn: _loadQuestions, // Refresh when returning from detail
           );
         } else {
           return QuestionCard(

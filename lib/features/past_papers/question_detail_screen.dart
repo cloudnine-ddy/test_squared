@@ -94,6 +94,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     FontWeight fontWeight = FontWeight.normal,
     Color? color,
     double? height,
+    double? letterSpacing,
   }) {
     return TextStyle(
       fontFamily: 'PatrickHand',
@@ -101,6 +102,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       fontWeight: fontWeight,
       color: color ?? _primaryColor,
       height: height,
+      letterSpacing: letterSpacing,
     );
   }
 
@@ -425,11 +427,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       final attempt = await _progressRepo.getLastAttempt(userId, widget.questionId);
 
       if (attempt != null && mounted) {
+        // For structured questions: load answers but don't show feedback/lock form
+        // (allows user to see their previous answers but still retry freely)
+        final isStructured = _question?.isStructured == true;
+        
         setState(() {
           _previousAttempt = attempt.toMap();
-          _isViewingPreviousAnswer = true;
-
-          // Pre-fill the answer for regular questions
+          
+          // Pre-fill the answer for all question types
           if (attempt.answerText != null) {
             // Check if it's structured answer (JSON format)
             try {
@@ -458,11 +463,24 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             _selectedMcqAnswer = attempt.selectedOption;
           }
 
-          // Show the feedback automatically
+          // For structured questions: only load answers, don't show feedback or lock form
+          if (isStructured) {
+            // Don't set feedback or answerSubmitted - user can freely retry
+            _isViewingPreviousAnswer = false;
+            return;
+          }
+          
+          // For MCQ/regular questions: show feedback and lock form
+          _isViewingPreviousAnswer = true;
+          
+          // Show the feedback automatically based on previous attempt result
           _aiFeedback = {
             'score': attempt.score,
-            'is_correct': attempt.isCorrect,
-            'feedback': 'Previously submitted answer',
+            'isCorrect': attempt.isCorrect,  // For UI display (green/red)
+            'is_correct': attempt.isCorrect, // For repository compatibility
+            'feedback': attempt.isCorrect == true
+                ? 'Previously answered correctly'
+                : 'Previously submitted answer',
             'strengths': [],
             'improvements': [],
             'hints': [],
@@ -653,11 +671,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         'score': isCorrect ? 100 : 0,
         'feedback': isCorrect
             ? 'Correct! Well done.'
-            : 'Incorrect. The correct answer is ${_question!.effectiveCorrectAnswer}.',
+            : 'Incorrect. Try again!',  // Don't reveal the answer - allow retry
         'strengths': isCorrect ? ['Selected the correct option'] : [],
         'hints': [],
         'improvements': [],
       };
+      // Lock options after submission (user must click Try Again to retry)
       _answerSubmitted = true;
     });
 
@@ -857,50 +876,76 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   void _showFullFigure() {
-    if (_question?.imageUrl == null) return;
+    final hasImageUrl = _question!.imageUrl != null && _question!.imageUrl!.isNotEmpty;
+    final pdfUrl = _question!.pdfUrl;
+    final loc = _question!.aiAnswerRaw?['figure_location'];
+    final hasPdfInfo = pdfUrl != null && loc != null;
+
+    if (!hasImageUrl && !hasPdfInfo) return;
 
     showDialog(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.8), // Darker backdrop for focus
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Stack(
+          alignment: Alignment.center,
           children: [
-            // Image with zoom
-            Container(
-              width: double.infinity,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.8,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
+            // Sketchy Card Container
+            WiredCard(
+              backgroundColor: Colors.white,
+              borderColor: _primaryColor,
+              borderWidth: 2,
+              padding: const EdgeInsets.all(12), // Frame thickness
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(4),
                 child: InteractiveViewer(
                   minScale: 0.5,
-                  maxScale: 4.0,
-                  child: Image.network(
-                    _question!.imageUrl!,
-                    fit: BoxFit.contain,
+                  maxScale: 5.0,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.75,
+                      minHeight: 200,
+                    ),
+                    child: hasImageUrl
+                        ? Image.network(
+                            _question!.imageUrl!,
+                            fit: BoxFit.contain,
+                          )
+                        : PdfCropViewer(
+                            pdfUrl: pdfUrl!,
+                            pageNumber: loc['page'] ?? 1,
+                            x: (loc['x_percent'] ?? 0).toDouble(),
+                            y: (loc['y_percent'] ?? 0).toDouble(),
+                            width: (loc['width_percent'] ?? 100).toDouble(),
+                            height: (loc['height_percent'] ?? 100).toDouble(),
+                          ),
                   ),
                 ),
               ),
             ),
-            // Close button
+            
+            // Sketchy Close Button (Top Right)
             Positioned(
-              top: 8,
-              right: 8,
+              top: 0,
+              right: 0,
               child: GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                  padding: const EdgeInsets.all(8),
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.red.shade400,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(2, 2)),
+                    ],
                   ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 20),
+                  child: const Center(
+                    child: Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                  ),
                 ),
               ),
             ),
@@ -963,7 +1008,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     return Scaffold(
       backgroundColor: _backgroundColor,
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced from 12
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(
@@ -998,29 +1043,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             ? _previousAttempt!['score'] as int?
                             : (_aiFeedback?['score'] as int?);
 
-                       return Padding(
-                         padding: const EdgeInsets.only(bottom: 12),
-                         child: Row(
-                           mainAxisAlignment: MainAxisAlignment.center,
-                           children: [
-                             Icon(
-                               _isViewingPreviousAnswer ? Icons.history : Icons.check_circle,
-                               size: 16,
-                               color: _isViewingPreviousAnswer ? Colors.blue : Colors.green
-                             ),
-                             const SizedBox(width: 8),
-                             Text(
-                               '${_isViewingPreviousAnswer ? "Previous Attempt" : "Saved"} • $timeAgo${score != null ? " • Score: $score%" : ""}',
-                               style: _patrickHand(
-                                 color: Colors.grey.shade700,
-                                 fontWeight: FontWeight.bold,
-                                 fontSize: 14
-                               ),
-                             ),
-                           ],
-                         ),
-                       );
-                    }
+                       return const SizedBox.shrink(); 
+                     }
                   ),
                ],
 
@@ -1039,7 +1063,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     backgroundColor: _prevQuestionId == null ? Colors.grey.shade100 : Colors.white,
                     filled: true,
                     borderColor: _prevQuestionId == null ? Colors.grey.shade300 : _primaryColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Reduced from 12
                     child: Icon(Icons.arrow_back_rounded, size: 20, color: _prevQuestionId == null ? Colors.grey : _primaryColor),
                   ),
                   const SizedBox(width: 12),
@@ -1054,7 +1078,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         VoidCallback? onPressed;
 
                         if (_answerSubmitted) {
-                           label = 'Retry';
+                           // MCQ incorrect: show 'Try Again'; MCQ correct or others: show 'Retry'
+                           if (_question!.isMCQ && _aiFeedback != null && !(_aiFeedback!['isCorrect'] ?? false)) {
+                             label = 'Try Again';
+                           } else {
+                             label = 'Retry';
+                           }
                            color = Colors.orange;
                            onPressed = _retryQuestion;
                         } else if (_isCheckingAnswer) {
@@ -1067,13 +1096,13 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                              enabled = _selectedMcqAnswer != null;
                              onPressed = enabled ? _checkMcqAnswer : null;
                            } else if (_question!.isStructured) {
-                             // Simplify: always enable logic, let check handle validation
                              onPressed = _checkStructuredAnswer;
                            } else {
                              enabled = _studentAnswerController.text.trim().isNotEmpty;
                              onPressed = enabled ? _checkAnswer : null;
                            }
                         }
+
 
                         // Only show on 'Your Answer' tab (index 0)
                         if (_tabController.index != 0) {
@@ -1087,7 +1116,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                 backgroundColor: Colors.white,
                                 filled: true,
                                 borderColor: _primaryColor,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 12
                                  child: Center(
                                     child: Text(
                                       'Answer Question',
@@ -1107,7 +1136,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                               backgroundColor: enabled ? color : Colors.grey.shade200,
                               filled: true,
                               borderColor: enabled ? color : Colors.grey.shade300,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 12
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -1155,7 +1184,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     backgroundColor: _nextQuestionId == null ? Colors.white : Colors.white,
                     filled: true,
                     borderColor: _nextQuestionId == null ? _primaryColor : _primaryColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Reduced from 12
                     child: Icon(
                       _nextQuestionId == null ? Icons.check : Icons.arrow_forward_rounded,
                       size: 20,
@@ -1215,6 +1244,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 floating: false,
                 pinned: true,
                 elevation: 0,
+                toolbarHeight: 48, // Condensed height
+                leadingWidth: 52, // Slightly narrower to fit new height
                 leading: Padding(
                   padding: const EdgeInsets.all(8),
                   child: GestureDetector(
@@ -1225,14 +1256,18 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         GoRouter.of(context).go('/dashboard');
                       }
                     },
-                    child: WiredCard(
-                      padding: EdgeInsets.zero,
-                      borderColor: _primaryColor.withValues(alpha: 0.3),
-                      child: Center(
-                        child: Icon(
-                          Icons.arrow_back_ios_new,
-                          color: _primaryColor,
-                          size: 18
+                    child: SizedBox(
+                      width: 36,
+                      height: 36,
+                      child: WiredCard(
+                        padding: EdgeInsets.zero,
+                        borderColor: _primaryColor.withValues(alpha: 0.3),
+                        child: Center(
+                          child: Icon(
+                            Icons.arrow_back_ios_new,
+                            color: _primaryColor,
+                            size: 16
+                          ),
                         ),
                       ),
                     ),
@@ -1248,7 +1283,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                       ),
                       child: Text(
                         'Q${_question!.questionNumber}',
-                        style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                        style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 19),
                       ),
                     ),
                     if (_question!.hasPaperInfo) ...[
@@ -1261,7 +1296,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                       Expanded(
                         child: Text(
                           _question!.paperLabel,
-                          style: _patrickHand(color: _primaryColor.withValues(alpha: 0.6), fontSize: 14),
+                          style: _patrickHand(color: _primaryColor.withValues(alpha: 0.6), fontSize: 17),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1275,8 +1310,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     clipBehavior: Clip.none,
                     children: [
                        Container(
-                         width: 44,
-                         height: 44,
+                         width: 38,
+                         height: 38,
                          child: WiredButton(
                            onPressed: _showNoteEditor,
                            backgroundColor: _hasNote ? Colors.blue : Colors.white,
@@ -1309,8 +1344,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                   const SizedBox(width: 12),
                   // Bookmark button
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 38,
+                    height: 38,
                     child: WiredButton(
                       onPressed: _toggleBookmark,
                       padding: EdgeInsets.zero,
@@ -1329,14 +1364,14 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     Container(
                       margin: const EdgeInsets.only(right: 16),
                       child: WiredCard(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), // Reduced from 6
                         backgroundColor: const Color(0xFFFFB300).withValues(alpha: 0.2), // Light Amber
                         borderColor: const Color(0xFFFFB300),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.star_rounded, color: Color(0xFF232832), size: 18),
-                            const SizedBox(width: 6),
+                            const Icon(Icons.star_rounded, color: Color(0xFF232832), size: 16), // Slightly smaller icon
+                            const SizedBox(width: 4),
                             Builder(
                               builder: (context) {
                                 return Text(
@@ -1344,7 +1379,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                                   style: _patrickHand(
                                     color: const Color(0xFF232832),
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: 15,
                                   ),
                                 );
                               }
@@ -1356,92 +1391,15 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ],
               ),
 
-              // Question Header Card REMOVED (Moved to AppBar)
-
-              // Figure Card
-              if ((_question!.hasFigure || (_question!.pdfUrl != null && _question!.aiAnswerRaw?['figure_location'] != null)) && !_question!.isStructured)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: GestureDetector(
-                      onTap: _question!.hasFigure ? () => _showFullFigure() : null,
-                      child: WiredCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Figure label
-                            Row(
-                              children: [
-                                Icon(Icons.image_outlined, color: _primaryColor, size: 20),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Figure',
-                                  style: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                                const Spacer(),
-                                if (_question!.hasFigure) ...[
-                                  Icon(Icons.zoom_in, color: _primaryColor.withValues(alpha: 0.5), size: 20),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Tap to zoom',
-                                    style: _patrickHand(color: _primaryColor.withValues(alpha: 0.5), fontSize: 14),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            // Figure image
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4),
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(maxHeight: 250),
-                                child: _question!.hasFigure
-                                  ? Image.network(
-                                      _question!.imageUrl!,
-                                      fit: BoxFit.contain,
-                                      width: double.infinity,
-                                    )
-                                  : Builder(
-                                      builder: (context) {
-                                        final loc = _question!.aiAnswerRaw!['figure_location'];
-                                        return PdfCropViewer(
-                                           pdfUrl: _question!.pdfUrl!,
-                                           pageNumber: loc['page'] ?? 1,
-                                           x: (loc['x_percent'] ?? 0).toDouble(),
-                                           y: (loc['y_percent'] ?? 0).toDouble(),
-                                           width: (loc['width_percent'] ?? 100).toDouble(),
-                                           height: (loc['height_percent'] ?? 100).toDouble(),
-                                        );
-                                      }
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Tabbed Answer Card
-              SliverToBoxAdapter(
+              // Tabbed Answer Card - Maximizing space usage
+              SliverFillRemaining(
+                hasScrollBody: true,
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      // Main tabbed card
-                      _buildTabbedCard(),
-                    ],
-                  ),
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4), 
+                  child: _buildTabbedCard(),
                 ),
               ),
 
-              // Extra space at bottom - removed based on feedback
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 10), // Reduced from 40
-              ),
             ],
           ),
 
@@ -1468,30 +1426,54 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Widget _buildTabbedCard() {
-    // Dynamic height based on screen size to avoid overflows and maximize space
-    final double cardHeight = MediaQuery.of(context).size.height * 0.75;
-
-    // Check for structured figures
+    // 1. Unified Figure Detection (Structured or MCQ)
     List<FigureBlock> figures = [];
-    if (_question!.isStructured && _question!.structureData != null) {
-      figures = _question!.structureData!
-          .whereType<FigureBlock>()
-          .toList();
+    if (_question!.isStructured) {
+      figures = _question!.structureData!.whereType<FigureBlock>().toList();
+    } else {
+      // Check for standalone image or PDF figure in MCQ/Unstructured
+      final hasImageUrl = _question!.imageUrl != null && _question!.imageUrl!.isNotEmpty;
+      final pdfUrl = _question!.pdfUrl;
+      final loc = _question!.aiAnswerRaw?['figure_location'];
+      
+      if (hasImageUrl) {
+        figures.add(FigureBlock(
+          url: _question!.imageUrl,
+          figureLabel: 'Figure',
+          description: '',
+        ));
+      } else if (pdfUrl != null && loc != null) {
+        figures.add(FigureBlock(
+          figureLabel: 'Figure',
+          description: '',
+          meta: {
+            'pdf_url': pdfUrl,
+            'figure_location': loc,
+          },
+        ));
+      }
     }
 
-    // Base card content (Tabs + View)
-    final tabbedContent = WiredCard(
+    return WiredCard(
       height: null, // Let parent Expanded handle height
+      padding: const EdgeInsets.all(3), // Breathing room for sketchy borders on all sides
       child: Column(
         children: [
-            const SizedBox(height: 5), // Small gap between border and tabs
-        // Tab Headers
-        // Tab Headers
-        Container(
-            height: 50,
+          // 1. Figures Panel (Integrated inside the hand-drawn frame)
+          if (figures.isNotEmpty) ...[
+            CollapsibleFiguresPanel(
+              figures: figures,
+              onFigureTap: _showFullFigure,
+            ),
+            const WiredDivider(),
+          ],
+
+          // 2. Tab Headers
+          Container(
+            height: 48, 
             decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
+                bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.1), width: 1.5),
               ),
             ),
             child: Row(
@@ -1502,12 +1484,12 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 _buildTabItem(1, 'Official', Icons.verified_outlined),
                 Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)),
                 _buildTabItem(2, 'AI Explanation', Icons.auto_awesome),
-                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)), // Extra divider for balance
+                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)), 
               ],
             ),
           ),
 
-          // Tab Content
+          // 3. Tab Content
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -1517,31 +1499,6 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 _buildAiSolutionTab(),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-
-    // If no figures, return just the card
-    if (figures.isEmpty) {
-      return SizedBox(
-        height: cardHeight,
-        child: tabbedContent,
-      );
-    }
-
-    // 4. Return Column Layout (Push logic instead of Stack logic)
-    return SizedBox(
-      height: cardHeight,
-      child: Column(
-        children: [
-          // Top: Sticky Figures (if any)
-          if (figures.isNotEmpty)
-            CollapsibleFiguresPanel(figures: figures),
-
-          // Bottom: The Tabs and Content (Takes remaining space)
-          Expanded(
-            child: tabbedContent,
           ),
         ],
       ),
@@ -1595,17 +1552,17 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                      (_structuredAnswers[part.label] as String?)?.isNotEmpty == true;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8), 
       child: WiredCard(
         backgroundColor: isExpanded ? Colors.white : const Color(0xFFFDFBF7),
         borderColor: isExpanded ? _primaryColor : _primaryColor.withValues(alpha: 0.3),
-        borderWidth: isExpanded ? 2 : 1.5,
+        borderWidth: isExpanded ? 2.2 : 1.5, // Slightly thicker when active
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header (always visible) - tap anywhere to toggle
             GestureDetector(
-              behavior: HitTestBehavior.opaque, // Makes entire area tappable
+              behavior: HitTestBehavior.opaque, 
               onTap: () => setState(() {
                 if (_expandedPartIndices.contains(index)) {
                   _expandedPartIndices.remove(index);
@@ -1614,33 +1571,41 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 }
               }),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Row(
                   children: [
-                    // Expand/collapse icon
+                    // Expand/collapse icon - Rounded variants for hand-drawn feel
                     Icon(
-                      isExpanded ? Icons.expand_more_rounded : Icons.chevron_right_rounded,
+                      isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
                       color: _primaryColor,
-                      size: 24,
+                      size: 26,
                     ),
-                    const SizedBox(width: 8),
-                    // Part label badge
+                    const SizedBox(width: 4),
+                    
+                    // Part label badge - Custom handwritten look
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isExpanded ? _primaryColor : _primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        color: isExpanded ? _primaryColor.withValues(alpha: 0.05) : Colors.transparent,
+                        border: Border.all(
+                          color: isExpanded ? _primaryColor : _primaryColor.withValues(alpha: 0.2),
+                          width: 1.2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        'Part ${part.label}',
+                        'Part ${part.label}'.toUpperCase(),
                         style: _patrickHand(
-                          color: isExpanded ? Colors.white : _primaryColor,
+                          color: _primaryColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
+                    
                     const SizedBox(width: 12),
+                    
                     // Part content preview (only when collapsed)
                     if (!isExpanded)
                       Expanded(
@@ -1649,39 +1614,41 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: _patrickHand(
-                            color: _primaryColor.withValues(alpha: 0.6),
-                            fontSize: 15,
+                            color: _primaryColor.withValues(alpha: 0.5),
+                            fontSize: 17,
                           ),
                         ),
                       ),
+                    
                     if (isExpanded) const Spacer(),
-                    // Marks badge
+                    
+                    // Marks badge - Sketchy yellow bubble
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFB300).withValues(alpha: 0.2),
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                        border: Border.all(
+                          color: const Color(0xFFFFB300).withValues(alpha: 0.3),
+                          width: 1,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${part.marks} mark${part.marks > 1 ? 's' : ''}',
+                        '${part.marks} marks'.toUpperCase(),
                         style: _patrickHand(
                           color: const Color(0xFF232832),
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
+                          letterSpacing: 0.8,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Status indicator (completed/pending) - only for answer tab
+                    
+                    const SizedBox(width: 6),
+                    
+                    // Status indicator (completed/pending)
                     if (tabType == 'answer' && hasAnswer)
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check, color: Colors.green, size: 16),
-                      ),
+                      const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 18),
                   ],
                 ),
               ),
@@ -1689,12 +1656,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
             // Expandable content
             if (isExpanded) ...[
-              Container(
-                height: 1.5,
-                color: _primaryColor.withValues(alpha: 0.15),
-              ),
+              const WiredDivider(),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: _buildPartContent(part, tabType),
               ),
             ],
@@ -1714,7 +1678,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             // Question text
             Text(
               part.content,
-              style: _patrickHand(fontSize: 18, height: 1.5),
+              style: _patrickHand(fontSize: 19, height: 1.5),
             ),
             const SizedBox(height: 16),
             // Answer input
@@ -1878,7 +1842,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           // Score badge (if feedback available)
           if (_aiFeedback != null) ...[
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0), // Reduced from 20
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 120), // Prevent unbounded expansion
                 child: WiredCard(
@@ -1922,7 +1886,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               isSubmitted: _answerSubmitted,
               savedAnswers: _structuredAnswers,
               perPartFeedback: _aiFeedback?['perPartResults'],
-              showSolutions: false,
+              showSolutions: _answerSubmitted, // Changed from false
+              onFigureTap: _showFullFigure, // Added this line
             ),
           ),
 
@@ -1932,12 +1897,13 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
     // Default view for MCQ and Unstructured
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Reduced from all(20)
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Score badge if submitted
-          if (_aiFeedback != null) ...[
+          // Score badge only for non-MCQ (MCQ uses the bottom feedback card only)
+          if (_aiFeedback != null && !_question!.isMCQ) ...[
+            // Non-MCQ score display (keeps original behavior)
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: 120),
               child: WiredCard(
@@ -1977,6 +1943,38 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                style: _patrickHand(fontSize: 20, height: 1.5, color: AppColors.textPrimary),
              ),
              const SizedBox(height: 24),
+          ],
+
+          // MCQ Feedback (shown above options for MCQ)
+          if (_aiFeedback != null && _question!.isMCQ) ...[
+            WiredCard(
+              padding: const EdgeInsets.all(16),
+              backgroundColor: (_aiFeedback!['isCorrect'] ?? false)
+                  ? Colors.green.withValues(alpha: 0.1)
+                  : Colors.red.withValues(alpha: 0.1),
+              borderColor: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
+              child: Row(
+                children: [
+                  Icon(
+                    (_aiFeedback!['isCorrect'] ?? false) ? Icons.check_circle_outline : Icons.cancel_outlined,
+                    color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green : Colors.red,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _aiFeedback!['feedback'] ?? '',
+                      style: _patrickHand(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: (_aiFeedback!['isCorrect'] ?? false) ? Colors.green.shade700 : Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
           ],
 
           // MCQ Options or Text Input
@@ -2080,8 +2078,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             // Written Check Button REMOVED (Moved to BottomNavBar)
           ],
 
-          // Feedback
-          if (_aiFeedback != null) ...[
+          // Feedback (for non-MCQ only - MCQ feedback is shown above options)
+          if (_aiFeedback != null && !_question!.isMCQ) ...[
             const SizedBox(height: 16),
             WiredCard(
               padding: const EdgeInsets.all(16),
@@ -2136,7 +2134,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   }
 
   Widget _buildAiSolutionTab() {
-    final isPremium = ref.watch(isPremiumProvider);
+    // AI Explanation is FREE for all users
 
     // Always show the tab - display message if no content
     final hasContent = _question!.hasAiSolution;
@@ -2165,133 +2163,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       );
     }
 
-    // If not premium, show blurred content with upgrade prompt
-    if (!isPremium) {
-      return Stack(
-        children: [
-          // Blurred content
-          ImageFiltered(
-            imageFilter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      WiredCard(
-                        padding: const EdgeInsets.all(8),
-                        backgroundColor: Colors.purple.withValues(alpha: 0.2),
-                        borderColor: Colors.purple,
-                        child: const Icon(Icons.auto_awesome, color: Colors.purple, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'AI Explanation',
-                        style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(color: Colors.white12),
-                  const SizedBox(height: 16),
-                  Text(
-                    _question!.aiAnswer ?? 'AI explanation not available for this question yet.',
-                    style: _patrickHand(color: AppColors.textPrimary.withValues(alpha: 0.85), fontSize: 16, height: 1.5),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Premium upgrade overlay
-          Positioned.fill(
-            child: Stack(
-              children: [
-                // Transparent blocking layer
-                Container(color: Colors.transparent),
-
-                // Centered floating card
-                Center(
-                  child: WiredCard(
-                    width: 320,
-                    // Auto height
-                    backgroundColor: const Color(0xFF2D3E50), // Navy background
-                    borderColor: Colors.amber,
-                    borderWidth: 2,
-                    child: Padding(
-                       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                       child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                               Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.amber, width: 2),
-                                ),
-                                child: const Icon(
-                                  Icons.lock_outline_rounded,
-                                  size: 24,
-                                  color: Colors.amber,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'Premium Content',
-                                style: _patrickHand(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Text(
-                                  'Unlock detailed AI explanations.',
-                                  textAlign: TextAlign.center,
-                                  style: _patrickHand(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              WiredButton(
-                                onPressed: () {
-                                  context.push('/premium');
-                                },
-                                backgroundColor: Colors.amber,
-                                filled: true,
-                                borderColor: Colors.amber.shade700,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                                child: Text(
-                                  'Unlock Premium',
-                                  style: _patrickHand(
-                                    color: const Color(0xFF2D3E50),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                     ),
-                  ),
-                ),
-              ],
-            ),
-              ),
-        ],
-      );
-    }
-
-    // Authenticated users see the normal content
+    // AI Explanation is FREE for all users - show content directly
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Reduced from all(20)
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2332,7 +2206,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               backgroundColor: const Color(0xFFFDFBF7),
               borderColor: Colors.purple.withValues(alpha: 0.5),
               borderWidth: 2,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(12), // Reduced from 20
               child: MarkdownBody(
                 data: _question!.aiAnswer ?? 'No AI explanation available.',
                 styleSheet: MarkdownStyleSheet(
@@ -2485,7 +2359,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
     // Authenticated users see the normal content
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // Reduced from all(20)
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2714,7 +2588,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                 padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 12
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),

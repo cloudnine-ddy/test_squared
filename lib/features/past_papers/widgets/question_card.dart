@@ -94,7 +94,7 @@ class QuestionCard extends StatelessWidget {
                           question.content,
                           style: _patrickHand(
                             color: _primaryColor,
-                            fontSize: 16,
+                            fontSize: 18,
                             height: 1.3,
                           ),
                           maxLines: 2,
@@ -122,7 +122,7 @@ class QuestionCard extends StatelessWidget {
                     question.isMCQ ? 'MCQ' : 'Written',
                     style: _patrickHand(
                       color: _primaryColor.withValues(alpha: 0.6),
-                      fontSize: 14,
+                      fontSize: 16,
                     ),
                   ),
 
@@ -146,7 +146,7 @@ class QuestionCard extends StatelessWidget {
                       question.paperLabel,
                       style: _patrickHand(
                         color: _primaryColor.withValues(alpha: 0.6),
-                        fontSize: 14,
+                        fontSize: 16,
                       ),
                     ),
                   ],
@@ -167,13 +167,14 @@ class QuestionCard extends StatelessWidget {
 
                   // Marks
                   if (question.marks != null) ...[
-                    Icon(Icons.star, size: 14, color: Colors.amber),
+                    Icon(Icons.star, size: 16, color: Colors.amber),
                     const SizedBox(width: 4),
                     Text(
                       '${question.marks} ${question.marks == 1 ? 'mark' : 'marks'}',
                       style: _patrickHand(
-                        color: _primaryColor.withValues(alpha: 0.6),
-                        fontSize: 14,
+                        color: _primaryColor.withValues(alpha: 0.7),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -194,13 +195,13 @@ class QuestionCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(statusIcon, size: 16, color: statusColor),
+                          Icon(statusIcon, size: 18, color: statusColor),
                           const SizedBox(width: 4),
                           Text(
                             _getScoreText(),
                             style: _patrickHand(
                               color: statusColor,
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

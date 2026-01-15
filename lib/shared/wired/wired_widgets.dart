@@ -185,6 +185,7 @@ class _WiredButtonState extends State<WiredButton> {
               seed: hashCode,
             ),
             child: Container(
+              alignment: Alignment.center,
               padding: widget.padding,
               color: bgColor,
               child: widget.child,

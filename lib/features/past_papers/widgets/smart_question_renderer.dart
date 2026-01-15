@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/question_blocks.dart';
 import '../../../core/theme/app_colors.dart';
 import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../shared/wired/wired_widgets.dart';
+import 'pdf_crop_viewer.dart';
 
 /// Smart Renderer that implements the "Sticky Figures" design
 /// Splits content into a fixed top panel (figures) and a scrollable list (questions)
@@ -12,6 +15,7 @@ class SmartQuestionRenderer extends StatefulWidget {
   final List<dynamic>? perPartFeedback;
   final Map<String, dynamic>? savedAnswers;
   final bool isSubmitted;
+  final VoidCallback? onFigureTap;
 
   const SmartQuestionRenderer({
     super.key,
@@ -21,6 +25,7 @@ class SmartQuestionRenderer extends StatefulWidget {
     this.perPartFeedback,
     this.savedAnswers,
     this.isSubmitted = false,
+    this.onFigureTap,
   });
 
   @override
@@ -34,6 +39,7 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> with Tick
 
   // State for block processing
   late List<_ProcessedPart> _questionParts;
+  final Set<int> _expandedIndices = {0}; // Default first one expanded
 
   @override
   void initState() {
@@ -105,18 +111,19 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> with Tick
   Widget build(BuildContext context) {
       // Just render the list of questions. Figures are handled by parent.
       return ListView.separated(
-        padding: const EdgeInsets.only(bottom: 20, left: 16, right: 16, top: 0),
+        padding: const EdgeInsets.only(bottom: 20, left: 16, right: 16, top: 16),
         itemCount: _questionParts.length,
         separatorBuilder: (ctx, i) => const SizedBox(height: 24),
         itemBuilder: (context, index) {
-          return _buildQuestionCard(_questionParts[index]);
+          return _buildQuestionCard(_questionParts[index], index);
         },
       );
   }
 
-  Widget _buildQuestionCard(_ProcessedPart partWrapper) {
+  Widget _buildQuestionCard(_ProcessedPart partWrapper, int index) {
     final block = partWrapper.block;
     final contextText = partWrapper.contextText;
+    final isExpanded = _expandedIndices.contains(index);
 
     // Find feedback for this specific part if available
     Map<String, dynamic>? partFeedback;
@@ -135,150 +142,198 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> with Tick
     final score = partFeedback?['score'] ?? 0;
     final feedbackText = partFeedback?['feedback'] ?? '';
     final hasFeedback = partFeedback != null;
+    
+    // Calculate feedback color based on score: green (>80), orange (>0), red (0)
+    final feedbackColor = (score > 80)
+        ? Colors.green
+        : (score > 0)
+            ? Colors.orange
+            : Colors.red;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: hasFeedback
-              ? (isCorrect ? Colors.green : Colors.red)
-              : AppColors.textSecondary.withValues(alpha: 0.1),
-          width: hasFeedback ? 1.5 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            offset: const Offset(0, 2),
-            blurRadius: 4,
-          )
-        ],
-      ),
+    return WiredCard(
+      backgroundColor: Colors.white,
+      borderColor: hasFeedback
+          ? (isCorrect ? Colors.green : Colors.red)
+          : AppColors.primary.withValues(alpha: 0.15),
+      borderWidth: hasFeedback ? 2.2 : 1.5,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Part (a) - [X] marks
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: hasFeedback
-                  ? (isCorrect ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05))
-                  : null,
-              border: Border(bottom: BorderSide(
-                color: hasFeedback
-                  ? (isCorrect ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2))
-                  : Colors.grey.shade100
-              )),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  'Part (${block.label})',
-                  style: TextStyle(
-                    fontFamily: 'PatrickHand',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: hasFeedback
-                        ? (isCorrect ? Colors.green.shade700 : Colors.red.shade700)
-                        : AppColors.primary,
+          // Header: Part (a) - [X] marks - CLICKABLE TOGGLE
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              setState(() {
+                if (_expandedIndices.contains(index)) {
+                  _expandedIndices.remove(index);
+                } else {
+                  _expandedIndices.add(index);
+                }
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  // Expand/collapse icon
+                  Icon(
+                    isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.keyboard_arrow_right_rounded,
+                    color: AppColors.primary,
+                    size: 26,
                   ),
-                ),
-                if (hasFeedback) ...[
-                   const SizedBox(width: 8),
-                   Icon(
-                     isCorrect ? Icons.check_circle : Icons.cancel,
-                     size: 18,
-                     color: isCorrect ? Colors.green : Colors.red,
-                   ),
-                ],
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    hasFeedback ? '$score/${block.marks} marks' : '${block.marks} marks',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: hasFeedback
-                          ? (isCorrect ? Colors.green.shade800 : Colors.red.shade800)
-                          : AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+                  const SizedBox(width: 4),
 
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Context Text (if any)
-                if (contextText != null && contextText.isNotEmpty) ...[
-                  Text(
-                    contextText,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontStyle: FontStyle.italic,
-                      height: 1.4,
-                      color: AppColors.textPrimary.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // Actual Question Content
-                Text(
-                  block.content,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    height: 1.4,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Input Field
-                _buildInputArea(block),
-
-                // AI Feedback Box
-                if (hasFeedback && feedbackText.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  // Part Label Badge
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: isCorrect ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      // border: Border.all(color: isCorrect ? Colors.green.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.2)),
+                      color: hasFeedback
+                          ? (isCorrect ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05))
+                          : AppColors.primary.withValues(alpha: 0.05),
+                      border: Border.all(
+                        color: hasFeedback
+                            ? (isCorrect ? Colors.green : Colors.red)
+                            : AppColors.primary.withValues(alpha: 0.2),
+                        width: 1.2,
+                      ),
+                      borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      feedbackText,
+                      'Part (${block.label})'.toUpperCase(),
                       style: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: isCorrect ? Colors.green.shade900 : Colors.red.shade900,
+                        fontFamily: 'PatrickHand',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                        color: hasFeedback
+                            ? (isCorrect ? Colors.green.shade800 : Colors.red.shade800)
+                            : AppColors.primary,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+                  
+                  // Part content preview (only when collapsed)
+                  if (!isExpanded)
+                    Expanded(
+                      child: Text(
+                        block.content,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'PatrickHand',
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                  
+                  if (isExpanded) ...[
+                    if (hasFeedback) ...[
+                       const SizedBox(width: 8),
+                       Icon(
+                         isCorrect ? Icons.check_circle_outline_rounded : Icons.cancel_outlined,
+                         size: 20,
+                         color: isCorrect ? Colors.green : Colors.red,
+                       ),
+                    ],
+                    const Spacer(),
+                  ],
+                  
+                  // Marks badge - Sketchy yellow bubble
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                      border: Border.all(
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      (hasFeedback ? '$score/${block.marks} marks' : '${block.marks} marks').toUpperCase(),
+                      style: TextStyle(
+                        fontFamily: 'PatrickHand',
+                        color: const Color(0xFF232832),
+                        fontWeight: FontWeight.bold,
                         fontSize: 14,
-                        height: 1.4,
+                        letterSpacing: 0.8,
                       ),
                     ),
                   ),
                 ],
-
-                 // Solution View
-                if (widget.showSolutions) ...[
-                  const SizedBox(height: 20),
-                  _buildSolution(block),
-                ],
-              ],
+              ),
             ),
           ),
+
+          if (isExpanded) ...[
+            const WiredDivider(),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (contextText != null && contextText.isNotEmpty) ...[
+                    Text(
+                      contextText,
+                      style: TextStyle(
+                        fontFamily: 'PatrickHand',
+                        fontSize: 18,
+                        fontStyle: FontStyle.italic,
+                        height: 1.4,
+                        color: AppColors.textPrimary.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Actual Question Content
+                  Text(
+                    block.content,
+                    style: const TextStyle(
+                      fontFamily: 'PatrickHand',
+                      fontSize: 19,
+                      fontWeight: FontWeight.bold,
+                      height: 1.4,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Input Field
+                  _buildInputArea(block),
+
+                  // AI Feedback Box - Color based on score
+                  if (hasFeedback && feedbackText.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    WiredCard(
+                      backgroundColor: feedbackColor.withValues(alpha: 0.05),
+                      borderColor: feedbackColor.withValues(alpha: 0.5),
+                      padding: const EdgeInsets.all(12),
+                      child: Text(
+                        feedbackText,
+                        style: TextStyle(
+                          fontFamily: 'PatrickHand',
+                          fontStyle: FontStyle.italic,
+                          color: feedbackColor,
+                          fontSize: 17,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                   // Solution View
+                  if (widget.showSolutions) ...[
+                    const SizedBox(height: 20),
+                    _buildSolution(block),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -295,88 +350,43 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> with Tick
         controller: controller,
         maxLines: 6,
         enabled: !widget.showSolutions && !widget.isSubmitted,
-        style: const TextStyle(fontSize: 16, height: 1.4),
+        style: TextStyle(
+          fontFamily: 'PatrickHand',
+          fontSize: 19, 
+          height: 1.4,
+          color: AppColors.textPrimary,
+        ),
         decoration: InputDecoration(
           hintText: widget.isSubmitted ? '' : 'Write your answer here...',
+          hintStyle: TextStyle(
+            fontFamily: 'PatrickHand',
+            color: Colors.grey.shade400,
+            fontSize: 16,
+          ),
           filled: true,
-          fillColor: Colors.grey.shade50,
+          fillColor: const Color(0xFFF9F9F9),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide(color: Colors.grey.shade200),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade300),
+            borderSide: BorderSide(color: Colors.grey.shade200),
           ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.all(16),
         ),
      );
   }
 
+  // Solution section removed - Official Answer and AI Model Answer are in separate tabs
   Widget _buildSolution(QuestionPartBlock block) {
-     final hasOfficial = block.officialAnswer != null && block.officialAnswer!.isNotEmpty;
-     final hasAi = block.aiAnswer != null && block.aiAnswer!.isNotEmpty;
-
-     if (!hasOfficial && !hasAi) {
-       return const SizedBox.shrink();
-     }
-
-     return Column(
-       crossAxisAlignment: CrossAxisAlignment.start,
-       children: [
-         // Official Answer (Mark Scheme)
-         if (hasOfficial)
-           Container(
-             width: double.infinity,
-             margin: const EdgeInsets.only(bottom: 12),
-             padding: const EdgeInsets.all(12),
-             decoration: BoxDecoration(
-               color: Colors.green.withValues(alpha: 0.05),
-               borderRadius: BorderRadius.circular(8),
-               border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-             ),
-             child: Column(
-               crossAxisAlignment: CrossAxisAlignment.start,
-               children: [
-                  Row(
-                    children: [
-                      Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
-                      const SizedBox(width: 6),
-                      Text('Official Answer', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade800, fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(block.officialAnswer!, style: TextStyle(color: Colors.green.shade900, height: 1.4)),
-               ],
-             ),
-           ),
-
-         // AI Model Answer
-         if (hasAi)
-           Container(
-             width: double.infinity,
-             padding: const EdgeInsets.all(12),
-             decoration: BoxDecoration(
-               color: Colors.blue.withValues(alpha: 0.05),
-               borderRadius: BorderRadius.circular(8),
-               border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-             ),
-             child: Column(
-               crossAxisAlignment: CrossAxisAlignment.start,
-               children: [
-                  Row(
-                    children: [
-                      Icon(Icons.auto_awesome, size: 16, color: Colors.blue.shade700),
-                      const SizedBox(width: 6),
-                      Text('AI Model Answer', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800, fontSize: 13)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(block.aiAnswer!, style: TextStyle(color: Colors.blue.shade900, height: 1.4)),
-               ],
-             ),
-           ),
-       ],
-     );
+     // Previously showed Official Answer and AI Model Answer here
+     // Now removed since these are available in the Official and AI Explanation tabs
+     return const SizedBox.shrink();
   }
 }
 
@@ -389,11 +399,13 @@ class _ProcessedPart {
 class CollapsibleFiguresPanel extends StatefulWidget {
   final List<FigureBlock> figures;
   final bool initiallyExpanded;
+  final VoidCallback? onFigureTap;
 
   const CollapsibleFiguresPanel({
     super.key,
     required this.figures,
     this.initiallyExpanded = false,
+    this.onFigureTap,
   });
 
   @override
@@ -404,11 +416,14 @@ class _CollapsibleFiguresPanelState extends State<CollapsibleFiguresPanel> with 
   late bool _expanded;
   late TabController _tabController;
   int _activeIndex = 0;
+  double _manualHeight = 220.0; // Default expanded height
 
   @override
   void initState() {
     super.initState();
     _expanded = widget.initiallyExpanded;
+    _loadPreferences(); // Load user saved state
+    
     if (widget.figures.isNotEmpty) {
        _tabController = TabController(length: widget.figures.length, vsync: this);
        _tabController.addListener(() {
@@ -417,6 +432,26 @@ class _CollapsibleFiguresPanelState extends State<CollapsibleFiguresPanel> with 
          });
        });
     }
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _expanded = prefs.getBool('pref_figures_panel_expanded') ?? widget.initiallyExpanded;
+        _manualHeight = prefs.getDouble('pref_figures_panel_height') ?? 220.0;
+      });
+    }
+  }
+
+  Future<void> _saveExpanded(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pref_figures_panel_expanded', value);
+  }
+
+  Future<void> _saveHeight(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('pref_figures_panel_height', value);
   }
 
   @override
@@ -428,165 +463,252 @@ class _CollapsibleFiguresPanelState extends State<CollapsibleFiguresPanel> with 
   @override
   Widget build(BuildContext context) {
     if (widget.figures.isEmpty) return const SizedBox.shrink();
+    
+    const double kCollapsedHeight = 42.0;
+    const double kMinExpandedHeight = 100.0;
+    const double kMaxExpandedHeight = 500.0;
 
-    const double kCollapsedHeight = 50.0;
-    const double kMaxExpandedHeight = 300.0; // Fixed max height as requested
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      height: _expanded ? kMaxExpandedHeight : kCollapsedHeight,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          height: _expanded ? _manualHeight : kCollapsedHeight,
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        border: Border(
-          bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.1), width: 1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            offset: const Offset(0, 4),
-            blurRadius: 10,
-          ),
-        ],
+        color: const Color(0xFFF5F2E9), // Darker Sketchy Beige for contrast
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
+          // Merged Header & Tabs - Use InkWell on the whole row for better UX
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: () {
+              final newState = !_expanded;
+              setState(() => _expanded = newState);
+              _saveExpanded(newState);
+            },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              height: kCollapsedHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  Icon(Icons.image_outlined, size: 18, color: AppColors.primary),
-                  const SizedBox(width: 8),
+                  // Label & Icon (No separate InkWell needed anymore)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.collections_outlined, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'FIGURES (${widget.figures.length})',
+                        style: const TextStyle(
+                          fontFamily: 'PatrickHand',
+                          fontSize: 16,
+                          letterSpacing: 1.0,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                        color: AppColors.textSecondary,
+                      ),
+                    ],
+                  ),
+                
+                // Vertical Divider
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  width: 1.5,
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                ),
+
+                // Inline Tab Selector (Visible when expanded or always?)
+                // Let's make it always visible if multiple figures
+                if (widget.figures.length > 1)
+                  Expanded(
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: widget.figures.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (ctx, i) {
+                        final isSelected = i == _activeIndex;
+                        final label = widget.figures[i].figureLabel.replaceAll('Figure', 'Fig');
+                        return InkWell(
+                          onTap: () {
+                            if (!_expanded) setState(() => _expanded = true);
+                            _tabController.animateTo(i);
+                          },
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(4),
+                                border: isSelected ? Border.all(color: AppColors.primary.withValues(alpha: 0.2)) : null,
+                              ),
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontFamily: 'PatrickHand',
+                                  color: isSelected ? AppColors.primary : Colors.grey.shade600,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                if (widget.figures.length <= 1) const Spacer(),
+
+                // Status Text
+                if (!_expanded)
                   Text(
-                    'Figures (${widget.figures.length})',
+                    'SHOW',
                     style: const TextStyle(
                       fontFamily: 'PatrickHand',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _expanded ? 'Hide' : 'Show',
-                    style: TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w600
+                      fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
-                    size: 20,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
-              ),
+                  )
+                else
+                  Text(
+                    'HIDE',
+                    style: const TextStyle(
+                      fontFamily: 'PatrickHand',
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                ),
+              ],
             ),
           ),
+        ),
 
-          // Content
-          if (_expanded)
+          // Content Area (Image)
+          if (_expanded) ...[
+            const WiredDivider(),
             Expanded(
               child: Container(
                 color: Colors.white,
-                child: Column(
-                  children: [
-                    // Tabs
-                    if (widget.figures.length > 1)
-                      Container(
-                        height: 32,
-                        decoration: BoxDecoration(
-                          border: Border(bottom: BorderSide(color: Colors.grey.shade200))
-                        ),
-                        child: ListView.separated(
-                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                           scrollDirection: Axis.horizontal,
-                           itemCount: widget.figures.length,
-                           separatorBuilder: (_,__) => const SizedBox(width: 16),
-                           itemBuilder: (ctx, i) {
-                             final isSelected = i == _activeIndex;
-                             final label = widget.figures[i].figureLabel.replaceAll('Figure', 'Fig');
-                             return InkWell(
-                               onTap: () => _tabController.animateTo(i),
-                               child: Center(
-                                 child: Container(
-                                   padding: const EdgeInsets.symmetric(vertical: 4),
-                                    decoration: BoxDecoration(
-                                      border: isSelected ? const Border(bottom: BorderSide(color: AppColors.primary, width: 2)) : null
-                                    ),
-                                    child: Text(
-                                      label,
-                                      style: TextStyle(
-                                        color: isSelected ? AppColors.primary : Colors.grey,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                 ),
-                               ),
-                             );
-                           },
-                        ),
-                      ),
-
-                    // Image + Caption Scrollable Area
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: widget.figures.map((fig) => _buildFigurePage(fig)).toList(),
-                      ),
-                    ),
-                  ],
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: widget.figures
+                      .map((fig) => _buildFigurePage(fig, _manualHeight - kCollapsedHeight))
+                      .toList(),
                 ),
               ),
             ),
+          ],
         ],
+      ),
+    ),
+
+    // 2. Resizable Handle (The "百叶窗" Drag Handle)
+    if (_expanded)
+      GestureDetector(
+        onVerticalDragUpdate: (details) {
+          setState(() {
+            _manualHeight += details.delta.dy;
+            _manualHeight = _manualHeight.clamp(kMinExpandedHeight, kMaxExpandedHeight);
+          });
+        },
+        onVerticalDragEnd: (_) => _saveHeight(_manualHeight),
+        child: Container(
+          width: double.infinity,
+          height: 20, // Hit area
+          color: Colors.transparent,
+          child: Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+  Widget _buildFigurePage(FigureBlock block, double availableHeight) {
+    final hasUrl = block.url != null && block.url!.isNotEmpty;
+    final hasPdfInfo = block.meta != null && 
+                       block.meta!['pdf_url'] != null && 
+                       block.meta!['figure_location'] != null;
+
+    // Estimate available image height: total - caption height - padding
+    final imageAreaHeight = (availableHeight - (block.description.isNotEmpty ? 40 : 0) - 24).clamp(80.0, 500.0);
+
+    return GestureDetector(
+      onTap: widget.onFigureTap,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(), // Disable internal scrolling for better drag UX
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Image/PDF Container - Scale to fill available height
+            SizedBox(
+              height: imageAreaHeight,
+              width: double.infinity,
+              child: hasUrl
+                  ? Image.network(
+                      block.url!,
+                      fit: BoxFit.contain, // Maintain aspect ratio while filling height
+                      loadingBuilder: (ctx, child, p) =>
+                          p == null ? child : const Center(child: CircularProgressIndicator()),
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                    )
+                  : hasPdfInfo
+                      ? _buildPdfCrop(block)
+                      : const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            // Caption
+            if (block.figureLabel.isNotEmpty || block.description.isNotEmpty)
+              Text(
+                '${block.figureLabel}${block.figureLabel.isNotEmpty ? ': ' : ''}${block.description}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontFamily: 'PatrickHand',
+                  fontSize: 15,
+                  color: AppColors.textPrimary,
+                  height: 1.1,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildFigurePage(FigureBlock block) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Image Container
-          SizedBox(
-             height: 300,
-             child: InteractiveViewer(
-                minScale: 1.0,
-                maxScale: 4.0,
-                child: block.url != null
-                  ? Image.network(
-                      block.url!,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (ctx, child, p) => p == null ? child : const Center(child: CircularProgressIndicator()),
-                      errorBuilder: (_,__,___) => const Icon(Icons.broken_image, size: 48, color: Colors.grey),
-                    )
-                  : const Icon(Icons.image_not_supported, size: 48, color: Colors.grey),
-             ),
-          ),
-          const SizedBox(height: 12),
-          // Caption
-          Text(
-            '${block.figureLabel}: ${block.description}',
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textPrimary,
-              height: 1.4,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildPdfCrop(FigureBlock block) {
+    final pdfUrl = block.meta!['pdf_url'] as String;
+    final loc = block.meta!['figure_location'] as Map<String, dynamic>;
+
+    return PdfCropViewer(
+      pdfUrl: pdfUrl,
+      pageNumber: loc['page'] ?? 1,
+      x: (loc['x_percent'] ?? 0).toDouble(),
+      y: (loc['y_percent'] ?? 0).toDouble(),
+      width: (loc['width_percent'] ?? 100).toDouble(),
+      height: (loc['height_percent'] ?? 100).toDouble(),
     );
   }
 }

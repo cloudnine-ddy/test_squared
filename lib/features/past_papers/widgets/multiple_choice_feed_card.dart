@@ -12,6 +12,7 @@ class MultipleChoiceFeedCard extends StatelessWidget {
   final String? paperName;
   final Map<String, dynamic>? latestAttempt;
   final String? topicId; // Added for navigation context initialization
+  final VoidCallback? onReturn; // Callback when returning from detail screen
   final Function(String?)? onAnswerChanged; // Kept for compatibility but unused
   final Function(bool)? onCheckResult;    // Kept for compatibility but unused
 
@@ -21,6 +22,7 @@ class MultipleChoiceFeedCard extends StatelessWidget {
     this.paperName,
     this.latestAttempt,
     this.topicId,
+    this.onReturn,
     this.onAnswerChanged,
     this.onCheckResult,
   });
@@ -60,6 +62,8 @@ class MultipleChoiceFeedCard extends StatelessWidget {
             queryParameters: topicId != null ? {'topicId': topicId} : null,
           );
           await context.push(uri.toString());
+          // Trigger refresh when coming back
+          onReturn?.call();
         },
         child: WiredCard(
           backgroundColor: Colors.white,
@@ -97,7 +101,7 @@ class MultipleChoiceFeedCard extends StatelessWidget {
                           question.content,
                           style: _patrickHand(
                             color: _primaryColor,
-                            fontSize: 16,
+                            fontSize: 18,
                             height: 1.3,
                           ),
                           maxLines: 2,
@@ -125,7 +129,7 @@ class MultipleChoiceFeedCard extends StatelessWidget {
                     'MCQ',
                     style: _patrickHand(
                       color: _primaryColor.withValues(alpha: 0.6),
-                      fontSize: 14,
+                      fontSize: 16,
                     ),
                   ),
 
@@ -150,7 +154,7 @@ class MultipleChoiceFeedCard extends StatelessWidget {
                         paperName!,
                         style: _patrickHand(
                           color: _primaryColor.withValues(alpha: 0.6),
-                          fontSize: 14,
+                          fontSize: 16,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -160,13 +164,14 @@ class MultipleChoiceFeedCard extends StatelessWidget {
                   // Marks (if paper name didn't take all space, or simplified)
                   if (question.marks != null) ...[
                     const SizedBox(width: 8),
-                    Icon(Icons.star, size: 14, color: Colors.amber),
+                    Icon(Icons.star, size: 16, color: Colors.amber),
                     const SizedBox(width: 4),
                     Text(
                       '${question.marks}m',
                       style: _patrickHand(
-                        color: _primaryColor.withValues(alpha: 0.6),
-                        fontSize: 14,
+                        color: _primaryColor.withValues(alpha: 0.7),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -189,13 +194,13 @@ class MultipleChoiceFeedCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(statusIcon, size: 16, color: statusColor),
+                          Icon(statusIcon, size: 18, color: statusColor),
                           const SizedBox(width: 4),
                           Text(
                             _getScoreText(latestAttempt!, question.marks),
                             style: _patrickHand(
                               color: statusColor,
-                              fontSize: 14,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

@@ -67,7 +67,7 @@ class TopicTags extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'PatrickHand', // Sketchy font
               color: topic.color,
-              fontSize: 13, // Slightly larger for handwritten font
+              fontSize: 15, // Increased to match card refinements
               fontWeight: FontWeight.bold,
             ),
           ),
