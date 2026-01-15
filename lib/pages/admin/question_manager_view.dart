@@ -36,6 +36,7 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
   Map<String, List<Map<String, dynamic>>> _questionsByPaper = {};
 
   // Selection state
+  String? _selectedExamType; // Exam type filter (IGCSE, SPM, A-Level)
   String? _selectedSubjectId;
   String? _selectedPaperId;
   String? _selectedQuestionId;
@@ -65,13 +66,19 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
     setState(() => _isLoading = true);
 
     try {
-      // Load subjects
+      // Load subjects with curriculum
       final subjectsRes = await _supabase
           .from('subjects')
-          .select('id, name, icon_url')
+          .select('id, name, icon_url, curriculum')
           .order('name');
 
       _subjects = List<Map<String, dynamic>>.from(subjectsRes);
+      
+      // Get unique exam types from loaded subjects
+      final examTypes = _subjects.map((s) => s['curriculum']?.toString()).whereType<String>().toSet();
+      if (_selectedExamType == null && examTypes.isNotEmpty) {
+        _selectedExamType = examTypes.first;
+      }
 
       // Load all papers with their questions count
       final papersRes = await _supabase
@@ -460,6 +467,38 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                           ],
                         ),
                         const SizedBox(height: 12),
+                        // Exam Type Selector
+                        DropdownButtonFormField<String>(
+                          value: _selectedExamType,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: 'Exam Type',
+                            labelStyle: const TextStyle(color: Color(0xFF787774), fontSize: 12),
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                          ),
+                          items: _subjects
+                              .map((s) => s['curriculum']?.toString())
+                              .whereType<String>()
+                              .toSet()
+                              .map((exam) => DropdownMenuItem(
+                                    value: exam,
+                                    child: Text(exam.toUpperCase(), style: const TextStyle(color: Color(0xFF37352F), fontSize: 14)),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            setState(() {
+                              _selectedExamType = v;
+                              _selectedSubjectId = null; // Reset subject when exam changes
+                              _selectedPaperId = null;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        // Subject Selector (filtered by exam type)
                         DropdownButtonFormField<String>(
                           value: _selectedSubjectId,
                           isExpanded: true,
@@ -472,7 +511,10 @@ class _QuestionManagerViewState extends State<QuestionManagerView> {
                             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: const BorderSide(color: Color(0xFFE9E9E7))),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                           ),
-                          items: _subjects.map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF37352F), fontSize: 14)))).toList(),
+                          items: _subjects
+                              .where((s) => s['curriculum'] == _selectedExamType) // Filter by exam type
+                              .map((s) => DropdownMenuItem(value: s['id']?.toString(), child: Text(s['name'] ?? 'Unknown', overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF37352F), fontSize: 14))))
+                              .toList(),
                           onChanged: (v) {
                             setState(() {
                               _selectedSubjectId = v;

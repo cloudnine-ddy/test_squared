@@ -73,21 +73,25 @@ class _QuestionEditorState extends State<QuestionEditor> {
   List<Map<String, dynamic>> _options = [];
   String? _correctAnswer;
   String? _originalAnswer; // AI-extracted answer (shown with green border)
+  
+  // Total marks field (can be manually overridden)
+  late TextEditingController _totalMarksController;
+  bool _manualMarksOverride = false;
 
-  @override
   void initState() {
     super.initState();
     _contentController = TextEditingController();
     _officialAnswerController = TextEditingController();
     _aiSolutionController = TextEditingController();
+    _totalMarksController = TextEditingController();
     _loadQuestion();
   }
 
-  @override
   void dispose() {
     _contentController.dispose();
     _officialAnswerController.dispose();
     _aiSolutionController.dispose();
+    _totalMarksController.dispose();
     super.dispose();
   }
 
@@ -181,6 +185,13 @@ class _QuestionEditorState extends State<QuestionEditor> {
       // AI Solution
       if (aiAnswer is Map) {
         _aiSolutionController.text = aiAnswer['text']?.toString() ?? aiAnswer['ai_solution']?.toString() ?? '';
+      }
+      
+      // Load existing marks value
+      final existingMarks = _question?['marks'];
+      if (existingMarks != null) {
+        _totalMarksController.text = existingMarks.toString();
+        _manualMarksOverride = true; // Mark as manually set if exists
       }
 
       if (mounted) {
@@ -328,10 +339,20 @@ class _QuestionEditorState extends State<QuestionEditor> {
             .join(' ');
          updateData['content'] = summary.isNotEmpty ? summary : 'Structured Question $_questionNumber';
 
-         // 3. Official answer and marks?
-         // Note: official_answer logic for structured is complex, maybe just leave basic field?
-         // For now, let's keep the main official_answer field as a fallback/summary
+         // 3. Official answer
          updateData['official_answer'] = _officialAnswerController.text.trim();
+         
+         // 4. Total marks (use manual value or calculate from parts)
+         final manualMarks = int.tryParse(_totalMarksController.text);
+         if (manualMarks != null && manualMarks > 0) {
+           updateData['marks'] = manualMarks;
+         } else {
+           // Auto-calculate from question parts
+           final calculatedMarks = _structureBlocks
+               .whereType<QuestionPartBlock>()
+               .fold<int>(0, (sum, part) => sum + part.marks);
+           updateData['marks'] = calculatedMarks > 0 ? calculatedMarks : null;
+         }
 
       } else {
          // LEGACY/MCQ UPDATE
@@ -427,6 +448,13 @@ class _QuestionEditorState extends State<QuestionEditor> {
     if (!_hasChanges) {
       setState(() => _hasChanges = true);
     }
+  }
+  
+  /// Calculate total marks from all question parts
+  int _getCalculatedMarks() {
+    return _structureBlocks
+        .whereType<QuestionPartBlock>()
+        .fold<int>(0, (sum, part) => sum + part.marks);
   }
 
   // --- STRUCTURED BLOCK HELPERS ---
@@ -1959,27 +1987,71 @@ class _QuestionEditorState extends State<QuestionEditor> {
             key: _formKey,
             child: CustomScrollView(
               slivers: [
-                // Metadata Section (Q# + Topics) - scrolls with content
+                // Metadata Section (Q# + Total Marks + Topics) - scrolls with content
                 SliverToBoxAdapter(
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Q Number (compact)
-                        SizedBox(
-                          width: 70,
-                          child: TextFormField(
-                            initialValue: _questionNumber.toString(),
-                            decoration: _inputDecoration('Q#').copyWith(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        // Q Number (with label)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Question #', style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF787774),
+                              fontWeight: FontWeight.w500,
+                            )),
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              width: 70,
+                              child: TextFormField(
+                                initialValue: _questionNumber.toString(),
+                                decoration: _inputDecoration('').copyWith(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) {
+                                  _questionNumber = int.tryParse(v) ?? 1;
+                                  _markChanged();
+                                },
+                              ),
                             ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (v) {
-                              _questionNumber = int.tryParse(v) ?? 1;
-                              _markChanged();
-                            },
-                          ),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        // Total Marks (with label)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Total Marks', style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF787774),
+                              fontWeight: FontWeight.w500,
+                            )),
+                            const SizedBox(height: 4),
+                            SizedBox(
+                              width: 90,
+                              child: TextFormField(
+                                controller: _totalMarksController,
+                                decoration: _inputDecoration('').copyWith(
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  hintText: _getCalculatedMarks().toString(),
+                                  suffixIcon: _totalMarksController.text.isEmpty 
+                                      ? const Icon(Icons.auto_awesome, size: 16, color: Colors.amber)
+                                      : null,
+                                ),
+                                keyboardType: TextInputType.number,
+                                onChanged: (v) {
+                                  _manualMarksOverride = v.isNotEmpty;
+                                  _markChanged();
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 12),
                         // Topics (expanded)
