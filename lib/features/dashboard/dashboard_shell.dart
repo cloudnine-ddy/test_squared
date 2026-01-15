@@ -272,6 +272,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                       Builder(builder: (context) {
                         final user = Supabase.instance.client.auth.currentUser;
                         final name = user?.userMetadata?['full_name'] as String? ?? 'Student';
+                        final email = user?.email ?? '';
+                        
                         return Row(
                           children: [
                             CircleAvatar(
@@ -280,7 +282,25 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                               child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'S', style: _patrickHand(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                             const SizedBox(width: 12),
-                            Expanded(child: Text(name, style: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    name, 
+                                    style: _patrickHand(fontSize: 14, fontWeight: FontWeight.bold), 
+                                    overflow: TextOverflow.ellipsis
+                                  ),
+                                  if (email.isNotEmpty)
+                                    Text(
+                                      email, 
+                                      style: _patrickHand(fontSize: 12, color: _primaryColor.withValues(alpha: 0.6)), 
+                                      overflow: TextOverflow.ellipsis
+                                    ),
+                                ],
+                              ),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.logout, size: 18),
                               onPressed: () async {

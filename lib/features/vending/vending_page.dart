@@ -143,7 +143,7 @@ class VendingPage extends StatelessWidget {
                                             borderColor: _primaryColor,
                                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                             child: Text(
-                                              'Sign up free',
+                                              'Sign up for free',
                                               style: _patrickHand(
                                                 color: Colors.white,
                                                 fontSize: 24,
@@ -225,7 +225,7 @@ class VendingPage extends StatelessWidget {
                                         borderColor: _primaryColor,
                                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                         child: Text(
-                                          'Sign up free',
+                                          'Sign up for free',
                                           style: _patrickHand(
                                             color: Colors.white,
                                             fontSize: 24,
@@ -933,7 +933,7 @@ class VendingPage extends StatelessWidget {
                     vertical: 10,
                   ), 
                   child: Text(
-                    'Get Started Free',
+                    'Get Started for Free',
                     style: _patrickHand(
                       fontSize: MediaQuery.of(context).size.width > 450 ? 18 : 14,
                       fontWeight: FontWeight.bold,
