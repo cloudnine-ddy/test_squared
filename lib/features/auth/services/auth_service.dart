@@ -41,9 +41,12 @@ class AuthService {
       // WEB: Use Supabase Standard OAuth (Redirect Flow)
       // This is more reliable for Web than the google_sign_in plugin
       if (kIsWeb) {
+        // Get the current origin dynamically (handles different ports)
+        final origin = Uri.base.origin;
+        print('[AuthService] Starting Google OAuth with redirect to: $origin');
         await _supabase.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: 'http://localhost:3000',
+          redirectTo: origin,
         );
         return true; // Return true to indicate flow started (redirect will happen)
       }
