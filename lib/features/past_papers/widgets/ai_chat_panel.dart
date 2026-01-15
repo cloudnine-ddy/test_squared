@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../data/past_paper_repository.dart'; // Added import
 import '../../../shared/wired/wired_widgets.dart'; // Sketchy widgets
+import '../../../shared/widgets/animated_mascot.dart';
 import 'chat_message.dart';
 import 'generated_question_card.dart';
 
@@ -267,17 +268,10 @@ class _AIChatPanelState extends State<AIChatPanel> {
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.psychology,
-              color: _primaryColor,
-              size: 20,
-            ),
+          // Animated Mascot Avatar
+          const AnimatedMascot(
+            size: 44,
+            borderRadius: BorderRadius.all(Radius.circular(10)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -285,10 +279,17 @@ class _AIChatPanelState extends State<AIChatPanel> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'AI Study Assistant',
+                  'Little Root',
                   style: _patrickHand(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Study Assistant',
+                  style: _patrickHand(
+                    fontSize: 12,
+                    color: _primaryColor.withValues(alpha: 0.7),
                   ),
                 ),
                 Row(
@@ -305,7 +306,7 @@ class _AIChatPanelState extends State<AIChatPanel> {
                     Text(
                       'Online',
                       style: _patrickHand(
-                        fontSize: 12, 
+                        fontSize: 12,
                         color: Colors.green,
                       ),
                     ),

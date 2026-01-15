@@ -1,8 +1,19 @@
 {
     "rewrites": [
         {
-            "source": "/(.*)",
+            "source": "/((?!assets|icons|favicon|manifest|flutter).*)",
             "destination": "/index.html"
+        }
+    ],
+    "headers": [
+        {
+            "source": "/(.*)",
+            "headers": [
+                {
+                    "key": "Cache-Control",
+                    "value": "no-cache"
+                }
+            ]
         }
     ]
 }
