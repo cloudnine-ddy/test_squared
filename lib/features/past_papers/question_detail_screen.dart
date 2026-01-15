@@ -1888,6 +1888,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               perPartFeedback: _aiFeedback?['perPartResults'],
               showSolutions: _answerSubmitted, // Changed from false
               onFigureTap: _showFullFigure, // Added this line
+              isPremium: isPremium,
+              onUpgrade: () => context.push('/premium'),
             ),
           ),
 
@@ -2122,10 +2124,13 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ],
               ),
             ),
-            // Show hints only if premium
-            if (isPremium && ((_aiFeedback!['hints'] as List?)?.isNotEmpty ?? false)) ...[
+            // Show hints for all users (blurred for free users)
+            if ((_aiFeedback!['hints'] as List?)?.isNotEmpty ?? false) ...[
               const SizedBox(height: 12),
-              _buildFeedbackList('Hints', (_aiFeedback!['hints'] as List).cast<String>(), Colors.amber, Icons.lightbulb_outline),
+              if (isPremium) 
+                _buildFeedbackList('Hints', (_aiFeedback!['hints'] as List).cast<String>(), Colors.amber, Icons.lightbulb_outline)
+              else
+                _buildBlurredHintsWithUpgrade((_aiFeedback!['hints'] as List).cast<String>()),
             ],
           ],
         ],
@@ -3011,6 +3016,141 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             ],
           ),
         )),
+      ],
+    );
+  }
+
+  /// Builds a blurred hints section with a premium upgrade overlay for free users
+  Widget _buildBlurredHintsWithUpgrade(List<String> hints) {
+    return Stack(
+      children: [
+        // Blurred hints content
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline, color: Colors.amber, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Hints',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ...hints.take(3).map((item) => Padding(
+                    padding: const EdgeInsets.only(left: 22, bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('• ', style: TextStyle(color: Colors.amber)),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: TextStyle(
+                              color: AppColors.textPrimary.withValues(alpha: 0.8),
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Premium unlock overlay
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Colors.transparent,
+            ),
+            child: Center(
+              child: WiredCard(
+                backgroundColor: AppColors.background,
+                borderColor: Colors.amber,
+                borderWidth: 2,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.amber, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.lock_outline,
+                        size: 20,
+                        color: Colors.amber,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Premium Feature',
+                      style: _patrickHand(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Upgrade to unlock AI hints',
+                      style: _patrickHand(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    WiredButton(
+                      onPressed: () => context.push('/premium'),
+                      backgroundColor: Colors.amber,
+                      filled: true,
+                      borderColor: Colors.amber.shade700,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star, color: Colors.white, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Upgrade',
+                            style: _patrickHand(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/question_blocks.dart';
 import '../../../core/theme/app_colors.dart';
 import 'dart:math' as math;
+import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../shared/wired/wired_widgets.dart';
 import 'pdf_crop_viewer.dart';
@@ -16,6 +17,8 @@ class SmartQuestionRenderer extends StatefulWidget {
   final Map<String, dynamic>? savedAnswers;
   final bool isSubmitted;
   final VoidCallback? onFigureTap;
+  final bool isPremium;
+  final VoidCallback? onUpgrade;
 
   const SmartQuestionRenderer({
     super.key,
@@ -26,6 +29,8 @@ class SmartQuestionRenderer extends StatefulWidget {
     this.savedAnswers,
     this.isSubmitted = false,
     this.onFigureTap,
+    this.isPremium = true,
+    this.onUpgrade,
   });
 
   @override
@@ -306,23 +311,27 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> with Tick
                   _buildInputArea(block),
 
                   // AI Feedback Box - Color based on score
+                  // Blurred for free users with upgrade prompt
                   if (hasFeedback && feedbackText.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    WiredCard(
-                      backgroundColor: feedbackColor.withValues(alpha: 0.05),
-                      borderColor: feedbackColor.withValues(alpha: 0.5),
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        feedbackText,
-                        style: TextStyle(
-                          fontFamily: 'PatrickHand',
-                          fontStyle: FontStyle.italic,
-                          color: feedbackColor,
-                          fontSize: 17,
-                          height: 1.4,
+                    if (widget.isPremium)
+                      WiredCard(
+                        backgroundColor: feedbackColor.withValues(alpha: 0.05),
+                        borderColor: feedbackColor.withValues(alpha: 0.5),
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          feedbackText,
+                          style: TextStyle(
+                            fontFamily: 'PatrickHand',
+                            fontStyle: FontStyle.italic,
+                            color: feedbackColor,
+                            fontSize: 17,
+                            height: 1.4,
+                          ),
                         ),
-                      ),
-                    ),
+                      )
+                    else
+                      _buildBlurredFeedbackWithUpgrade(feedbackText, feedbackColor),
                   ],
 
                    // Solution View
@@ -387,6 +396,132 @@ class _SmartQuestionRendererState extends State<SmartQuestionRenderer> with Tick
      // Previously showed Official Answer and AI Model Answer here
      // Now removed since these are available in the Official and AI Explanation tabs
      return const SizedBox.shrink();
+  }
+
+  /// Builds a blurred feedback section with a premium upgrade overlay for free users
+  Widget _buildBlurredFeedbackWithUpgrade(String feedbackText, Color feedbackColor) {
+    return Stack(
+      children: [
+        // Blurred feedback content
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: feedbackColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: feedbackColor.withValues(alpha: 0.5)),
+              ),
+              child: Text(
+                feedbackText,
+                style: TextStyle(
+                  fontFamily: 'PatrickHand',
+                  fontStyle: FontStyle.italic,
+                  color: feedbackColor,
+                  fontSize: 17,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Premium unlock overlay - Sketchy hand-drawn style (compact layout)
+        Positioned.fill(
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.background.withValues(alpha: 0.6),
+            ),
+            child: Center(
+              child: WiredCard(
+                backgroundColor: AppColors.background,
+                borderColor: Colors.amber,
+                borderWidth: 2.5,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Lock icon with sketchy circle
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: CustomPaint(
+                        painter: _SketchyCirclePainter(color: Colors.amber),
+                        child: const Center(
+                          child: Icon(
+                            Icons.lock_outline,
+                            size: 16,
+                            color: Colors.amber,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Text column
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Hints Locked',
+                          style: TextStyle(
+                            fontFamily: 'PatrickHand',
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Upgrade to unlock',
+                          style: TextStyle(
+                            fontFamily: 'PatrickHand',
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    // Upgrade button
+                    WiredButton(
+                      onPressed: widget.onUpgrade ?? () {},
+                      backgroundColor: Colors.amber,
+                      filled: true,
+                      borderColor: Colors.amber.shade700,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star, color: Colors.white, size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Upgrade',
+                            style: TextStyle(
+                              fontFamily: 'PatrickHand',
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -711,4 +846,47 @@ class _CollapsibleFiguresPanelState extends State<CollapsibleFiguresPanel> with 
       height: (loc['height_percent'] ?? 100).toDouble(),
     );
   }
+}
+
+/// Custom painter for a hand-drawn sketchy circle effect
+class _SketchyCirclePainter extends CustomPainter {
+  final Color color;
+  
+  _SketchyCirclePainter({required this.color});
+  
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round;
+    
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 2;
+    
+    // Draw a slightly wobbly circle for hand-drawn effect
+    final path = Path();
+    final random = math.Random(42); // Fixed seed for consistency
+    
+    for (int i = 0; i <= 360; i += 10) {
+      final angle = i * math.pi / 180;
+      final wobble = (random.nextDouble() - 0.5) * 1.5;
+      final r = radius + wobble;
+      final x = center.dx + r * math.cos(angle);
+      final y = center.dy + r * math.sin(angle);
+      
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    
+    canvas.drawPath(path, paint);
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

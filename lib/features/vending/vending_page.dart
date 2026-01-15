@@ -123,14 +123,13 @@ class VendingPage extends StatelessWidget {
                                         children: [
                                           WiredButton(
                                             onPressed: () => context.push('/login'),
-                                            filled: true,
-                                            backgroundColor: _primaryColor,
+                                            filled: false,
                                             borderColor: _primaryColor,
                                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                             child: Text(
                                               'Log in',
                                               style: _patrickHand(
-                                                color: Colors.white,
+                                                color: _primaryColor,
                                                 fontSize: 24,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -139,13 +138,14 @@ class VendingPage extends StatelessWidget {
                                           const SizedBox(width: 24),
                                           WiredButton(
                                             onPressed: () => context.push('/signup'),
-                                            filled: false,
+                                            filled: true,
+                                            backgroundColor: _primaryColor,
                                             borderColor: _primaryColor,
                                             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                             child: Text(
                                               'Sign up free',
                                               style: _patrickHand(
-                                                color: _primaryColor,
+                                                color: Colors.white,
                                                 fontSize: 24,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -206,14 +206,13 @@ class VendingPage extends StatelessWidget {
                                     children: [
                                       WiredButton(
                                         onPressed: () => context.push('/login'),
-                                        filled: true,
-                                        backgroundColor: _primaryColor,
+                                        filled: false,
                                         borderColor: _primaryColor,
                                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                         child: Text(
                                           'Log in',
                                           style: _patrickHand(
-                                            color: Colors.white,
+                                            color: _primaryColor,
                                             fontSize: 24,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -221,13 +220,14 @@ class VendingPage extends StatelessWidget {
                                       ),
                                       WiredButton(
                                         onPressed: () => context.push('/signup'),
-                                        filled: false,
+                                        filled: true,
+                                        backgroundColor: _primaryColor,
                                         borderColor: _primaryColor,
                                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                                         child: Text(
                                           'Sign up free',
                                           style: _patrickHand(
-                                            color: _primaryColor,
+                                            color: Colors.white,
                                             fontSize: 24,
                                             fontWeight: FontWeight.bold,
                                           ),
