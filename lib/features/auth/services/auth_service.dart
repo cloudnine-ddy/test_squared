@@ -41,12 +41,18 @@ class AuthService {
       // WEB: Use Supabase Standard OAuth (Redirect Flow)
       // This is more reliable for Web than the google_sign_in plugin
       if (kIsWeb) {
-        // Get the current origin dynamically (handles different ports)
+        // Get the current origin dynamically
         final origin = Uri.base.origin;
-        print('[AuthService] Starting Google OAuth with redirect to: $origin');
+        
+        // Use production URL if not on localhost
+        final redirectUrl = origin.contains('localhost') 
+            ? origin 
+            : 'https://test-squared.vercel.app';
+            
+        print('[AuthService] Starting Google OAuth with redirect to: $redirectUrl');
         await _supabase.auth.signInWithOAuth(
           OAuthProvider.google,
-          redirectTo: origin,
+          redirectTo: redirectUrl,
         );
         return true; // Return true to indicate flow started (redirect will happen)
       }
