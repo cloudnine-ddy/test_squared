@@ -304,12 +304,7 @@ class PremiumPage extends StatelessWidget {
       buttonColor: AppColors.primary,
       filledButton: true,
       onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-             content: Text('Payment coming soon!', style: _patrickHand(color: Colors.white)),
-             backgroundColor: AppColors.primary,
-          ),
-        );
+        context.push('/checkout/pro');
       },
       isPopular: true,
     );
@@ -335,12 +330,7 @@ class PremiumPage extends StatelessWidget {
       buttonColor: AppColors.accent,
       filledButton: true,
       onPressed: () {
-         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-             content: Text('Payment coming soon!', style: _patrickHand(color: Colors.white)),
-             backgroundColor: AppColors.primary,
-          ),
-        );
+        context.push('/checkout/elite');
       },
       isPopular: false,
     );

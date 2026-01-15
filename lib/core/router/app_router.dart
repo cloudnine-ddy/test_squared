@@ -19,6 +19,7 @@ import '../../features/bookmarks/screens/bookmarks_screen.dart';
 import '../../features/search/screens/search_screen.dart';
 import '../../features/settings/screens/accessibility_settings_screen.dart';
 import '../../features/premium/premium_page.dart';
+import '../../features/premium/checkout_page.dart';
 import '../../features/vending/vending_page.dart';
 import '../../main.dart' show isPasswordRecoverySession;
 
@@ -104,6 +105,13 @@ final goRouter = GoRouter(
     GoRoute(
       path: '/premium',
       builder: (context, state) => const PremiumPage(),
+    ),
+    GoRoute(
+      path: '/checkout/:planType',
+      builder: (context, state) {
+        final planType = state.pathParameters['planType'] ?? 'pro';
+        return CheckoutPage(planType: planType);
+      },
     ),
     GoRoute(
       path: '/papers/year/:year/subject/:subjectId',
