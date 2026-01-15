@@ -71,8 +71,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
             _isLoading = false;
           });
           
-          ToastService.showSuccess('Account created successfully!');
-          context.go('/dashboard');
+          // Check if email confirmation is required
+          final supabase = Supabase.instance.client;
+          final user = supabase.auth.currentUser;
+          
+          if (user != null && user.emailConfirmedAt != null) {
+            // Email already confirmed (or confirmation not required)
+            ToastService.showSuccess('Account created successfully!');
+            context.go('/dashboard');
+          } else {
+            // Email confirmation required - show message and stay on page
+            _showEmailConfirmationDialog();
+          }
         }
       } on AuthException catch (e) {
         if (mounted) {
@@ -90,6 +100,51 @@ class _SignUpScreenState extends State<SignUpScreen> {
         }
       }
     }
+  }
+
+  void _showEmailConfirmationDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Check Your Email 📧',
+          style: _patrickHand(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'We\'ve sent a confirmation link to:',
+              style: _patrickHand(fontSize: 16, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _emailController.text.trim(),
+              style: _patrickHand(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Please click the link in the email to verify your account, then come back to login.',
+              style: _patrickHand(fontSize: 14, color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go('/login');
+            },
+            child: Text(
+              'Go to Login',
+              style: _patrickHand(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleGoogleSignIn() async {
