@@ -24,9 +24,29 @@ import '../../features/premium/premium_page.dart';
 import '../../features/premium/checkout_page.dart';
 import '../../features/vending/vending_page.dart';
 import '../../main.dart' show isPasswordRecoverySession;
+import 'dart:async';
+
+/// A class that converts a Stream into a Listenable for GoRouter
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen(
+          (dynamic _) => notifyListeners(),
+        );
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
 
 final goRouter = GoRouter(
   initialLocation: '/',
+  refreshListenable: GoRouterRefreshStream(Supabase.instance.client.auth.onAuthStateChange),
   redirect: (context, state) {
     final supabase = Supabase.instance.client;
     final user = supabase.auth.currentUser;
@@ -58,13 +78,7 @@ final goRouter = GoRouter(
     ];
     
     if (!isLoggedIn) {
-      bool isProtected = false;
-      for (var route in protectedRoutes) {
-        if (path.startsWith(route)) {
-          isProtected = true;
-          break;
-        }
-      }
+      final isProtected = protectedRoutes.any((route) => path == route || path.startsWith('$route/'));
       if (isProtected) return '/login';
     }
 

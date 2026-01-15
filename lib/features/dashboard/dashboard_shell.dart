@@ -8,6 +8,7 @@ import '../auth/services/auth_service.dart';
 import '../auth/providers/auth_provider.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
+import 'widgets/explore_subjects_sheet.dart';
 
 /// A shell wrapper for the dashboard that keeps the sidebar persistent
 class DashboardShell extends ConsumerStatefulWidget {
@@ -67,6 +68,21 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
       });
     } catch (e) {
       setState(() => _isLoadingPinnedSubjects = false);
+    }
+  }
+
+  void _showSubjectSelector(BuildContext context) async {
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => const ExploreSubjectsSheet(),
+    );
+
+    if (result != null && context.mounted) {
+      final id = result['id'];
+      final name = result['name'];
+      if (id != null && name != null) {
+        context.go('/dashboard?subjectId=$id&subjectName=${Uri.encodeComponent(name)}');
+      }
     }
   }
 
@@ -131,11 +147,11 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                   ),
                 ),
 
-                // Secondary Navigation Header (Return to dashboard)
+                // Secondary Navigation Header (Explore Subjects)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                   child: WiredButton(
-                    onPressed: () => context.go('/dashboard'),
+                    onPressed: () => _showSubjectSelector(context),
                     filled: true,
                     backgroundColor: _primaryColor,
                     borderColor: _primaryColor,
@@ -143,10 +159,10 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.home, color: Colors.white, size: 18),
+                        const Icon(Icons.search, color: Colors.white, size: 18),
                         const SizedBox(width: 10),
                         Text(
-                          'Dashboard',
+                          'Explore Subjects',
                           style: _patrickHand(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ],
