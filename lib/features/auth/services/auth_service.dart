@@ -43,12 +43,10 @@ class AuthService {
       if (kIsWeb) {
         // Get the current origin dynamically
         final origin = Uri.base.origin;
-        
-        // Use production URL if not on localhost
-        final redirectUrl = origin.contains('localhost') 
-            ? origin 
-            : 'https://test-squared.vercel.app';
-            
+
+        // Use the current origin as redirect URL (works for any domain)
+        final redirectUrl = origin;
+
         print('[AuthService] Starting Google OAuth with redirect to: $redirectUrl');
         await _supabase.auth.signInWithOAuth(
           OAuthProvider.google,
@@ -113,7 +111,7 @@ class AuthService {
     } catch (e) {
       // Ignore Google sign-out errors
     }
-    
+
     await _supabase.auth.signOut();
   }
 
@@ -121,8 +119,8 @@ class AuthService {
   Future<void> resetPasswordForEmail(String email) async {
     await _supabase.auth.resetPasswordForEmail(
       email,
-      // Redirect to root - the app will detect recovery session and navigate to reset-password
-      redirectTo: 'http://localhost:3000/',
+      // Redirect to current origin - the app will detect recovery session and navigate to reset-password
+      redirectTo: kIsWeb ? Uri.base.origin : 'https://testsquared.space',
     );
   }
 
