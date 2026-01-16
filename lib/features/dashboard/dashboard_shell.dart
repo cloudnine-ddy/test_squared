@@ -13,7 +13,20 @@ import 'widgets/explore_subjects_sheet.dart';
 /// A shell wrapper for the dashboard that keeps the sidebar persistent
 class DashboardShell extends ConsumerStatefulWidget {
   final Widget child;
-  
+
+  // Static callback to refresh pinned subjects
+  static VoidCallback? _refreshCallback;
+
+  /// Call this from anywhere to refresh pinned subjects in the sidebar
+  static void refreshPinnedSubjects() {
+    _refreshCallback?.call();
+  }
+
+  /// Register the refresh callback
+  static void _registerRefreshCallback(VoidCallback callback) {
+    _refreshCallback = callback;
+  }
+
   const DashboardShell({
     super.key,
     required this.child,
@@ -55,19 +68,26 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   @override
   void initState() {
     super.initState();
-    _loadPinnedSubjects();
+    // Register this instance's refresh method as the static callback
+    DashboardShell._registerRefreshCallback(_refreshPinnedSubjects);
+    _refreshPinnedSubjects();
   }
 
-  Future<void> _loadPinnedSubjects() async {
+  /// Internal method to refresh pinned subjects
+  Future<void> _refreshPinnedSubjects() async {
     setState(() => _isLoadingPinnedSubjects = true);
     try {
       final subjects = await PastPaperRepository().getPinnedSubjects();
-      setState(() {
-        _pinnedSubjects = subjects;
-        _isLoadingPinnedSubjects = false;
-      });
+      if (mounted) {
+        setState(() {
+          _pinnedSubjects = subjects;
+          _isLoadingPinnedSubjects = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingPinnedSubjects = false);
+      if (mounted) {
+        setState(() => _isLoadingPinnedSubjects = false);
+      }
     }
   }
 
@@ -169,14 +189,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     ),
                   ),
                 ),
-                
+
                 const SizedBox(height: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: WiredDivider(color: _primaryColor, thickness: 1.5),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // My Subjects Title
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -192,7 +212,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                     ),
                   ),
                 ),
-                
+
                 // Subjects List
                 Expanded(
                   child: _isLoadingPinnedSubjects
@@ -267,13 +287,13 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                         ),
                       WiredDivider(color: _primaryColor, thickness: 1.5),
                       const SizedBox(height: 16),
-                      
+
                       // User Profile Row
                       Builder(builder: (context) {
                         final user = Supabase.instance.client.auth.currentUser;
                         final name = user?.userMetadata?['full_name'] as String? ?? 'Student';
                         final email = user?.email ?? '';
-                        
+
                         return Row(
                           children: [
                             CircleAvatar(
@@ -288,14 +308,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    name, 
-                                    style: _patrickHand(fontSize: 14, fontWeight: FontWeight.bold), 
+                                    name,
+                                    style: _patrickHand(fontSize: 14, fontWeight: FontWeight.bold),
                                     overflow: TextOverflow.ellipsis
                                   ),
                                   if (email.isNotEmpty)
                                     Text(
-                                      email, 
-                                      style: _patrickHand(fontSize: 12, color: _primaryColor.withValues(alpha: 0.6)), 
+                                      email,
+                                      style: _patrickHand(fontSize: 12, color: _primaryColor.withValues(alpha: 0.6)),
                                       overflow: TextOverflow.ellipsis
                                     ),
                                 ],
@@ -317,7 +337,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
               ],
             ),
           ),
-          
+
           // Main Content
           Expanded(child: widget.child),
         ],

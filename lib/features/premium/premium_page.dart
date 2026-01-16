@@ -33,7 +33,13 @@ class PremiumPage extends StatelessWidget {
             backgroundColor: AppColors.primary,
             leading: IconButton(
                icon: const Icon(Icons.arrow_back, color: Colors.white),
-               onPressed: () => context.pop(),
+               onPressed: () {
+                 if (context.canPop()) {
+                   context.pop();
+                 } else {
+                   context.go('/dashboard');
+                 }
+               },
             ),
             title: Text(
               'TestSquared Premium',
@@ -235,7 +241,7 @@ class PremiumPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 40),
                     WiredButton(
-                      onPressed: () {}, // TODO: Scroll up or action
+                      onPressed: () => context.push('/checkout/pro'),
                       backgroundColor: Colors.white,
                       borderColor: Colors.white,
                       filled: true,
@@ -276,7 +282,7 @@ class PremiumPage extends StatelessWidget {
       footnote: '*Limits apply: AI Answer checks – 5/day, Question Generation - 10/Week',
       buttonText: 'Get Free →',
       buttonColor: AppColors.primary,
-      filledButton: false, 
+      filledButton: false,
       onPressed: () => context.pop(),
       isPopular: false,
     );
@@ -376,12 +382,12 @@ class PremiumPage extends StatelessWidget {
   Widget _buildCardContent(
     String title,
     String subtitle,
-    String price, 
-    String period, 
+    String price,
+    String period,
     List<String> features,
     String footnote,
-    String buttonText, 
-    Color buttonColor, 
+    String buttonText,
+    Color buttonColor,
     bool filledButton,
     VoidCallback? onPressed,
     {required bool isPopular}

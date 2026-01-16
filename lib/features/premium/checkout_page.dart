@@ -11,7 +11,7 @@ import '../auth/providers/auth_provider.dart';
 /// Checkout page for manual payment processing via QR and receipt upload
 class CheckoutPage extends ConsumerStatefulWidget {
   final String planType; // 'pro' or 'elite'
-  
+
   const CheckoutPage({
     super.key,
     required this.planType,
@@ -60,7 +60,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   Future<void> _pickReceipt() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'], // Allow PDF and images
       withData: true, // Important: allows getting bytes on all platforms
     );
 
@@ -86,11 +86,11 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     try {
       final supabase = ref.read(supabaseClientProvider);
       final user = supabase.auth.currentUser;
-      
+
       if (user == null) throw Exception('User not authenticated');
 
       String? publicUrl;
-      
+
       // 1. Upload file to storage
       // Use uploadBinary for all platforms to avoid dart:io dependency which breaks web
       final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.${_selectedFile!.extension}';
@@ -116,7 +116,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
 
       // 3. Success Feedback
       _confettiController.play();
-      
+
       // Refresh user data
       ref.invalidate(currentUserProvider);
 
@@ -173,7 +173,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     final String planName = isPro ? 'Pro' : 'Elite';
     final String price = isPro ? 'RM 10' : 'RM 29';
     final Color accentColor = isPro ? AppColors.primary : AppColors.accent;
-    
+
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
@@ -181,7 +181,13 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: _primaryColor),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/premium');
+            }
+          },
         ),
         title: Text(
           'Checkout',
@@ -231,9 +237,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // QR Code Section
                     Text(
                       'Step 1: Scan & Pay',
@@ -274,9 +280,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 32),
-                    
+
                     // Upload Section
                     Text(
                       'Step 2: Upload Receipt',
@@ -298,7 +304,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              _selectedFile != null ? _selectedFile!.name : 'Click to select receipt (Image or PDF)',
+                              _selectedFile != null ? _selectedFile!.name : 'Click to select receipt',
                               textAlign: TextAlign.center,
                               style: _patrickHand(
                                 fontSize: 16,
@@ -317,12 +323,21 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 40),
-                    
+
                     // Action Buttons
                     if (_isUploading)
-                      const CircularProgressIndicator(color: AppColors.primary)
+                      Container(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          children: [
+                            const CircularProgressIndicator(color: AppColors.primary),
+                            const SizedBox(height: 16),
+                            Text('Uploading receipt...', style: _patrickHand(color: AppColors.primary)),
+                          ],
+                        ),
+                      )
                     else
                       Column(
                         children: [
@@ -360,7 +375,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
               ),
             ),
           ),
-          
+
           // Confetti!
           Align(
             alignment: Alignment.topCenter,

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/router/app_router.dart'; // Import goRouter instance
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -430,10 +431,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
         // For structured questions: load answers but don't show feedback/lock form
         // (allows user to see their previous answers but still retry freely)
         final isStructured = _question?.isStructured == true;
-        
+
         setState(() {
           _previousAttempt = attempt.toMap();
-          
+
           // Pre-fill the answer for all question types
           if (attempt.answerText != null) {
             // Check if it's structured answer (JSON format)
@@ -469,10 +470,10 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             _isViewingPreviousAnswer = false;
             return;
           }
-          
+
           // For MCQ/regular questions: show feedback and lock form
           _isViewingPreviousAnswer = true;
-          
+
           // Show the feedback automatically based on previous attempt result
           _aiFeedback = {
             'score': attempt.score,
@@ -580,32 +581,32 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
     if (_question == null || _studentAnswerController.text.trim().isEmpty) return;
 
     // Check if user can use check answer (premium or has free checks remaining)
-    final canUseCheckAnswer = ref.read(canUseCheckAnswerProvider);
+    // REMOVED: Free checks limit - now unlimited for all users
+    // final canUseCheckAnswer = ref.read(canUseCheckAnswerProvider);
     final isPremium = ref.read(isPremiumProvider);
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
-    if (!canUseCheckAnswer) {
-      // Show upgrade dialog when free checks exhausted
-      AccessControlService.checkPremium(
-        context,
-        ref,
-        featureName: 'AI Answer Checking',
-        highlights: [
-          'You have used all 5 free answer checks',
-          'Upgrade to Premium for unlimited checks',
-          'Get instant AI-powered feedback',
-          'Track your progress over time',
-        ],
-      );
-      return;
-    }
+    // REMOVED: Free checks limit check - unlimited answer checking now
+    // if (!canUseCheckAnswer) {
+    //   AccessControlService.checkPremium(
+    //     context,
+    //     ref,
+    //     featureName: 'AI Answer Checking',
+    //     highlights: [
+    //       'You have used all 5 free answer checks',
+    //       'Upgrade to Premium for unlimited checks',
+    //       'Get instant AI-powered feedback',
+    //       'Track your progress over time',
+    //     ],
+    //   );
+    //   return;
+    // }
 
-    // Decrement free checks for non-premium users
-    if (!isPremium && userId != null) {
-      await decrementFreeChecks(userId);
-      // Invalidate the provider to refresh the count
-      ref.invalidate(currentUserProvider);
-    }
+    // REMOVED: Decrement free checks - no longer needed
+    // if (!isPremium && userId != null) {
+    //   await decrementFreeChecks(userId);
+    //   ref.invalidate(currentUserProvider);
+    // }
 
     setState(() {
       _isCheckingAnswer = true;
@@ -689,31 +690,32 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
   Future<void> _checkStructuredAnswer() async {
     if (_question == null || _structuredAnswers.isEmpty) return;
 
-    // Check premium access
-    final canUseCheckAnswer = ref.read(canUseCheckAnswerProvider);
+    // REMOVED: Free checks limit - now unlimited for all users
+    // final canUseCheckAnswer = ref.read(canUseCheckAnswerProvider);
     final isPremium = ref.read(isPremiumProvider);
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
-    if (!canUseCheckAnswer) {
-      AccessControlService.checkPremium(
-        context,
-        ref,
-        featureName: 'AI Answer Checking',
-        highlights: [
-          'You have used all 5 free answer checks',
-          'Upgrade to Premium for unlimited checks',
-          'Get instant AI-powered feedback',
-          'Track your progress over time',
-        ],
-      );
-      return;
-    }
+    // REMOVED: Free checks limit check - unlimited answer checking now
+    // if (!canUseCheckAnswer) {
+    //   AccessControlService.checkPremium(
+    //     context,
+    //     ref,
+    //     featureName: 'AI Answer Checking',
+    //     highlights: [
+    //       'You have used all 5 free answer checks',
+    //       'Upgrade to Premium for unlimited checks',
+    //       'Get instant AI-powered feedback',
+    //       'Track your progress over time',
+    //     ],
+    //   );
+    //   return;
+    // }
 
-    // Decrement free checks for non-premium users
-    if (!isPremium && userId != null) {
-      await decrementFreeChecks(userId);
-      ref.invalidate(currentUserProvider);
-    }
+    // REMOVED: Decrement free checks - no longer needed
+    // if (!isPremium && userId != null) {
+    //   await decrementFreeChecks(userId);
+    //   ref.invalidate(currentUserProvider);
+    // }
 
     setState(() {
       _isCheckingAnswer = true;
@@ -925,7 +927,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 ),
               ),
             ),
-            
+
             // Sketchy Close Button (Top Right)
             Positioned(
               top: 0,
@@ -1043,7 +1045,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                             ? _previousAttempt!['score'] as int?
                             : (_aiFeedback?['score'] as int?);
 
-                       return const SizedBox.shrink(); 
+                       return const SizedBox.shrink();
                      }
                   ),
                ],
@@ -1103,30 +1105,8 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                            }
                         }
 
-
-                        // Only show on 'Your Answer' tab (index 0)
-                        if (_tabController.index != 0) {
-                          // Maybe show "Back to Question"? Or just disabled?
-                          // Let's show "View Question" to jump back to tab 0
-                          return Center(
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 250),
-                              child: WiredButton(
-                                onPressed: () => _tabController.animateTo(0),
-                                backgroundColor: Colors.white,
-                                filled: true,
-                                borderColor: _primaryColor,
-                                padding: const EdgeInsets.symmetric(vertical: 8), // Reduced from 12
-                                 child: Center(
-                                    child: Text(
-                                      'Answer Question',
-                                      style: _patrickHand(color: _primaryColor, fontWeight: FontWeight.bold, fontSize: 16),
-                                    ),
-                                 ),
-                              ),
-                            ),
-                          );
-                        }
+                        // REMOVED: Tab restriction - now allow submit from any tab
+                        // Previously showed "Answer Question" button on non-tab-0, now always show submit
 
                         return Center(
                           child: ConstrainedBox(
@@ -1395,7 +1375,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               SliverFillRemaining(
                 hasScrollBody: true,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4), 
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
                   child: _buildTabbedCard(),
                 ),
               ),
@@ -1435,7 +1415,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
       final hasImageUrl = _question!.imageUrl != null && _question!.imageUrl!.isNotEmpty;
       final pdfUrl = _question!.pdfUrl;
       final loc = _question!.aiAnswerRaw?['figure_location'];
-      
+
       if (hasImageUrl) {
         figures.add(FigureBlock(
           url: _question!.imageUrl,
@@ -1470,7 +1450,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
 
           // 2. Tab Headers
           Container(
-            height: 48, 
+            height: 48,
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(color: _primaryColor.withValues(alpha: 0.1), width: 1.5),
@@ -1484,20 +1464,25 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                 _buildTabItem(1, 'Official', Icons.verified_outlined),
                 Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)),
                 _buildTabItem(2, 'AI Explanation', Icons.auto_awesome),
-                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)), 
+                Container(width: 1.5, color: _primaryColor.withValues(alpha: 0.2)),
               ],
             ),
           ),
 
-          // 3. Tab Content
+          // 3. Tab Content - Using IndexedStack to preserve state when switching tabs
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAnswerTab(),
-                _buildOfficialAnswerTab(),
-                _buildAiSolutionTab(),
-              ],
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, _) {
+                return IndexedStack(
+                  index: _tabController.index,
+                  children: [
+                    _buildAnswerTab(),
+                    _buildOfficialAnswerTab(),
+                    _buildAiSolutionTab(),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -1552,7 +1537,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                      (_structuredAnswers[part.label] as String?)?.isNotEmpty == true;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8), 
+      padding: const EdgeInsets.only(bottom: 8),
       child: WiredCard(
         backgroundColor: isExpanded ? Colors.white : const Color(0xFFFDFBF7),
         borderColor: isExpanded ? _primaryColor : _primaryColor.withValues(alpha: 0.3),
@@ -1562,7 +1547,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
           children: [
             // Header (always visible) - tap anywhere to toggle
             GestureDetector(
-              behavior: HitTestBehavior.opaque, 
+              behavior: HitTestBehavior.opaque,
               onTap: () => setState(() {
                 if (_expandedPartIndices.contains(index)) {
                   _expandedPartIndices.remove(index);
@@ -1581,7 +1566,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                       size: 26,
                     ),
                     const SizedBox(width: 4),
-                    
+
                     // Part label badge - Custom handwritten look
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1603,9 +1588,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(width: 12),
-                    
+
                     // Part content preview (only when collapsed)
                     if (!isExpanded)
                       Expanded(
@@ -1619,9 +1604,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                           ),
                         ),
                       ),
-                    
+
                     if (isExpanded) const Spacer(),
-                    
+
                     // Marks badge - Sketchy yellow bubble
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1643,9 +1628,9 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(width: 6),
-                    
+
                     // Status indicator (completed/pending)
                     if (tabType == 'answer' && hasAnswer)
                       const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 18),
@@ -1889,7 +1874,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
               showSolutions: _answerSubmitted, // Changed from false
               onFigureTap: _showFullFigure, // Added this line
               isPremium: isPremium,
-              onUpgrade: () => context.push('/premium'),
+              onUpgrade: () => goRouter.push('/premium'),
             ),
           ),
 
@@ -2127,7 +2112,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
             // Show hints for all users (blurred for free users)
             if ((_aiFeedback!['hints'] as List?)?.isNotEmpty ?? false) ...[
               const SizedBox(height: 12),
-              if (isPremium) 
+              if (isPremium)
                 _buildFeedbackList('Hints', (_aiFeedback!['hints'] as List).cast<String>(), Colors.amber, Icons.lightbulb_outline)
               else
                 _buildBlurredHintsWithUpgrade((_aiFeedback!['hints'] as List).cast<String>()),
@@ -3128,7 +3113,7 @@ class _QuestionDetailScreenState extends ConsumerState<QuestionDetailScreen>
                     ),
                     const SizedBox(height: 12),
                     WiredButton(
-                      onPressed: () => context.push('/premium'),
+                      onPressed: () => goRouter.push('/premium'),
                       backgroundColor: Colors.amber,
                       filled: true,
                       borderColor: Colors.amber.shade700,

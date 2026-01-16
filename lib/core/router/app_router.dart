@@ -66,17 +66,17 @@ final goRouter = GoRouter(
 
     // If NOT logged in, don't allow access to protected routes
     final protectedRoutes = [
-      '/dashboard', 
-      '/premium', 
-      '/checkout', 
-      '/progress', 
-      '/bookmarks', 
+      '/dashboard',
+      '/premium',
+      '/checkout',
+      '/progress',
+      '/bookmarks',
       '/search',
       '/topic',
       '/question',
       '/paper'
     ];
-    
+
     if (!isLoggedIn) {
       final isProtected = protectedRoutes.any((route) => path == route || path.startsWith('$route/'));
       if (isProtected) return '/login';
@@ -111,7 +111,7 @@ final goRouter = GoRouter(
       builder: (context, state) => const VendingPage(),
     ),
 
-    // Dashboard Shell (Protected Routes)
+    // Dashboard Shell (Protected Routes with sidebar)
     ShellRoute(
       builder: (context, state, child) => DashboardShell(child: child),
       routes: [
@@ -127,17 +127,6 @@ final goRouter = GoRouter(
           },
         ),
         GoRoute(
-          path: '/premium',
-          builder: (context, state) => const PremiumPage(),
-        ),
-        GoRoute(
-          path: '/checkout/:planType',
-          builder: (context, state) {
-            final planType = state.pathParameters['planType'] ?? 'pro';
-            return CheckoutPage(planType: planType);
-          },
-        ),
-        GoRoute(
           path: '/progress',
           builder: (context, state) => const ProgressDashboardScreen(),
         ),
@@ -149,7 +138,24 @@ final goRouter = GoRouter(
           path: '/search',
           builder: (context, state) => const SearchScreen(),
         ),
+        GoRoute(
+          path: '/dashboard-preview',
+          builder: (context, state) => const DashboardScreen(previewMode: true),
+        ),
       ],
+    ),
+
+    // Premium routes (outside ShellRoute to avoid navigation conflicts from question pages)
+    GoRoute(
+      path: '/premium',
+      builder: (context, state) => const PremiumPage(),
+    ),
+    GoRoute(
+      path: '/checkout/:planType',
+      builder: (context, state) {
+        final planType = state.pathParameters['planType'] ?? 'pro';
+        return CheckoutPage(planType: planType);
+      },
     ),
 
     // Non-Shell Protected Routes (e.g. Admin, Details)
@@ -157,10 +163,7 @@ final goRouter = GoRouter(
       path: '/admin',
       builder: (context, state) => const AdminShell(),
     ),
-    GoRoute(
-      path: '/dashboard-preview',
-      builder: (context, state) => const DashboardScreen(previewMode: true),
-    ),
+    // /dashboard-preview moved inside ShellRoute above
     GoRoute(
       path: '/topic/:topicId',
       builder: (context, state) {

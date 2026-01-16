@@ -15,7 +15,7 @@ class AdminQuestionPreviewView extends StatefulWidget {
 
 class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
   final _supabase = Supabase.instance.client;
-  
+
   bool _isLoading = true;
   List<Map<String, dynamic>> _subjects = [];
   String? _selectedSubjectId;
@@ -36,7 +36,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
           .from('subjects')
           .select('id, name')
           .order('name');
-      
+
       if (mounted) {
         setState(() {
           _subjects = List<Map<String, dynamic>>.from(res);
@@ -64,7 +64,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
           .select('id, name, subject_id')
           .eq('subject_id', subjectId)
           .order('name');
-      
+
       if (mounted) {
         setState(() {
           _topics = (res as List).map((t) => TopicModel.fromMap(t)).toList();
@@ -88,7 +88,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
           .select('id, question_number, content, type, marks, topic_id')
           .eq('topic_id', topicId)
           .order('question_number');
-      
+
       if (mounted) {
         setState(() {
           _questions = List<Map<String, dynamic>>.from(res);
@@ -103,7 +103,9 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Left sidebar - Navigation
+        // Note: Student Dashboard Sidebar is now provided by DashboardShell via ShellRoute
+
+        // Question Navigation sidebar
         Container(
           width: 320,
           decoration: BoxDecoration(
@@ -147,7 +149,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
                   ],
                 ),
               ),
-              
+
               // Subject Dropdown
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -178,7 +180,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
                   },
                 ),
               ),
-              
+
               // Topics and Questions List
               Expanded(
                 child: _isLoading
@@ -213,7 +215,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
                                 ),
                                 ..._topics.map((topic) => _buildTopicTile(topic)),
                               ],
-                              
+
                               // Questions Section (when topic selected)
                               if (_selectedTopicId != null && _questions.isNotEmpty) ...[
                                 const SizedBox(height: 16),
@@ -238,7 +240,27 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
                             ],
                           ),
               ),
-              
+
+              // Student Navigation Items (same as dashboard shell)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Column(
+                  children: [
+                    _buildNavButton(Icons.trending_up, 'My Progress', () {
+                      // Open progress in new tab or navigate
+                    }),
+                    const SizedBox(height: 8),
+                    _buildNavButton(Icons.bookmark, 'Bookmarks', () {
+                      // Open bookmarks
+                    }),
+                    const SizedBox(height: 8),
+                    _buildNavButton(Icons.search, 'Search', () {
+                      // Open search
+                    }),
+                  ],
+                ),
+              ),
+
               // Info Footer
               Container(
                 padding: const EdgeInsets.all(12),
@@ -262,7 +284,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
             ],
           ),
         ),
-        
+
         // Right side - Question Preview
         Expanded(
           child: _selectedQuestionId != null
@@ -319,7 +341,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
 
   Widget _buildTopicTile(TopicModel topic) {
     final isSelected = _selectedTopicId == topic.id;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
@@ -365,7 +387,7 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
     final isSelected = _selectedQuestionId == q['id'];
     final type = q['type']?.toString().toLowerCase() ?? 'structured';
     final isMcq = type == 'mcq';
-    
+
     return Tooltip(
       message: 'Q${q['question_number']} • ${isMcq ? 'MCQ' : 'Structured'} • ${q['marks'] ?? '?'} marks',
       child: InkWell(
@@ -400,6 +422,73 @@ class _AdminQuestionPreviewViewState extends State<AdminQuestionPreviewView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNavButton(IconData icon, String label, VoidCallback onTap) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.textSecondary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSubjectItem(String name) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.textPrimary.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          name,
+          style: TextStyle(fontFamily: 'PatrickHand', fontSize: 16, color: AppColors.textPrimary),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardNavButton(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.textPrimary.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textPrimary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: TextStyle(fontFamily: 'PatrickHand', fontSize: 16, fontWeight: FontWeight.w600))),
+        ],
       ),
     );
   }

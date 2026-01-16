@@ -9,6 +9,7 @@ import '../past_papers/models/topic_model.dart';
 import '../progress/data/topic_progress_repository.dart';
 import '../past_papers/widgets/circular_topic_progress.dart';
 import '../../shared/wired/wired_widgets.dart';
+import 'dashboard_shell.dart';
 
 class SubjectDetailView extends StatefulWidget {
   final String subjectName;
@@ -214,6 +215,9 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
 
       // Refresh the pinned subjects list in the parent
       widget.onPinChanged();
+
+      // Also refresh the sidebar in DashboardShell
+      DashboardShell.refreshPinnedSubjects();
     } catch (e) {
       print('Error toggling pin: $e');
       if (mounted) {
