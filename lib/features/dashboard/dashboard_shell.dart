@@ -43,7 +43,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
   final List<String> _curriculums = [
     'IGCSE',
-    'SPM (Coming Soon)',
+    'SPM',
     'A-Level (Coming Soon)',
   ];
 
@@ -77,7 +77,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Future<void> _refreshPinnedSubjects() async {
     setState(() => _isLoadingPinnedSubjects = true);
     try {
-      final subjects = await PastPaperRepository().getPinnedSubjects();
+      final subjects = await PastPaperRepository().getPinnedSubjects(curriculum: _selectedCurriculum);
       if (mounted) {
         setState(() {
           _pinnedSubjects = subjects;
@@ -94,14 +94,14 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   void _showSubjectSelector(BuildContext context) async {
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => const ExploreSubjectsSheet(),
+      builder: (context) => ExploreSubjectsSheet(curriculum: _selectedCurriculum),
     );
 
     if (result != null && context.mounted) {
       final id = result['id'];
       final name = result['name'];
       if (id != null && name != null) {
-        context.go('/dashboard?subjectId=$id&subjectName=${Uri.encodeComponent(name)}');
+        context.go('/dashboard?subjectId=$id&subjectName=${Uri.encodeComponent(name)}&curriculum=$_selectedCurriculum');
       }
     }
   }
@@ -162,6 +162,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           return;
                         }
                         setState(() => _selectedCurriculum = newValue);
+                        _refreshPinnedSubjects(); // Refresh subjects for new curriculum
+                        // Navigate to dashboard without subject to refresh view
+                        context.go('/dashboard?curriculum=$_selectedCurriculum');
                       },
                     ),
                   ),
@@ -228,7 +231,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                                   child: GestureDetector(
                                     onTap: () {
                                       // Special handling for dashboard home navigation with subject
-                                      context.go('/dashboard?subjectId=${subject.id}&subjectName=${Uri.encodeComponent(subject.name)}');
+                                      context.go('/dashboard?subjectId=${subject.id}&subjectName=${Uri.encodeComponent(subject.name)}&curriculum=$_selectedCurriculum');
                                     },
                                     child: WiredCard(
                                       borderColor: _primaryColor.withValues(alpha: 0.3),

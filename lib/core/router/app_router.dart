@@ -120,9 +120,11 @@ final goRouter = GoRouter(
           builder: (context, state) {
             final subjectId = state.uri.queryParameters['subjectId'];
             final subjectName = state.uri.queryParameters['subjectName'];
+            final curriculum = state.uri.queryParameters['curriculum'] ?? 'IGCSE';
             return DashboardScreen(
               initialSubjectId: subjectId,
               initialSubjectName: subjectName,
+              curriculum: curriculum,
             );
           },
         ),

@@ -53,13 +53,13 @@ class PastPaperRepository {
 
         for (var q in questionsData) {
           final topicIds = q['topic_ids'];
-          final type = q['type'] as String? ?? 'Structured'; 
-          
+          final type = q['type'] as String? ?? 'Structured';
+
           if (topicIds is List) {
             for (var topicId in topicIds) {
               final id = topicId.toString();
               topicCounts[id] = (topicCounts[id] ?? 0) + 1;
-              
+
               if (type.toLowerCase() == 'mcq') {
                  topicMCQCounts[id] = (topicMCQCounts[id] ?? 0) + 1;
               } else {
@@ -327,7 +327,7 @@ class PastPaperRepository {
     }
   }
 
-  Future<List<SubjectModel>> getPinnedSubjects() async {
+  Future<List<SubjectModel>> getPinnedSubjects({String? curriculum}) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {
@@ -347,11 +347,17 @@ class PastPaperRepository {
         return [];
       }
 
-      // Fetch the actual subject data
-      final subjectsResponse = await _supabase
+      // Fetch the actual subject data with optional curriculum filter
+      var query = _supabase
           .from('subjects')
           .select()
           .inFilter('id', pinnedIds.map((e) => e.toString()).toList());
+
+      if (curriculum != null) {
+        query = query.eq('curriculum', curriculum);
+      }
+
+      final subjectsResponse = await query;
 
       final List<dynamic> data = subjectsResponse as List<dynamic>;
 

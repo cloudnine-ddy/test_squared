@@ -4,7 +4,9 @@ import '../../past_papers/models/subject_model.dart';
 import '../../../shared/wired/wired_widgets.dart';
 
 class ExploreSubjectsSheet extends StatefulWidget {
-  const ExploreSubjectsSheet({super.key});
+  final String curriculum;
+
+  const ExploreSubjectsSheet({super.key, required this.curriculum});
 
   @override
   State<ExploreSubjectsSheet> createState() => _ExploreSubjectsSheetState();
@@ -13,7 +15,6 @@ class ExploreSubjectsSheet extends StatefulWidget {
 class _ExploreSubjectsSheetState extends State<ExploreSubjectsSheet> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  final String _selectedCurriculum = 'IGCSE';
 
   static const Color _primaryColor = Color(0xFF2D3E50);
   static const Color _backgroundColor = Color(0xFFFDFBF7);
@@ -73,7 +74,7 @@ class _ExploreSubjectsSheetState extends State<ExploreSubjectsSheet> {
                 ],
               ),
               const SizedBox(height: 20),
-              
+
               // Search Bar
               WiredCard(
                 backgroundColor: Colors.white,
@@ -96,7 +97,7 @@ class _ExploreSubjectsSheetState extends State<ExploreSubjectsSheet> {
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),  
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
                   style: _patrickHand(fontSize: 16),
                   onChanged: (value) {
@@ -111,7 +112,7 @@ class _ExploreSubjectsSheetState extends State<ExploreSubjectsSheet> {
               // Subjects List
               Flexible(
                 child: FutureBuilder<List<SubjectModel>>(
-                  future: PastPaperRepository().getSubjects(curriculum: _selectedCurriculum),    
+                  future: PastPaperRepository().getSubjects(curriculum: widget.curriculum),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(

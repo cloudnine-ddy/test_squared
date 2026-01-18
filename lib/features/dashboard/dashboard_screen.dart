@@ -10,12 +10,14 @@ class DashboardScreen extends ConsumerStatefulWidget {
   final bool previewMode;
   final String? initialSubjectId;
   final String? initialSubjectName;
-  
+  final String curriculum;
+
   const DashboardScreen({
-    super.key, 
+    super.key,
     this.previewMode = false,
     this.initialSubjectId,
     this.initialSubjectName,
+    this.curriculum = 'IGCSE',
   });
 
   @override
@@ -23,8 +25,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  String? _selectedSubjectName; 
-  String? _selectedSubjectId; 
+  String? _selectedSubjectName;
+  String? _selectedSubjectId;
   List<SubjectModel> _pinnedSubjects = [];
 
   static const Color _primaryColor = Color(0xFF2D3E50);
@@ -56,7 +58,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void didUpdateWidget(DashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialSubjectId != oldWidget.initialSubjectId) {
+    // If curriculum changed, clear the subject selection
+    if (widget.curriculum != oldWidget.curriculum) {
+      setState(() {
+        _selectedSubjectId = widget.initialSubjectId;
+        _selectedSubjectName = widget.initialSubjectName;
+      });
+      _loadPinnedSubjects();
+    } else if (widget.initialSubjectId != oldWidget.initialSubjectId) {
       setState(() {
         _selectedSubjectId = widget.initialSubjectId;
         _selectedSubjectName = widget.initialSubjectName;
@@ -97,7 +106,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _showSubjectSelector(BuildContext context) async {
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => const ExploreSubjectsSheet(),
+      builder: (context) => ExploreSubjectsSheet(curriculum: widget.curriculum),
     );
 
     if (result != null && context.mounted) {
