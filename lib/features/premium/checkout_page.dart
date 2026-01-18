@@ -252,23 +252,13 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                       padding: const EdgeInsets.all(16),
                       child: Column(
                         children: [
-                          Container(
-                            width: 200,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: const Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.qr_code_2, size: 80, color: Colors.grey),
-                                  SizedBox(height: 8),
-                                  Text('QR Code Placeholder', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                ],
-                              ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'lib/core/assets/images/QR_payment.png',
+                              width: 200,
+                              height: 200,
+                              fit: BoxFit.contain,
                             ),
                           ),
                           const SizedBox(height: 16),
