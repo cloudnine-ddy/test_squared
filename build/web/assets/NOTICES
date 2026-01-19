@@ -1816,6 +1816,10 @@ url_launcher_ios
 url_launcher_linux
 url_launcher_macos
 url_launcher_windows
+video_player
+video_player_android
+video_player_avfoundation
+video_player_platform_interface
 
 Copyright 2013 The Flutter Authors
 
@@ -5993,12 +5997,6 @@ limitations under the License.
 flutter
 
 Copyright 2014 The Flutter Authors. All rights reserved.
-Use of this source code is governed by a BSD-style license that can be
-found in the LICENSE file.
---------------------------------------------------------------------------------
-flutter
-
-Copyright 2014 The Flutter Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -6024,6 +6022,12 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+--------------------------------------------------------------------------------
+flutter
+
+Copyright 2014 The Flutter Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
 --------------------------------------------------------------------------------
 flutter
 
@@ -6139,6 +6143,7 @@ shared_preferences_web
 shared_preferences_windows
 url_launcher
 url_launcher_platform_interface
+video_player_web
 xdg_directories
 
 Copyright 2013 The Flutter Authors. All rights reserved.
