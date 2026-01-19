@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared/wired/wired_widgets.dart';
+import 'demo_video_player.dart';
 
 class VendingPage extends StatelessWidget {
   const VendingPage({super.key});
@@ -303,19 +304,14 @@ class VendingPage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // Content - Demo GIF
+                        // Content - Demo Video
                         Expanded(
                           child: ClipRRect(
                             borderRadius: const BorderRadius.only(
                               bottomLeft: Radius.circular(20),
                               bottomRight: Radius.circular(20),
                             ),
-                            child: Image.asset(
-                              'lib/core/assets/images/demo_general.gif',
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                              width: double.infinity,
-                            ),
+                            child: const DemoVideoPlayer(),
                           ),
                         ),
                       ],
