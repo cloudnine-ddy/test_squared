@@ -62,34 +62,56 @@ class _ImageAnnotationDialogState extends State<ImageAnnotationDialog> {
   Future<void> _saveAnnotation() async {
     setState(() => _isSaving = true);
     try {
-      // 1. Capture the boundary as an image
-      RenderRepaintBoundary boundary = _globalKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 2.0); // Higher resolution
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      print('[Sketch] Starting save annotation...');
 
+      // 1. Capture the boundary as an image
+      final context = _globalKey.currentContext;
+      if (context == null) {
+        throw Exception('RepaintBoundary context is null');
+      }
+
+      RenderRepaintBoundary boundary = context.findRenderObject() as RenderRepaintBoundary;
+      print('[Sketch] Boundary size: ${boundary.size}');
+
+      // Wait for the boundary to be ready (sometimes needed for first frame)
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+      print('[Sketch] Image captured: ${image.width}x${image.height}');
+
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       if (byteData == null) throw Exception('Failed to capture image');
 
       final Uint8List pngBytes = byteData.buffer.asUint8List();
+      print('[Sketch] PNG bytes: ${pngBytes.length}');
 
       // 2. Upload to Supabase
-      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final userId = user.id;
       final fileName = '${DateTime.now().millisecondsSinceEpoch}_annotated.png';
       final path = '$userId/$fileName';
+      print('[Sketch] Uploading to path: $path');
 
       await Supabase.instance.client.storage
           .from('note-images')
           .uploadBinary(path, pngBytes);
+      print('[Sketch] Upload complete');
 
       final newUrl = Supabase.instance.client.storage
           .from('note-images')
           .getPublicUrl(path);
+      print('[Sketch] Public URL: $newUrl');
 
       if (mounted) {
-        Navigator.pop(context, newUrl);
+        Navigator.pop(this.context, newUrl);
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('[Sketch] ERROR: $e');
+      print('[Sketch] Stack: $stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(this.context).showSnackBar(
           SnackBar(content: Text('Failed to save annotation: $e')),
         );
       }
@@ -167,84 +189,85 @@ class _ImageAnnotationDialogState extends State<ImageAnnotationDialog> {
           ),
           const SizedBox(height: 12),
 
-          // Drawing Area
-          Flexible(
-            child: RepaintBoundary(
-              key: _globalKey,
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 400),
-                decoration: BoxDecoration(
-                  color: Colors.white, // White paper background
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black12, blurRadius: 4),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Base Image (if provided)
-                      if (widget.imageUrl != null)
-                        Image.network(
-                          widget.imageUrl!,
-                          fit: BoxFit.contain,
-                          loadingBuilder: (context, child, event) {
-                            if (event == null) return child;
-                            return const Center(child: CircularProgressIndicator());
-                          },
-                        )
-                      else
-                        // Blank Paper Mode: Just a container that fills space
-                        Container(
-                          width: double.infinity,
-                          height: 500, // Default height for blank paper
-                          color: Colors.white,
-                          child: CustomPaint(
-                            painter: _PaperLinesPainter(), // Optional: Add lines
+          // Drawing Area - Fixed size for reliable capture
+          Expanded(
+            child: Center(
+              child: RepaintBoundary(
+                key: _globalKey,
+                child: Container(
+                  width: 600,
+                  height: 500,
+                  decoration: BoxDecoration(
+                    color: Colors.white, // White paper background
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black12, blurRadius: 4),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Base Image (if provided)
+                        if (widget.imageUrl != null)
+                          Image.network(
+                            widget.imageUrl!,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, event) {
+                              if (event == null) return child;
+                              return const Center(child: CircularProgressIndicator());
+                            },
+                          )
+                        else
+                          // Blank Paper Mode: Just a container that fills space
+                          Container(
+                            width: 600,
+                            height: 500,
+                            color: Colors.white,
+                            child: CustomPaint(
+                              size: const Size(600, 500),
+                              painter: _PaperLinesPainter(), // Optional: Add lines
+                            ),
+                          ),
+
+                        // Gesture Detector & Custom Paint
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onPanStart: (details) {
+                              _saveToHistory();
+                              _addPoint(DrawingPoint(
+                                offset: details.localPosition,
+                                paint: Paint()
+                                  ..color = _selectedColor
+                                  ..isAntiAlias = true
+                                  ..strokeWidth = _strokeWidth
+                                  ..strokeCap = StrokeCap.round
+                                  ..strokeJoin = StrokeJoin.round,
+                              ));
+                            },
+                            onPanUpdate: (details) {
+                              _addPoint(DrawingPoint(
+                                offset: details.localPosition,
+                                paint: Paint()
+                                  ..color = _selectedColor
+                                  ..isAntiAlias = true
+                                  ..strokeWidth = _strokeWidth
+                                  ..strokeCap = StrokeCap.round
+                                  ..strokeJoin = StrokeJoin.round,
+                              ));
+                            },
+                            onPanEnd: (details) {
+                              _addPoint(null); // End of line
+                            },
+                            child: CustomPaint(
+                              size: const Size(600, 500),
+                              painter: _AnnotationPainter(_points),
+                            ),
                           ),
                         ),
-
-                      // Gesture Detector & Custom Paint
-                      Positioned.fill(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return GestureDetector(
-                              onPanStart: (details) {
-                                _saveToHistory();
-                                _addPoint(DrawingPoint(
-                                  offset: details.localPosition,
-                                  paint: Paint()
-                                    ..color = _selectedColor
-                                    ..isAntiAlias = true
-                                    ..strokeWidth = _strokeWidth
-                                    ..strokeCap = StrokeCap.round
-                                    ..strokeJoin = StrokeJoin.round,
-                                ));
-                              },
-                              onPanUpdate: (details) {
-                                _addPoint(DrawingPoint(
-                                  offset: details.localPosition,
-                                  paint: Paint()
-                                    ..color = _selectedColor
-                                    ..isAntiAlias = true
-                                    ..strokeWidth = _strokeWidth
-                                    ..strokeCap = StrokeCap.round
-                                    ..strokeJoin = StrokeJoin.round,
-                                ));
-                              },
-                              onPanEnd: (details) {
-                                _addPoint(null); // End of line
-                              },
-                              child: CustomPaint(
-                                painter: _AnnotationPainter(_points),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

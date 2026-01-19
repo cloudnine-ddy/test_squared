@@ -119,16 +119,20 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
   }
 
   Future<void> _addSketch() async {
+    print('[Note] Opening sketch dialog...');
     final newUrl = await showDialog<String>(
       context: context,
       builder: (context) => const ImageAnnotationDialog(imageUrl: null),
     );
 
+    print('[Note] Sketch dialog returned: $newUrl');
     if (newUrl != null && mounted) {
+      print('[Note] Adding URL to _imageUrls. Current count: ${_imageUrls.length}');
       setState(() {
         _imageUrls.add(newUrl);
         _hasChanges = true;
       });
+      print('[Note] After adding: ${_imageUrls.length} images');
     }
   }
 
@@ -154,8 +158,11 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
     // Clamp dimensions
     _width = _width.clamp(320.0, 800.0);
     _height = _height.clamp(300.0, 800.0);
-    
+
     final wordCount = _controller.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+
+    // Debug: print image count on each build
+    print('[Note] Build called. Image count: ${_imageUrls.length}');
 
     return SizedBox(
       width: _width,
@@ -196,7 +203,7 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
                     ),
                   ),
                 ),
-                
+
                 // Divider
                 Container(
                   height: 1,
@@ -211,11 +218,32 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Images Section (show at top so it's visible!)
+                        if (_imageUrls.isNotEmpty) ...[
+                          Text(
+                            'Attachments (${_imageUrls.length})',
+                            style: _patrickHand(
+                              fontSize: 14,
+                              color: _primaryColor.withValues(alpha: 0.6),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: _imageUrls.map((url) => _buildImageThumbnail(url)).toList(),
+                          ),
+                          const SizedBox(height: 16),
+                          Divider(color: _primaryColor.withValues(alpha: 0.1)),
+                          const SizedBox(height: 8),
+                        ],
+
                         // Text Input
                         TextField(
                           controller: _controller,
                           maxLines: null,
-                          minLines: 8,
+                          minLines: _imageUrls.isEmpty ? 8 : 4, // Reduce when images present
                           style: _patrickHand(fontSize: 18, height: 1.4),
                           decoration: InputDecoration(
                             hintText: 'Write your thoughts here...',
@@ -224,16 +252,6 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                         ),
-
-                        const SizedBox(height: 16),
-
-                        // Images
-                        if (_imageUrls.isNotEmpty)
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 12,
-                            children: _imageUrls.map((url) => _buildImageThumbnail(url)).toList(),
-                          ),
                       ],
                     ),
                   ),
@@ -276,9 +294,9 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
                            TextButton(
                             onPressed: widget.onClose,
                             child: Text(
-                              'Cancel', 
+                              'Cancel',
                               style: _patrickHand(
-                                color: _primaryColor.withValues(alpha: 0.7), 
+                                color: _primaryColor.withValues(alpha: 0.7),
                                 fontWeight: FontWeight.bold
                               )
                             ),
@@ -369,6 +387,7 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
   }
 
   Widget _buildImageThumbnail(String url) {
+    print('[Note] Building thumbnail for: $url');
     return WiredCard(
       padding: const EdgeInsets.all(4),
       backgroundColor: Colors.white,
@@ -383,8 +402,36 @@ class _DraggableNoteWidgetState extends State<DraggableNoteWidget> {
                 width: 70,
                 height: 70,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                  Container(width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.broken_image, size: 20)),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    width: 70,
+                    height: 70,
+                    color: Colors.grey[100],
+                    child: const Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  print('[Note] Image load error: $error');
+                  return Container(
+                    width: 70,
+                    height: 70,
+                    color: Colors.grey[200],
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.broken_image, size: 20, color: Colors.grey),
+                        Text('Error', style: TextStyle(fontSize: 8, color: Colors.grey)),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
           ),
