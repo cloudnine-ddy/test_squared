@@ -321,6 +321,14 @@ class VendingPage extends StatelessWidget {
               ),
             ),
             
+            const SizedBox(height: 80),
+
+            // Section Divider
+            _buildSectionDivider(),
+
+            // NEW: Teacher Endorsement Section
+            _buildTeacherEndorsementSection(context),
+
             const SizedBox(height: 100),
 
             // Section Divider
@@ -399,6 +407,207 @@ class VendingPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Teacher Endorsement Section
+  Widget _buildTeacherEndorsementSection(BuildContext context) {
+    final teachers = [
+      {
+        'name': 'Cikgu Kalai',
+        'role': 'Sejarah Teacher',
+        'photo': 'lib/core/assets/images/teacher_cikgu_kalai.png',
+        'highlights': [
+          '23+ years teaching in KL & Selangor',
+          'Runs her own tuition centre',
+          'SPM seminar specialist',
+        ],
+        'color': const Color(0xFFFFF59D), // Yellow sticky note
+      },
+      {
+        'name': 'Lee Min Kyung',
+        'role': 'IGCSE Computer Science Teacher',
+        'photo': 'lib/core/assets/images/teacher_lee_min_kyung.jpg',
+        'highlights': [
+          'Computer Science graduate from HKU',
+          'Teaching IGCSE in Vietnam',
+          'Expert in exam techniques & problem-solving',
+        ],
+        'color': const Color(0xFFB2EBF2), // Cyan sticky note
+      },
+    ];
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 1000),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        children: [
+          // Section Header
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Icon(
+                Icons.school_outlined,
+                color: _primaryColor.withValues(alpha: 0.6),
+                size: 36,
+              ),
+              Text(
+                'Trusted by Educators',
+                textAlign: TextAlign.center,
+                style: _patrickHand(
+                  fontSize: MediaQuery.of(context).size.width > 600 ? 52 : 36,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Hear from teachers who love Test²',
+            style: _patrickHand(
+              fontSize: 20,
+              color: _primaryColor.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 48),
+
+          // Teacher Cards
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 700;
+              
+              if (isWide) {
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: teachers.map((t) => Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _buildTeacherCard(t),
+                      ),
+                    )).toList(),
+                  ),
+                );
+              } else {
+                return Column(
+                  children: teachers.map((t) => Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: _buildTeacherCard(t),
+                  )).toList(),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeacherCard(Map<String, dynamic> teacher) {
+    final color = teacher['color'] as Color;
+    final highlights = teacher['highlights'] as List<String>;
+    final photo = teacher['photo'] as String?;
+    
+    return Transform.rotate(
+      angle: teacher['name'] == 'Cikgu Kalai' ? -0.02 : 0.02,
+      child: WiredCard(
+        backgroundColor: color,
+        borderColor: _primaryColor.withValues(alpha: 0.4),
+        borderWidth: 2,
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Circular Photo
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _primaryColor.withValues(alpha: 0.5),
+                  width: 3,
+                ),
+                image: photo != null
+                    ? DecorationImage(
+                        image: AssetImage(photo),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: photo == null
+                  ? Center(
+                      child: Icon(
+                        Icons.person,
+                        size: 60,
+                        color: _primaryColor.withValues(alpha: 0.4),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 20),
+            
+            // Name
+            Text(
+              teacher['name'] as String,
+              style: _patrickHand(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: _primaryColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            
+            // Role
+            Text(
+              teacher['role'] as String,
+              style: _patrickHand(
+                fontSize: 16,
+                color: _primaryColor.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Sketchy Divider
+            WiredDivider(
+              color: _primaryColor.withValues(alpha: 0.3),
+              thickness: 1.5,
+            ),
+            const SizedBox(height: 16),
+            
+            // Highlights (Bullet Points)
+            ...highlights.map((highlight) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '• ',
+                    style: _patrickHand(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _primaryColor,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      highlight,
+                      style: _patrickHand(
+                        fontSize: 17,
+                        color: _primaryColor.withValues(alpha: 0.85),
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+          ],
+        ),
       ),
     );
   }
