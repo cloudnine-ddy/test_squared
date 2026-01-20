@@ -16,6 +16,12 @@ class DashboardShell extends ConsumerStatefulWidget {
 
   // Static callback to refresh pinned subjects
   static VoidCallback? _refreshCallback;
+  
+  // Static getter for current curriculum
+  static String? _currentCurriculum;
+  
+  /// Get the current selected curriculum from anywhere
+  static String get currentCurriculum => _currentCurriculum ?? 'IGCSE';
 
   /// Call this from anywhere to refresh pinned subjects in the sidebar
   static void refreshPinnedSubjects() {
@@ -43,7 +49,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
 
   final List<String> _curriculums = [
     'IGCSE',
-    'SPM (Coming Soon)',
+    'SPM',
     'A-Level (Coming Soon)',
   ];
 
@@ -70,6 +76,8 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
     super.initState();
     // Register this instance's refresh method as the static callback
     DashboardShell._registerRefreshCallback(_refreshPinnedSubjects);
+    // Initialize static curriculum
+    DashboardShell._currentCurriculum = _selectedCurriculum;
     _refreshPinnedSubjects();
   }
 
@@ -77,7 +85,9 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   Future<void> _refreshPinnedSubjects() async {
     setState(() => _isLoadingPinnedSubjects = true);
     try {
-      final subjects = await PastPaperRepository().getPinnedSubjects();
+      final subjects = await PastPaperRepository().getPinnedSubjects(
+        curriculum: _selectedCurriculum,
+      );
       if (mounted) {
         setState(() {
           _pinnedSubjects = subjects;
@@ -94,7 +104,7 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
   void _showSubjectSelector(BuildContext context) async {
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => const ExploreSubjectsSheet(),
+      builder: (context) => ExploreSubjectsSheet(curriculum: _selectedCurriculum),
     );
 
     if (result != null && context.mounted) {
@@ -161,7 +171,12 @@ class _DashboardShellState extends ConsumerState<DashboardShell> {
                           ToastService.showWarning('This curriculum is coming soon!');
                           return;
                         }
-                        setState(() => _selectedCurriculum = newValue);
+                        setState(() {
+                          _selectedCurriculum = newValue;
+                          DashboardShell._currentCurriculum = newValue;
+                        });
+                        // Refresh pinned subjects for the new curriculum
+                        _refreshPinnedSubjects();
                       },
                     ),
                   ),

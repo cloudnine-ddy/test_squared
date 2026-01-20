@@ -327,7 +327,9 @@ class PastPaperRepository {
     }
   }
 
-  Future<List<SubjectModel>> getPinnedSubjects() async {
+  /// Get pinned subjects, optionally filtered by curriculum.
+  /// Since each subject has a curriculum field, we filter after fetching.
+  Future<List<SubjectModel>> getPinnedSubjects({String? curriculum}) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {
@@ -341,7 +343,17 @@ class PastPaperRepository {
           .eq('id', user.id)
           .single();
 
-      final List<dynamic> pinnedIds = profileResponse['pinned_subject_ids'] ?? [];
+      final dynamic rawPinnedData = profileResponse['pinned_subject_ids'];
+      
+      if (rawPinnedData == null) {
+        return [];
+      }
+
+      // pinned_subject_ids is a UUID array
+      List<String> pinnedIds = [];
+      if (rawPinnedData is List) {
+        pinnedIds = rawPinnedData.map((e) => e.toString()).toList();
+      }
 
       if (pinnedIds.isEmpty) {
         return [];
@@ -351,7 +363,7 @@ class PastPaperRepository {
       final subjectsResponse = await _supabase
           .from('subjects')
           .select()
-          .inFilter('id', pinnedIds.map((e) => e.toString()).toList());
+          .inFilter('id', pinnedIds);
 
       final List<dynamic> data = subjectsResponse as List<dynamic>;
 
@@ -359,7 +371,15 @@ class PastPaperRepository {
       for (var item in data) {
         try {
           if (item is Map<String, dynamic>) {
-            subjects.add(SubjectModel.fromMap(item));
+            // If curriculum specified, filter by curriculum
+            if (curriculum != null) {
+              final subjectCurriculum = item['curriculum']?.toString();
+              if (subjectCurriculum == curriculum) {
+                subjects.add(SubjectModel.fromMap(item));
+              }
+            } else {
+              subjects.add(SubjectModel.fromMap(item));
+            }
           }
         } catch (e) {
           print('Skipping bad subject: $e');
@@ -374,7 +394,8 @@ class PastPaperRepository {
     }
   }
 
-  Future<void> pinSubject(String subjectId) async {
+  /// Pin a subject (curriculum parameter kept for API consistency but not used for storage)
+  Future<void> pinSubject(String subjectId, {String? curriculum}) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {
@@ -407,7 +428,8 @@ class PastPaperRepository {
     }
   }
 
-  Future<void> unpinSubject(String subjectId) async {
+  /// Unpin a subject (curriculum parameter kept for API consistency but not used for storage)
+  Future<void> unpinSubject(String subjectId, {String? curriculum}) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) {

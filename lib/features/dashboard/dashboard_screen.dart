@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../past_papers/data/past_paper_repository.dart';
 import '../past_papers/models/subject_model.dart';
 import '../../shared/wired/wired_widgets.dart';
+import 'dashboard_shell.dart';
 import 'subject_detail_view.dart';
 import 'widgets/dashboard_empty_state.dart';
 import 'widgets/explore_subjects_sheet.dart';
@@ -68,7 +69,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _loadPinnedSubjects() async {
     try {
-      final subjects = await PastPaperRepository().getPinnedSubjects();
+      final subjects = await PastPaperRepository().getPinnedSubjects(
+        curriculum: DashboardShell.currentCurriculum,
+      );
       if (context.mounted) {
         setState(() {
           _pinnedSubjects = subjects;
@@ -128,7 +131,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _showSubjectSelector(BuildContext context) async {
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => const ExploreSubjectsSheet(),
+      builder: (context) => const ExploreSubjectsSheet(curriculum: 'IGCSE'),
     );
 
     if (result != null && context.mounted) {

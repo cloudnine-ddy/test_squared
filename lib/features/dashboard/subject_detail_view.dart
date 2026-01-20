@@ -193,9 +193,13 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
     });
 
     try {
+      final curriculum = DashboardShell.currentCurriculum;
       if (_isPinned) {
         // Unpin the subject
-        await PastPaperRepository().unpinSubject(widget.subjectId);
+        await PastPaperRepository().unpinSubject(
+          widget.subjectId,
+          curriculum: curriculum,
+        );
         setState(() {
           _isPinned = false;
         });
@@ -204,7 +208,10 @@ class _SubjectDetailViewState extends State<SubjectDetailView> {
         }
       } else {
         // Pin the subject
-        await PastPaperRepository().pinSubject(widget.subjectId);
+        await PastPaperRepository().pinSubject(
+          widget.subjectId,
+          curriculum: curriculum,
+        );
         setState(() {
           _isPinned = true;
         });
