@@ -131,7 +131,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void _showSubjectSelector(BuildContext context) async {
     final result = await showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => const ExploreSubjectsSheet(curriculum: 'IGCSE'),
+      builder: (context) => ExploreSubjectsSheet(
+        curriculum: DashboardShell.currentCurriculum,
+      ),
     );
 
     if (result != null && context.mounted) {
